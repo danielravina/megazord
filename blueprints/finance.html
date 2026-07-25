@@ -1,0 +1,943 @@
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>מנהל כספים - ליבה</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      /* Custom scrollbar for tables */
+      .table-container::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      .table-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      .table-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      .tab-active {
+        border-bottom: 2px solid #3b82f6;
+        color: #3b82f6;
+        font-weight: bold;
+      }
+      .tab-inactive {
+        color: #64748b;
+      }
+      .tab-inactive:hover {
+        color: #3b82f6;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+    <div class="max-w-5xl mx-auto p-4 md:p-6">
+      <!-- Header & Totals -->
+      <header class="mb-8">
+        <h1 class="text-3xl font-bold mb-6 text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-wallet text-blue-600"></i>
+          ניהול כספים
+        </h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between"
+          >
+            <div>
+              <p class="text-sm text-slate-500 mb-1">סך הכנסות</p>
+              <p class="text-3xl font-bold text-emerald-600" id="total-incomes">₪ 0</p>
+            </div>
+            <div
+              class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-xl"
+            >
+              <i class="fa-solid fa-arrow-trend-up"></i>
+            </div>
+          </div>
+
+          <div
+            class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between"
+          >
+            <div>
+              <p class="text-sm text-slate-500 mb-1">סך הוצאות</p>
+              <p class="text-3xl font-bold text-rose-600" id="total-expenses">₪ 0</p>
+            </div>
+            <div
+              class="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 text-xl"
+            >
+              <i class="fa-solid fa-arrow-trend-down"></i>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content Box -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- Tabs -->
+        <div class="flex border-b border-slate-200 px-2" id="tabs">
+          <button class="px-6 py-4 tab-active" onclick="switchTab('dashboard')">
+            <i class="fa-solid fa-chart-pie ml-2"></i> לוח בקרה
+          </button>
+          <button class="px-6 py-4 tab-inactive" onclick="switchTab('incomes')">
+            <i class="fa-solid fa-coins ml-2"></i> הכנסות
+          </button>
+          <button class="px-6 py-4 tab-inactive" onclick="switchTab('expenses')">
+            <i class="fa-solid fa-receipt ml-2"></i> הוצאות
+          </button>
+          <button class="px-6 py-4 tab-inactive" onclick="switchTab('taxes')">
+            <i class="fa-solid fa-scale-balanced ml-2"></i> מנוע מיסים
+          </button>
+          <button class="px-6 py-4 tab-inactive" onclick="switchTab('savings')">
+            <i class="fa-solid fa-piggy-bank ml-2"></i> חסכונות
+          </button>
+        </div>
+
+        <div class="p-6">
+          <!-- Loading State -->
+          <div id="loading" class="text-center py-10">
+            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500 mb-2"></i>
+            <p class="text-slate-500">טוען נתונים...</p>
+          </div>
+
+          <!-- Dashboard Section -->
+          <div id="section-dashboard" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div class="bg-indigo-50 border border-indigo-100 p-5 rounded-xl shadow-sm">
+                <h3 class="text-sm font-medium text-indigo-800 mb-1">הכנסות נטו (מוערך)</h3>
+                <p class="text-3xl font-bold text-indigo-600" id="dash-net-income">₪ 0</p>
+              </div>
+              <div class="bg-amber-50 border border-amber-100 p-5 rounded-xl shadow-sm">
+                <h3 class="text-sm font-medium text-amber-800 mb-1">הוצאות עסקיות</h3>
+                <p class="text-3xl font-bold text-amber-600" id="dash-expenses">₪ 0</p>
+              </div>
+              <div class="bg-rose-50 border border-rose-100 p-5 rounded-xl shadow-sm">
+                <h3 class="text-sm font-medium text-rose-800 mb-1">חבות מס כוללת</h3>
+                <p class="text-3xl font-bold text-rose-600" id="dash-total-tax">₪ 0</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">
+                  חלוקת חבויות מס וניכויים
+                </h3>
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center">
+                    <div class="flex flex-col">
+                      <span class="text-slate-600">מע"מ (מגולם)</span>
+                      <span class="text-xs text-blue-500" id="due-vat">-</span>
+                    </div>
+                    <span class="font-bold text-slate-800" id="tax-calc-vat">₪ 0</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <div class="flex flex-col">
+                      <span class="text-slate-600">מקדמות מס הכנסה</span>
+                      <span class="text-xs text-blue-500" id="due-income">-</span>
+                    </div>
+                    <span class="font-bold text-slate-800" id="tax-calc-income">₪ 0</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <div class="flex flex-col">
+                      <span class="text-slate-600">ביטוח לאומי</span>
+                      <span class="text-xs text-blue-500" id="due-btl">-</span>
+                    </div>
+                    <span class="font-bold text-slate-800" id="tax-calc-btl">₪ 0</span>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">מאזן כספי</h3>
+                <div class="h-48 relative">
+                  <canvas id="financeChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Incomes Section -->
+          <div id="section-incomes" class="hidden">
+            <form
+              id="form-income"
+              class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 bg-slate-50 p-4 rounded-lg border border-slate-100"
+            >
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">תיאור</label>
+                <input
+                  type="text"
+                  id="inc-desc"
+                  required
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">סכום (₪)</label>
+                <input
+                  type="number"
+                  id="inc-amount"
+                  required
+                  min="0"
+                  step="0.01"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">תאריך</label>
+                <input
+                  type="date"
+                  id="inc-date"
+                  required
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">סוג</label>
+                <select
+                  id="inc-type"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                >
+                  <option value="שוטף">שוטף</option>
+                  <option value="עתידי">עתידי</option>
+                </select>
+              </div>
+              <div class="md:col-span-5 flex justify-end mt-2">
+                <button
+                  type="submit"
+                  class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"
+                >
+                  <i class="fa-solid fa-plus"></i> הוסף הכנסה
+                </button>
+              </div>
+            </form>
+
+            <div class="table-container overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      תאריך
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      תיאור
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      סוג
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      סכום
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="table-incomes" class="bg-white divide-y divide-slate-200">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+              <div id="empty-incomes" class="hidden text-center py-8 text-slate-500">
+                אין הכנסות להצגה.
+              </div>
+            </div>
+          </div>
+
+          <!-- Expenses Section -->
+          <div id="section-expenses" class="hidden">
+            <form
+              id="form-expense"
+              class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8 bg-slate-50 p-4 rounded-lg border border-slate-100"
+            >
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">תיאור</label>
+                <input
+                  type="text"
+                  id="exp-desc"
+                  required
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">סכום (₪)</label>
+                <input
+                  type="number"
+                  id="exp-amount"
+                  required
+                  min="0"
+                  step="0.01"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">תאריך</label>
+                <input
+                  type="date"
+                  id="exp-date"
+                  required
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">קטגוריה</label>
+                <select
+                  id="exp-category"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                >
+                  <option value="שיווק">שיווק</option>
+                  <option value="שכירות">שכירות</option>
+                  <option value="חשבונות">חשבונות</option>
+                  <option value="פרויקט">פרויקט</option>
+                  <option value="רכש">רכש</option>
+                  <option value="הפרשות">הפרשות</option>
+                </select>
+              </div>
+              <div class="flex items-center mt-6">
+                <input
+                  type="checkbox"
+                  id="exp-paid"
+                  class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded ml-2"
+                />
+                <label for="exp-paid" class="text-sm font-medium text-slate-700">שולם?</label>
+              </div>
+              <div class="md:col-span-6 flex justify-end mt-2">
+                <button
+                  type="submit"
+                  class="bg-rose-600 text-white px-4 py-2 rounded-md hover:bg-rose-700 transition flex items-center gap-2 shadow-sm"
+                >
+                  <i class="fa-solid fa-plus"></i> הוסף הוצאה
+                </button>
+              </div>
+            </form>
+
+            <div class="table-container overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      תאריך
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      תיאור
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      קטגוריה
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      סטטוס
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      סכום
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="table-expenses" class="bg-white divide-y divide-slate-200">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+              <div id="empty-expenses" class="hidden text-center py-8 text-slate-500">
+                אין הוצאות להצגה.
+              </div>
+            </div>
+          </div>
+
+          <!-- Taxes Section -->
+          <div id="section-taxes" class="hidden">
+            <form
+              id="form-taxes"
+              class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-lg border border-slate-100"
+            >
+              <div class="md:col-span-2 mb-2">
+                <h3 class="text-lg font-bold text-slate-800 border-b pb-2">
+                  הגדרות מיסים ומועדי חיוב
+                </h3>
+                <p class="text-sm text-slate-500 mt-1">
+                  עדכן את האחוזים ומועדי החיוב של הרשויות לחישוב מדויק של חבויות המס ותזרים
+                  המזומנים.
+                </p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">מע"מ (%)</label>
+                <input
+                  type="number"
+                  id="tax-vat-rate"
+                  required
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value="17"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1"
+                  >יום חיוב מע"מ בחודש</label
+                >
+                <input
+                  type="number"
+                  id="tax-vat-day"
+                  required
+                  min="1"
+                  max="31"
+                  value="15"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1"
+                  >תדירות דיווח מע"מ</label
+                >
+                <select
+                  id="tax-vat-freq"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                >
+                  <option value="bimonthly">דו-חודשי</option>
+                  <option value="monthly">חודשי</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1"
+                  >מקדמות מס הכנסה (%)</label
+                >
+                <input
+                  type="number"
+                  id="tax-income-adv"
+                  required
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value="0"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1"
+                  >יום חיוב מס הכנסה</label
+                >
+                <input
+                  type="number"
+                  id="tax-income-day"
+                  required
+                  min="1"
+                  max="31"
+                  value="15"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1"
+                  >ביטוח לאומי - מקדמות (%)</label
+                >
+                <input
+                  type="number"
+                  id="tax-btl-adv"
+                  required
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value="5"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1"
+                  >יום חיוב ביטוח לאומי</label
+                >
+                <input
+                  type="number"
+                  id="tax-btl-day"
+                  required
+                  min="1"
+                  max="31"
+                  value="15"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1"
+                  >נקודות זכות (מס הכנסה)</label
+                >
+                <input
+                  type="number"
+                  id="tax-credit-pts"
+                  required
+                  min="0"
+                  max="20"
+                  step="0.25"
+                  value="2.25"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                />
+              </div>
+
+              <div class="md:col-span-2 flex justify-end mt-4">
+                <button
+                  type="submit"
+                  class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"
+                >
+                  <i class="fa-solid fa-save"></i> שמור הגדרות מיסים
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Savings Section -->
+          <div id="section-savings" class="hidden">
+            <form
+              id="form-saving"
+              class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 bg-slate-50 p-4 rounded-lg border border-slate-100"
+            >
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">סוג הקופה / קרן</label>
+                <select
+                  id="sav-type"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 border p-2"
+                >
+                  <option value="קרן השתלמות">קרן השתלמות</option>
+                  <option value="פנסיה">פנסיה</option>
+                  <option value="קופת גמל">קופת גמל להשקעה</option>
+                  <option value="אחר">אחר</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">תאריך הפקדה</label>
+                <input
+                  type="date"
+                  id="sav-date"
+                  required
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 border p-2"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">סכום ההפקדה (₪)</label>
+                <input
+                  type="number"
+                  id="sav-amount"
+                  required
+                  min="0"
+                  step="0.01"
+                  class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 border p-2"
+                />
+              </div>
+              <div class="flex items-end">
+                <button
+                  type="submit"
+                  class="w-full bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700 transition flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <i class="fa-solid fa-plus"></i> הוסף הפקדה
+                </button>
+              </div>
+            </form>
+
+            <div class="table-container overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      תאריך
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      סוג הקרן
+                    </th>
+                    <th
+                      class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider"
+                    >
+                      סכום שהופקד
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="table-savings" class="bg-white divide-y divide-slate-200">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+              <div id="empty-savings" class="hidden text-center py-8 text-slate-500">
+                אין הפקדות להצגה.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // State
+      let incomes = [];
+      let expenses = [];
+      let savings = [];
+      let taxSettings = {
+        vatRate: 17,
+        vatFrequency: "bimonthly",
+        incomeTaxAdvance: 0,
+        bituahLeumi: 5,
+        creditPoints: 2.25,
+      };
+      let currentTab = "dashboard";
+      let financeChartInstance = null;
+
+      // Formatters
+      const formatCurrency = (amount) =>
+        new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS" }).format(amount);
+      const formatDate = (dateString) => new Date(dateString).toLocaleDateString("he-IL");
+      const generateId = () => Math.random().toString(36).substring(2, 9);
+
+      // Elements
+      const loadingEl = document.getElementById("loading");
+      const sectionDashboard = document.getElementById("section-dashboard");
+      const sectionIncomes = document.getElementById("section-incomes");
+      const sectionExpenses = document.getElementById("section-expenses");
+      const sectionTaxes = document.getElementById("section-taxes");
+      const sectionSavings = document.getElementById("section-savings");
+      const totalIncomesEl = document.getElementById("total-incomes");
+      const totalExpensesEl = document.getElementById("total-expenses");
+
+      // Tab Switching
+      function switchTab(tab) {
+        currentTab = tab;
+        const buttons = document.querySelectorAll("#tabs button");
+
+        if (buttons[0])
+          buttons[0].className =
+            tab === "dashboard" ? "px-6 py-4 tab-active" : "px-6 py-4 tab-inactive";
+        if (buttons[1])
+          buttons[1].className =
+            tab === "incomes" ? "px-6 py-4 tab-active" : "px-6 py-4 tab-inactive";
+        if (buttons[2])
+          buttons[2].className =
+            tab === "expenses" ? "px-6 py-4 tab-active" : "px-6 py-4 tab-inactive";
+        if (buttons[3])
+          buttons[3].className =
+            tab === "taxes" ? "px-6 py-4 tab-active" : "px-6 py-4 tab-inactive";
+        if (buttons[4])
+          buttons[4].className =
+            tab === "savings" ? "px-6 py-4 tab-active" : "px-6 py-4 tab-inactive";
+
+        sectionDashboard.classList.toggle("hidden", tab !== "dashboard");
+        sectionIncomes.classList.toggle("hidden", tab !== "incomes");
+        sectionExpenses.classList.toggle("hidden", tab !== "expenses");
+        sectionTaxes.classList.toggle("hidden", tab !== "taxes");
+        sectionSavings.classList.toggle("hidden", tab !== "savings");
+
+        if (tab === "dashboard" && typeof renderDashboard === "function") renderDashboard();
+      }
+
+      // Render Functions
+      function getNextOccurrence(day) {
+        if (!day) return "-";
+        const today = new Date();
+        let targetDate = new Date(today.getFullYear(), today.getMonth(), day);
+        if (today.getDate() >= day) {
+          targetDate.setMonth(today.getMonth() + 1);
+        }
+        return targetDate.toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
+      }
+
+      function renderDashboard() {
+        const sumIncomes = incomes.reduce((sum, item) => sum + Number(item.amount), 0);
+        const baseExpenses = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
+        const sumSavings = savings.reduce((sum, item) => sum + Number(item.amount), 0);
+        const sumExpenses = baseExpenses + sumSavings; // Savings act as an expense for cashflow
+
+        const vatRate = (taxSettings.vatRate || 17) / 100;
+        const vatTotal = sumIncomes - sumIncomes / (1 + vatRate);
+
+        const grossWithoutVat = sumIncomes - vatTotal;
+        const incomeTaxAdvTotal = grossWithoutVat * ((taxSettings.incomeTaxAdvance || 0) / 100);
+        const btlAdvTotal = grossWithoutVat * ((taxSettings.bituahLeumi || 5) / 100);
+
+        const totalTax = vatTotal + incomeTaxAdvTotal + btlAdvTotal;
+        const netIncome = sumIncomes - totalTax - sumExpenses;
+
+        document.getElementById("dash-net-income").textContent = formatCurrency(netIncome);
+        document.getElementById("dash-expenses").textContent = formatCurrency(sumExpenses);
+        document.getElementById("dash-total-tax").textContent = formatCurrency(totalTax);
+
+        document.getElementById("tax-calc-vat").textContent = formatCurrency(vatTotal);
+        document.getElementById("tax-calc-income").textContent = formatCurrency(incomeTaxAdvTotal);
+        document.getElementById("tax-calc-btl").textContent = formatCurrency(btlAdvTotal);
+
+        // Set due dates
+        document.getElementById("due-vat").textContent =
+          `חיוב הבא: ${getNextOccurrence(taxSettings.vatBillingDay || 15)}`;
+        document.getElementById("due-income").textContent =
+          `חיוב הבא: ${getNextOccurrence(taxSettings.incomeTaxBillingDay || 15)}`;
+        document.getElementById("due-btl").textContent =
+          `חיוב הבא: ${getNextOccurrence(taxSettings.bituahLeumiBillingDay || 15)}`;
+
+        const ctx = document.getElementById("financeChart");
+        if (ctx) {
+          if (financeChartInstance) financeChartInstance.destroy();
+          financeChartInstance = new Chart(ctx, {
+            type: "doughnut",
+            data: {
+              labels: ["נטו רווח", "הוצאות מוכרות", 'מיסים (מע"מ, מס הכנסה, בט"ל)'],
+              datasets: [
+                {
+                  data: [Math.max(0, netIncome), sumExpenses, totalTax],
+                  backgroundColor: ["#4f46e5", "#f59e0b", "#e11d48"],
+                },
+              ],
+            },
+            options: { responsive: true, maintainAspectRatio: false },
+          });
+        }
+      }
+
+      function renderTotals() {
+        const sumIncomes = incomes.reduce((sum, item) => sum + Number(item.amount), 0);
+        const sumExpenses = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
+        totalIncomesEl.textContent = formatCurrency(sumIncomes);
+        totalExpensesEl.textContent = formatCurrency(sumExpenses);
+        if (currentTab === "dashboard") renderDashboard();
+      }
+
+      function renderTables() {
+        // Incomes Table
+        const tbodyInc = document.getElementById("table-incomes");
+        const emptyInc = document.getElementById("empty-incomes");
+
+        if (incomes.length === 0) {
+          tbodyInc.innerHTML = "";
+          emptyInc.classList.remove("hidden");
+          tbodyInc.parentElement.classList.add("hidden");
+        } else {
+          emptyInc.classList.add("hidden");
+          tbodyInc.parentElement.classList.remove("hidden");
+          tbodyInc.innerHTML = incomes
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .map(
+              (inc) => `
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-500">${formatDate(inc.date)}</td>
+                        <td class="px-4 py-3 text-sm text-slate-900 font-medium">${inc.description}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${inc.type === "שוטף" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}">
+                                ${inc.type}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-emerald-600">${formatCurrency(inc.amount)}</td>
+                    </tr>
+                `,
+            )
+            .join("");
+        }
+
+        // Expenses Table
+        const tbodyExp = document.getElementById("table-expenses");
+        const emptyExp = document.getElementById("empty-expenses");
+
+        if (expenses.length === 0) {
+          tbodyExp.innerHTML = "";
+          emptyExp.classList.remove("hidden");
+          tbodyExp.parentElement.classList.add("hidden");
+        } else {
+          emptyExp.classList.add("hidden");
+          tbodyExp.parentElement.classList.remove("hidden");
+          tbodyExp.innerHTML = expenses
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .map(
+              (exp) => `
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-500">${formatDate(exp.date)}</td>
+                        <td class="px-4 py-3 text-sm text-slate-900 font-medium">${exp.description}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-500">${exp.category}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            ${
+                              exp.isPaid
+                                ? '<span class="text-emerald-500"><i class="fa-solid fa-check-circle"></i> שולם</span>'
+                                : '<span class="text-amber-500"><i class="fa-regular fa-clock"></i> ממתין</span>'
+                            }
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-rose-600">${formatCurrency(exp.amount)}</td>
+                    </tr>
+                `,
+            )
+            .join("");
+        }
+
+        // Savings Table
+        const tbodySav = document.getElementById("table-savings");
+        const emptySav = document.getElementById("empty-savings");
+
+        if (savings.length === 0) {
+          tbodySav.innerHTML = "";
+          emptySav.classList.remove("hidden");
+          tbodySav.parentElement.classList.add("hidden");
+        } else {
+          emptySav.classList.add("hidden");
+          tbodySav.parentElement.classList.remove("hidden");
+          tbodySav.innerHTML = savings
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .map(
+              (sav) => `
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-500">${formatDate(sav.date)}</td>
+                        <td class="px-4 py-3 text-sm text-slate-900 font-medium">${sav.fundType}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-teal-600">${formatCurrency(sav.amount)}</td>
+                    </tr>
+                `,
+            )
+            .join("");
+        }
+
+        renderTotals();
+      }
+
+      // Data Handling
+      async function loadData() {
+        try {
+          const [incomesData, expensesData, taxData, savingsData] = await Promise.all([
+            sdk.db.get("incomes").catch(() => []),
+            sdk.db.get("expenses").catch(() => []),
+            sdk.db.get("tax_settings").catch(() => null),
+            sdk.db.get("savings").catch(() => []),
+          ]);
+          incomes = Array.isArray(incomesData) ? incomesData : [];
+          expenses = Array.isArray(expensesData) ? expensesData : [];
+          savings = Array.isArray(savingsData) ? savingsData : [];
+          if (taxData) {
+            taxSettings = taxData;
+            document.getElementById("tax-vat-rate").value = taxSettings.vatRate ?? 17;
+            document.getElementById("tax-vat-day").value = taxSettings.vatBillingDay ?? 15;
+            document.getElementById("tax-vat-freq").value = taxSettings.vatFrequency || "bimonthly";
+            document.getElementById("tax-income-adv").value = taxSettings.incomeTaxAdvance ?? 0;
+            document.getElementById("tax-income-day").value = taxSettings.incomeTaxBillingDay ?? 15;
+            document.getElementById("tax-btl-adv").value = taxSettings.bituahLeumi ?? 5;
+            document.getElementById("tax-btl-day").value = taxSettings.bituahLeumiBillingDay ?? 15;
+            document.getElementById("tax-credit-pts").value = taxSettings.creditPoints ?? 2.25;
+          }
+        } catch (err) {
+          console.error("Failed to load data", err);
+        } finally {
+          loadingEl.classList.add("hidden");
+          switchTab(currentTab);
+          renderTables();
+        }
+      }
+
+      // Form Submissions
+      document.getElementById("form-income").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const newItem = {
+          id: generateId(),
+          description: document.getElementById("inc-desc").value,
+          amount: parseFloat(document.getElementById("inc-amount").value),
+          date: document.getElementById("inc-date").value,
+          type: document.getElementById("inc-type").value,
+        };
+
+        incomes.push(newItem);
+        renderTables();
+        e.target.reset();
+
+        // Optimistic save
+        try {
+          await sdk.db.set("incomes", incomes);
+        } catch (e) {
+          console.error("Save failed", e);
+        }
+      });
+
+      document.getElementById("form-expense").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const newItem = {
+          id: generateId(),
+          description: document.getElementById("exp-desc").value,
+          amount: parseFloat(document.getElementById("exp-amount").value),
+          date: document.getElementById("exp-date").value,
+          category: document.getElementById("exp-category").value,
+          isPaid: document.getElementById("exp-paid").checked,
+        };
+
+        expenses.push(newItem);
+        renderTables();
+        e.target.reset();
+
+        // Optimistic save
+        try {
+          await sdk.db.set("expenses", expenses);
+        } catch (e) {
+          console.error("Save failed", e);
+        }
+      });
+
+      document.getElementById("form-taxes").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> שומר...';
+
+        taxSettings = {
+          vatRate: parseFloat(document.getElementById("tax-vat-rate").value),
+          vatBillingDay: parseInt(document.getElementById("tax-vat-day").value),
+          vatFrequency: document.getElementById("tax-vat-freq").value,
+          incomeTaxAdvance: parseFloat(document.getElementById("tax-income-adv").value),
+          incomeTaxBillingDay: parseInt(document.getElementById("tax-income-day").value),
+          bituahLeumi: parseFloat(document.getElementById("tax-btl-adv").value),
+          bituahLeumiBillingDay: parseInt(document.getElementById("tax-btl-day").value),
+          creditPoints: parseFloat(document.getElementById("tax-credit-pts").value),
+        };
+
+        try {
+          await sdk.db.set("tax_settings", taxSettings);
+          btn.innerHTML = '<i class="fa-solid fa-check"></i> נשמר בהצלחה';
+          setTimeout(() => (btn.innerHTML = originalText), 2000);
+        } catch (err) {
+          console.error("Save failed", err);
+          btn.innerHTML = originalText;
+        }
+      });
+
+      document.getElementById("form-saving").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const newItem = {
+          id: generateId(),
+          fundType: document.getElementById("sav-type").value,
+          amount: parseFloat(document.getElementById("sav-amount").value),
+          date: document.getElementById("sav-date").value,
+        };
+
+        savings.push(newItem);
+        renderTables();
+        e.target.reset();
+
+        // Set default date back
+        document.getElementById("sav-date").value = new Date().toISOString().split("T")[0];
+
+        // Optimistic save
+        try {
+          await sdk.db.set("savings", savings);
+        } catch (e) {
+          console.error("Save failed", e);
+        }
+      });
+
+      // Initialize
+      // Set today's date as default in forms
+      const today = new Date().toISOString().split("T")[0];
+      document.getElementById("inc-date").value = today;
+      document.getElementById("exp-date").value = today;
+      if (document.getElementById("sav-date")) document.getElementById("sav-date").value = today;
+
+      loadData();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,351 @@
+
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מזג אוויר - Weather App</title>
+    <meta name="description" content="אפליקציית מזג אוויר נקייה ומתקדמת בעברית">
+    <style>
+        /* Custom scrollbar for a sleeker look */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+        /* Entrance animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-blue-50 text-slate-800 min-h-screen flex items-center justify-center p-4 font-sans selection:bg-blue-100">
+
+    <!-- Main App Container -->
+    <main class="w-full max-w-md bg-white border border-blue-100 rounded-3xl shadow-xl overflow-hidden relative">
+        
+        <!-- App Header -->
+        <header class="flex items-center justify-between p-6 pb-2">
+            <h1 class="text-xl font-bold tracking-tight text-slate-800">
+                <i class="fa-solid fa-cloud-sun text-blue-500 ml-2"></i> מזג אוויר
+            </h1>
+            <button id="refresh-btn" class="text-slate-400 hover:text-blue-600 transition-colors p-2 rounded-full hover:bg-blue-50" aria-label="רענן נתונים" style="display: none;">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </header>
+
+        <!-- Dynamic Content Area -->
+        <div id="content-area" class="p-6 pt-4 min-h-[400px] flex flex-col relative">
+            
+            <!-- Loading State -->
+            <div id="loading-view" class="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-10 transition-opacity duration-300">
+                <i class="fa-solid fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+                <p class="text-slate-500 font-medium" id="loading-text">מאתר מיקום...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error-view" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-white z-10 hidden">
+                <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-location-xmark text-2xl text-red-500"></i>
+                </div>
+                <h2 class="text-lg font-bold mb-2">שגיאה באיתור</h2>
+                <p id="error-message" class="text-slate-500 text-sm mb-6">לא הצלחנו לקבל את המיקום שלך.</p>
+                <button onclick="initApp()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium transition-colors">
+                    נסה שוב
+                </button>
+            </div>
+
+            <!-- Weather Data View (Hidden by default) -->
+            <div id="weather-view" class="hidden flex-col gap-6 fade-in">
+                
+                <!-- Current Weather Section -->
+                <section class="flex flex-col items-center text-center">
+                    <h2 id="location-name" class="text-sm font-medium text-slate-500 mb-1">המיקום שלי</h2>
+                    <div class="flex items-center justify-center gap-4 my-4">
+                        <div id="current-icon" class="text-6xl text-slate-800">
+                            <!-- Icon injected via JS -->
+                        </div>
+                        <div class="text-6xl font-light tracking-tighter" dir="ltr">
+                            <span id="current-temp">--</span><span class="text-4xl align-top text-blue-300">°</span>
+                        </div>
+                    </div>
+                    <p id="current-desc" class="text-xl font-semibold tracking-wide text-blue-600 mb-6">--</p>
+
+                    <!-- Extra Details Grid -->
+                    <div class="grid grid-cols-2 gap-3 w-full">
+                        <div class="bg-blue-50 rounded-2xl p-3 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                <i class="fa-solid fa-droplet text-sm"></i>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">לחות</p>
+                                <p id="current-humidity" class="text-sm font-bold text-slate-800" dir="ltr">--%</p>
+                            </div>
+                        </div>
+                        <div class="bg-teal-50 rounded-2xl p-3 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-600">
+                                <i class="fa-solid fa-wind text-sm"></i>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">רוח</p>
+                                <p class="text-sm font-bold flex items-center gap-1 text-slate-800" dir="rtl">
+                                    <span id="current-wind" dir="ltr">--</span>
+                                    <span class="text-[10px] text-slate-500 font-normal">קמ"ש</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <hr class="border-blue-50">
+
+                <!-- Forecast Section -->
+                <section>
+                    <h3 class="text-sm font-semibold text-slate-500 mb-4 flex items-center gap-2">
+                        <i class="fa-regular fa-calendar-days text-blue-500"></i> תחזית לשבוע הקרוב
+                    </h3>
+                    <div id="forecast-list" class="flex flex-col gap-1">
+                        <!-- Forecast items injected via JS -->
+                    </div>
+                </section>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Constants & WMO Weather Code Mapping to Hebrew and FontAwesome Icons
+        // Reference: https://open-meteo.com/en/docs
+        const WMO_CODES = {
+            0: { label: 'בהיר', icon: 'fa-sun text-yellow-400' },
+            1: { label: 'בהיר ברובו', icon: 'fa-sun text-yellow-400' },
+            2: { label: 'מעונן חלקי', icon: 'fa-cloud-sun text-gray-300' },
+            3: { label: 'מעונן', icon: 'fa-cloud text-gray-400' },
+            45: { label: 'ערפל', icon: 'fa-smog text-gray-400' },
+            48: { label: 'ערפל קופא', icon: 'fa-smog text-gray-300' },
+            51: { label: 'טפטוף קל', icon: 'fa-cloud-rain text-blue-300' },
+            53: { label: 'טפטוף מתון', icon: 'fa-cloud-rain text-blue-400' },
+            55: { label: 'טפטוף כבד', icon: 'fa-cloud-showers-heavy text-blue-500' },
+            56: { label: 'טפטוף קופא קל', icon: 'fa-cloud-meatball text-blue-200' },
+            57: { label: 'טפטוף קופא כבד', icon: 'fa-cloud-meatball text-blue-300' },
+            61: { label: 'גשם קל', icon: 'fa-cloud-rain text-blue-400' },
+            63: { label: 'גשם מתון', icon: 'fa-cloud-rain text-blue-500' },
+            65: { label: 'גשם כבד', icon: 'fa-cloud-showers-heavy text-blue-600' },
+            66: { label: 'גשם קופא קל', icon: 'fa-cloud-meatball text-blue-300' },
+            67: { label: 'גשם קופא כבד', icon: 'fa-cloud-meatball text-blue-400' },
+            71: { label: 'שלג קל', icon: 'fa-snowflake text-white' },
+            73: { label: 'שלג מתון', icon: 'fa-snowflake text-white' },
+            75: { label: 'שלג כבד', icon: 'fa-snowflake text-white' },
+            77: { label: 'גבישי קרח', icon: 'fa-icicles text-blue-200' },
+            80: { label: 'ממטרי גשם קלים', icon: 'fa-cloud-showers-water text-blue-400' },
+            81: { label: 'ממטרי גשם', icon: 'fa-cloud-showers-water text-blue-500' },
+            82: { label: 'ממטרי גשם כבדים', icon: 'fa-cloud-showers-heavy text-blue-600' },
+            85: { label: 'ממטרי שלג קלים', icon: 'fa-snowflake text-white' },
+            86: { label: 'ממטרי שלג כבדים', icon: 'fa-snowflake text-white' },
+            95: { label: 'סופת רעמים', icon: 'fa-cloud-bolt text-purple-400' },
+            96: { label: 'סופת רעמים וברד קל', icon: 'fa-cloud-bolt text-purple-500' },
+            99: { label: 'סופת רעמים וברד כבד', icon: 'fa-cloud-bolt text-purple-600' },
+        };
+
+        const FALLBACK_WEATHER = { label: 'לא ידוע', icon: 'fa-circle-question text-gray-500' };
+
+        // Helper to get day name in Hebrew
+        function getHebrewDayName(dateString) {
+            const date = new Date(dateString);
+            const today = new Date();
+            
+            // Check if today
+            if (date.toDateString() === today.toDateString()) {
+                return 'היום';
+            }
+            
+            const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+            return `יום ${days[date.getDay()]}`;
+        }
+
+        // Helper to format temperature
+        function formatTemp(temp) {
+            return Math.round(temp);
+        }
+
+        // DOM Elements
+        const els = {
+            loadingView: document.getElementById('loading-view'),
+            loadingText: document.getElementById('loading-text'),
+            errorView: document.getElementById('error-view'),
+            errorMessage: document.getElementById('error-message'),
+            weatherView: document.getElementById('weather-view'),
+            refreshBtn: document.getElementById('refresh-btn'),
+            
+            currentTemp: document.getElementById('current-temp'),
+            currentIcon: document.getElementById('current-icon'),
+            currentDesc: document.getElementById('current-desc'),
+            currentHumidity: document.getElementById('current-humidity'),
+            currentWind: document.getElementById('current-wind'),
+            
+            forecastList: document.getElementById('forecast-list')
+        };
+
+        // UI State Management
+        function showLoading(text) {
+            if (text) els.loadingText.textContent = text;
+            els.loadingView.classList.remove('hidden');
+            els.loadingView.style.opacity = '1';
+            els.errorView.classList.add('hidden');
+            els.weatherView.classList.add('hidden');
+            els.refreshBtn.style.display = 'none';
+        }
+
+        function hideLoading() {
+            els.loadingView.style.opacity = '0';
+            setTimeout(() => els.loadingView.classList.add('hidden'), 300);
+        }
+
+        function showError(msg) {
+            hideLoading();
+            els.errorMessage.textContent = msg;
+            els.errorView.classList.remove('hidden');
+            els.weatherView.classList.add('hidden');
+            els.refreshBtn.style.display = 'none';
+        }
+
+        function showWeather() {
+            hideLoading();
+            els.errorView.classList.add('hidden');
+            els.weatherView.classList.remove('hidden');
+            els.refreshBtn.style.display = 'block';
+        }
+
+        // Main Application Logic
+        async function fetchWeatherData(lat, lon) {
+            try {
+                showLoading('טוען נתוני מזג אוויר...');
+                
+                // Open-Meteo API endpoint
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('שגיאה בתקשורת עם שרת מזג האוויר');
+                
+                const data = await response.json();
+                renderWeather(data);
+                showWeather();
+            } catch (err) {
+                console.error("API Error:", err);
+                showError('לא הצלחנו לטעון את נתוני מזג האוויר. נסה שוב מאוחר יותר.');
+            }
+        }
+
+        function renderWeather(data) {
+            // Render Current Weather
+            const current = data.current;
+            const weatherInfo = WMO_CODES[current.weather_code] || FALLBACK_WEATHER;
+            
+            els.currentTemp.textContent = formatTemp(current.temperature_2m);
+            els.currentIcon.innerHTML = `<i class="fa-solid ${weatherInfo.icon}"></i>`;
+            els.currentDesc.textContent = weatherInfo.label;
+            els.currentHumidity.textContent = `${current.relative_humidity_2m}%`;
+            els.currentWind.textContent = current.wind_speed_10m.toFixed(1);
+
+            // Render Forecast
+            const daily = data.daily;
+            els.forecastList.innerHTML = ''; // Clear previous
+
+            // Loop through next 5 days (skipping today which is index 0, or keep it depending on preference. Let's keep today and next 4)
+            const daysToShow = Math.min(5, daily.time.length);
+            
+            for (let i = 0; i < daysToShow; i++) {
+                const date = daily.time[i];
+                const code = daily.weather_code[i];
+                const maxT = formatTemp(daily.temperature_2m_max[i]);
+                const minT = formatTemp(daily.temperature_2m_min[i]);
+                const wInfo = WMO_CODES[code] || FALLBACK_WEATHER;
+                const dayName = getHebrewDayName(date);
+
+                const itemHTML = `
+                    <div class="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition-colors">
+                        <span class="w-20 text-sm font-medium text-slate-500">${dayName}</span>
+                        <div class="flex items-center justify-center flex-1">
+                            <i class="fa-solid ${wInfo.icon} text-lg" title="${wInfo.label}"></i>
+                        </div>
+                        <div class="flex items-center gap-3 w-24 justify-end text-sm font-medium tracking-tight" dir="ltr">
+                            <span class="text-slate-800">${maxT}°</span>
+                            <div class="w-12 h-1 bg-slate-100 rounded-full overflow-hidden flex">
+                                <div class="h-full bg-gradient-to-r from-blue-400 to-orange-400 w-full opacity-50"></div>
+                            </div>
+                            <span class="text-slate-400">${minT}°</span>
+                        </div>
+                    </div>
+                `;
+                els.forecastList.insertAdjacentHTML('beforeend', itemHTML);
+            }
+        }
+
+        function getGeolocation() {
+            showLoading('מאתר את מיקומך...');
+            
+            if (!("geolocation" in navigator)) {
+                showError("הדפדפן שלך אינו תומך בשירותי מיקום.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    fetchWeatherData(lat, lon);
+                },
+                (error) => {
+                    console.error("Geolocation error:", error);
+                    let errorMsg = "שגיאה לא ידועה באיתור המיקום.";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = "הגישה למיקום נדחתה. אנא אשר גישה למיקום בדפדפן.";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = "מידע על מיקום אינו זמין כרגע.";
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = "הבקשה למיקום ארכה זמן רב מדי.";
+                            break;
+                    }
+                    showError(errorMsg);
+                    
+                    // Fallback to a default location (e.g., Tel Aviv) if user denies, for demo purposes
+                    // For strict requirements, we show error. Let's provide a button to load default in error view if we wanted.
+                },
+                {
+                    enableHighAccuracy: false,
+                    timeout: 10000,
+                    maximumAge: 60000
+                }
+            );
+        }
+
+        // Initialize
+        function initApp() {
+            getGeolocation();
+        }
+
+        // Event Listeners
+        els.refreshBtn.addEventListener('click', initApp);
+
+        // Start App
+        initApp();
+
+    </script>
+</body>
+</html>

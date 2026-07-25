@@ -1,0 +1,810 @@
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>לוח בקרה אישי</title>
+    <meta name="description" content="Personal life dashboard layout in Hebrew" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      /* Base styles already handled by Tailwind, adding a clean sans-serif font */
+      @import url("https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap");
+      body {
+        font-family: "Heebo", sans-serif;
+        background-color: #f8fafc; /* slate-50 */
+      }
+
+      /* Modal transitions */
+      #iframe-modal {
+        transition: opacity 0.2s ease-in-out;
+      }
+      #iframe-modal.hidden-modal {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Custom scrollbar for a cleaner look */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    </style>
+  </head>
+  <body class="text-slate-800 antialiased min-h-screen p-4 sm:p-8">
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto space-y-6">
+      <!-- Top Section: Interactive Widgets & Summary -->
+      <div class="flex flex-col lg:flex-row gap-6 justify-between items-start">
+        <!-- Right Side (RTL Start): Interactive Quick Action Widgets -->
+        <div class="flex flex-wrap gap-3">
+          <button
+            onclick="openModal('מזג אוויר')"
+            class="w-24 h-24 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-1 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none p-1"
+          >
+            <div class="flex items-center gap-1.5">
+              <i id="widget-weather-icon" class="fa-solid fa-cloud-sun text-lg text-sky-500"></i>
+              <span id="widget-time" class="text-sm font-bold text-slate-700">--:--</span>
+            </div>
+            <span
+              id="widget-weather-text"
+              class="text-xs font-medium text-slate-500 text-center leading-tight mt-1"
+              >מזג אוויר<br />טוען...</span
+            >
+          </button>
+          <button
+            onclick="openModal('פתקים (ToDo)')"
+            class="w-24 h-24 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <i class="fa-regular fa-note-sticky text-3xl text-yellow-500"></i>
+            <span class="text-sm font-medium text-center leading-tight">פתקים<br />ToDo</span>
+          </button>
+          <button
+            onclick="openModal('יומן')"
+            class="w-24 h-24 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <i class="fa-regular fa-calendar text-3xl text-red-400"></i>
+            <span class="text-sm font-medium">יומן</span>
+          </button>
+          <button
+            onclick="openModal('AI')"
+            class="w-24 h-24 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <i class="fa-solid fa-robot text-3xl text-slate-400"></i>
+            <span class="text-sm font-medium">AI</span>
+          </button>
+          <button
+            onclick="openModal('פרויקטים')"
+            class="w-24 h-24 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <i class="fa-solid fa-folder-plus text-3xl text-blue-500"></i>
+            <span class="text-sm font-medium text-center leading-tight">יצירת<br />פרויקט</span>
+          </button>
+          <button
+            onclick="openModal('ניהול כספים')"
+            class="w-24 h-24 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <i class="fa-solid fa-file-invoice-dollar text-3xl text-emerald-500"></i>
+            <span class="text-sm font-medium text-center leading-tight">ניהול<br />כספים</span>
+          </button>
+          <button
+            onclick="openModal('מחשבון')"
+            class="w-24 h-24 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <i class="fa-solid fa-calculator text-3xl text-slate-600"></i>
+            <span class="text-sm font-medium">מחשבון</span>
+          </button>
+        </div>
+
+        <!-- Middle/Left Side: Global Indices & Crypto -->
+        <div class="flex flex-col sm:flex-row gap-4 lg:ml-auto">
+          <!-- Global Indices -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 min-w-[200px]">
+            <h3 class="text-slate-500 text-sm font-medium mb-3">מדדים עולמיים (יומי)</h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-sm">
+                <span class="font-medium text-slate-700">ת"א 125</span>
+                <span id="index-ta125" class="text-slate-400 font-medium" dir="ltr">טוען...</span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="font-medium text-slate-700">S&P 500</span>
+                <span id="index-sp500" class="text-slate-400 font-medium" dir="ltr">טוען...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Crypto -->
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 min-w-[200px]">
+            <h3 class="text-slate-500 text-sm font-medium mb-3">קריפטו (24h)</h3>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-sm">
+                <span class="font-medium text-slate-700">XRP</span>
+                <span id="crypto-xrp" class="text-slate-400 font-medium" dir="ltr">טוען...</span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="font-medium text-slate-700">Solana</span>
+                <span id="crypto-sol" class="text-slate-400 font-medium" dir="ltr">טוען...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Section: Main Financial Summary & Documents -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Documents Widget (Right Side, below top widgets) -->
+        <div class="lg:col-span-1">
+          <button
+            onclick="openModal('מסמכים')"
+            class="w-full h-full min-h-[120px] bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center gap-3 hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none p-4"
+          >
+            <i class="fa-regular fa-file-lines text-4xl text-slate-400"></i>
+            <span class="text-lg font-medium text-slate-700">מסמכים</span>
+          </button>
+        </div>
+
+        <!-- Big Net Worth Display (Center/Left) -->
+        <div
+          class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center relative overflow-hidden"
+        >
+          <!-- Decorative background blur -->
+          <div
+            class="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl opacity-50 -z-10 -translate-y-1/2 translate-x-1/4"
+          ></div>
+
+          <h2 class="text-slate-500 text-xl font-medium mb-2 tracking-wide">
+            נטו חודשי (פרויקטים)
+          </h2>
+          <div
+            class="text-5xl sm:text-7xl font-bold text-slate-800 tracking-tight flex items-baseline gap-2 mb-4"
+            dir="ltr"
+          >
+            <span>₪</span>
+            <span id="display-net-worth">0</span>
+          </div>
+          <div class="flex items-center gap-2 text-slate-500 text-lg">
+            <span>ממוצע שנתי:</span>
+            <span class="font-semibold text-slate-700" dir="ltr"
+              >₪ <span id="display-annual-avg">0</span></span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Section: Detailed Columns -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Right Column: Income & Expenses -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 class="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-2">
+            תזרים חודשי
+          </h3>
+
+          <div class="flex justify-between items-end mb-6">
+            <div>
+              <div class="text-sm text-slate-500">סך הכנסות (כולל פרויקטים)</div>
+              <div class="text-2xl font-bold text-emerald-600" dir="ltr">
+                ₪ <span id="display-income">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <div class="text-sm text-slate-500 mb-1">סך הוצאות</div>
+            <div class="text-xl font-bold text-rose-500" dir="ltr">
+              ₪ <span id="display-expenses">0</span>
+            </div>
+
+            <ul
+              id="dynamic-expenses-list"
+              class="mt-4 space-y-2 text-sm text-slate-600 max-h-[200px] overflow-y-auto pr-1"
+            >
+              <!-- Dynamic expenses will be injected here -->
+            </ul>
+          </div>
+
+          <!-- Personal details box from sketch -->
+          <div class="mt-8 bg-slate-50 p-4 rounded-lg border border-slate-100">
+            <ul class="space-y-1 text-sm text-slate-600">
+              <li>• פרטים אישיים</li>
+              <li>• עדכון פרטים</li>
+              <li>• שמירת מסמכים</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Middle Column: Savings -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 class="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-2">
+            חסכונות מוכרים (הורדות חודשיות)
+          </h3>
+
+          <div id="dynamic-savings-list" class="space-y-5">
+            <div class="text-slate-400 italic text-sm">טוען נתונים...</div>
+          </div>
+        </div>
+
+        <!-- Left Column: Loans & Assets -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 class="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-2">
+            הלוואות ועסקים
+          </h3>
+
+          <div class="space-y-6">
+            <!-- Business Assets (Estimated from sketch "הלוואות ועסקים") -->
+            <div>
+              <div class="text-sm text-slate-500 mb-1">שווי עסק מוערך</div>
+              <div class="text-3xl font-bold text-slate-800" dir="ltr">₪ 300,000</div>
+            </div>
+
+            <!-- Loans -->
+            <div>
+              <div class="text-sm text-slate-500 mb-2">הלוואות פעילות</div>
+              <div class="bg-rose-50 p-4 rounded-lg border border-rose-100">
+                <div class="flex justify-between items-end mb-2">
+                  <span class="font-medium text-rose-800">הלוואה עסקית</span>
+                  <span class="text-xl font-bold text-rose-700" dir="ltr">₪ 161,200</span>
+                </div>
+                <div class="flex justify-between items-center text-sm text-rose-600/80">
+                  <span>החזר חודשי</span>
+                  <span dir="ltr">₪ 4,500</span>
+                </div>
+                <div class="mt-3 w-full bg-rose-200 rounded-full h-1">
+                  <div class="bg-rose-500 h-1 rounded-full" style="width: 35%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Expenses Pie Chart -->
+            <div class="mt-4 pt-4 border-t border-slate-100">
+              <div class="flex justify-between items-center mb-4">
+                <h4 class="text-sm font-bold text-slate-700">התפלגות הוצאות</h4>
+                <select
+                  id="expenses-timeframe"
+                  onchange="renderExpensesChart()"
+                  class="text-xs border-slate-200 rounded-md text-slate-600 bg-slate-50 focus:ring-blue-500 focus:border-blue-500 p-1"
+                >
+                  <option value="month">החודש</option>
+                  <option value="year">השנה</option>
+                </select>
+              </div>
+              <div class="relative h-48 w-full flex justify-center">
+                <canvas id="expensesPieChart"></canvas>
+              </div>
+              <div id="no-expenses-msg" class="text-center text-sm text-slate-400 hidden mt-2">
+                אין הוצאות בתקופה זו
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div
+      id="iframe-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm hidden-modal"
+    >
+      <div
+        class="bg-white w-11/12 max-w-4xl h-[80vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden transform transition-transform scale-95"
+        id="modal-content"
+      >
+        <!-- Modal Header -->
+        <div
+          class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50"
+        >
+          <h3 class="text-xl font-bold text-slate-800" id="modal-title">כותרת מודל</h3>
+          <button
+            onclick="closeModal()"
+            class="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors focus:outline-none"
+          >
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+
+        <!-- Modal Body (Iframe container) -->
+        <div class="flex-1 p-0 bg-slate-100">
+          <iframe
+            src="about:blank"
+            class="w-full h-full border-0"
+            id="modal-iframe"
+            title="Widget Content"
+          ></iframe>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-6 py-3 border-t border-slate-100 bg-white flex justify-end">
+          <button
+            onclick="closeModal()"
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-300"
+          >
+            סגור
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const modal = document.getElementById("iframe-modal");
+      const modalContent = document.getElementById("modal-content");
+      const modalTitle = document.getElementById("modal-title");
+      const modalIframe = document.getElementById("modal-iframe");
+
+      function openModal(title) {
+        // Set title
+        modalTitle.textContent = title;
+
+        const modalHeader = modalContent.children[0];
+        const modalFooter = modalContent.children[2];
+
+        if (title === "פרויקטים" || title === "יומן") {
+          modalContent.className =
+            "bg-white w-full h-full flex flex-col overflow-hidden transform transition-transform scale-95";
+          modalHeader.style.display = "flex";
+          modalFooter.style.display = "none";
+
+          const floatingClose = document.getElementById("floating-close");
+          if (floatingClose) floatingClose.style.display = "none";
+        } else {
+          modalContent.className =
+            "bg-white w-11/12 max-w-4xl h-[80vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden transform transition-transform scale-95";
+          modalHeader.style.display = "flex";
+          modalFooter.style.display = "flex";
+
+          const floatingClose = document.getElementById("floating-close");
+          if (floatingClose) floatingClose.style.display = "none";
+        }
+
+        // Route specific widgets to their apps
+        if (title === "פתקים (ToDo)") {
+          modalIframe.src = "/3b8bfc77-ef51-4a9d-933d-119911114b4b";
+        } else if (title === "יומן") {
+          modalIframe.src = "/747cdbe2-ebf4-48f9-a7a5-8578e8835c5e";
+        } else if (title === "מזג אוויר") {
+          modalIframe.src = "/8b0c6411-fd23-4997-909b-50658ebf5d9e";
+        } else if (title === "פרויקטים") {
+          modalIframe.src = "/2f59833e-4ade-450b-9f5d-4d2c64ae5273";
+        } else if (title === "מסמכים") {
+          modalIframe.src = "/b0073794-3522-4e4b-8e77-36946154f0d9";
+        } else if (title === "ניהול כספים") {
+          modalIframe.src = "/072b639b-e0c7-4dd4-8ab3-cd883c81fd83";
+        } else if (title === "מחשבון") {
+          modalIframe.src = "/9de19b90-7b8d-4127-a989-de73980a5dfb";
+        } else {
+          modalIframe.src = "about:blank";
+        }
+
+        // Show modal by removing hidden class and scaling in
+        modal.classList.remove("hidden-modal");
+
+        // Small delay for transition effect
+        requestAnimationFrame(() => {
+          modalContent.classList.remove("scale-95");
+          modalContent.classList.add("scale-100");
+        });
+      }
+
+      function closeModal() {
+        // Scale out
+        modalContent.classList.remove("scale-100");
+        modalContent.classList.add("scale-95");
+
+        // Hide after transition
+        setTimeout(() => {
+          modal.classList.add("hidden-modal");
+          // Reset iframe src to stop playing/running when closed
+          modalIframe.src = "about:blank";
+        }, 200); // Matches transition duration
+      }
+
+      // Close on backdrop click
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          closeModal();
+        }
+      });
+
+      // Close on Escape key
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !modal.classList.contains("hidden-modal")) {
+          closeModal();
+        }
+      });
+
+      // Weather & Time Widget Logic
+      function updateTime() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+        document.getElementById("widget-time").textContent = timeStr;
+      }
+      setInterval(updateTime, 1000);
+      updateTime();
+
+      function updateWeatherWidget() {
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const lat = position.coords.latitude;
+              const lon = position.coords.longitude;
+              try {
+                const res = await fetch(
+                  `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`,
+                );
+                const data = await res.json();
+                if (data && data.current_weather) {
+                  const temp = Math.round(data.current_weather.temperature);
+                  // Simple weather code mapping for icon could be added, but keeping the icon static and showing temp
+                  document.getElementById("widget-weather-text").innerHTML =
+                    `מזג אוויר<br><span class="text-sky-600 font-bold text-sm" dir="ltr">${temp}°C</span>`;
+                }
+              } catch (e) {
+                document.getElementById("widget-weather-text").innerHTML =
+                  `מזג אוויר<br><span class="text-xs">שגיאה</span>`;
+              }
+            },
+            () => {
+              document.getElementById("widget-weather-text").innerHTML =
+                `מזג אוויר<br><span class="text-xs">אין מיקום</span>`;
+            },
+          );
+        } else {
+          document.getElementById("widget-weather-text").innerHTML =
+            `מזג אוויר<br><span class="text-xs">לא נתמך</span>`;
+        }
+      }
+      updateWeatherWidget();
+
+      // Financial Data Sync - Source of Truth: Finance Core
+      const FINANCE_CORE_ID = "072b639b-e0c7-4dd4-8ab3-cd883c81fd83";
+
+      const PROJECTS_CORE_ID = "2f59833e-4ade-450b-9f5d-4d2c64ae5273";
+
+      let financialState = {
+        incomes: [],
+        expenses: [],
+        savings: [],
+        taxSettings: null,
+        projects: [],
+      };
+
+      function calculateNetAndTotals() {
+        const totalIncome = financialState.incomes.reduce(
+          (sum, item) => sum + Number(item.amount || 0),
+          0,
+        );
+        const totalExpenses = financialState.expenses.reduce(
+          (sum, item) => sum + Number(item.amount || 0),
+          0,
+        );
+
+        // Tax Calculation logic synced with Finance Core
+        let netIncome = totalIncome - totalExpenses;
+        let totalTax = 0;
+
+        if (financialState.taxSettings && netIncome > 0) {
+          const settings = financialState.taxSettings;
+          // Simplified tax engine: Income Tax + Bituah Leumi (VAT usually balances out or is paid from gross)
+          const incomeTax = netIncome * (settings.incomeTaxAdvance / 100);
+          const bituahLeumi = netIncome * (settings.bituahLeumi / 100);
+          totalTax = incomeTax + bituahLeumi;
+
+          // Adjustment for credit points (approx 235 NIS per point)
+          const creditValue = (settings.creditPoints || 2.25) * 235;
+          totalTax = Math.max(0, totalTax - creditValue);
+        }
+
+        const netWorth = Math.round(netIncome - totalTax);
+        const annualAvg = netWorth * 12;
+
+        // Update UI
+        document.getElementById("display-income").textContent =
+          Math.round(totalIncome).toLocaleString();
+        document.getElementById("display-expenses").textContent =
+          Math.round(totalExpenses).toLocaleString();
+        document.getElementById("display-net-worth").textContent = netWorth.toLocaleString();
+        document.getElementById("display-annual-avg").textContent = annualAvg.toLocaleString();
+
+        // Update recent expenses list
+        const list = document.getElementById("dynamic-expenses-list");
+        if (list) {
+          list.innerHTML =
+            financialState.expenses
+              .sort((a, b) => new Date(b.date) - new Date(a.date))
+              .slice(0, 5)
+              .map(
+                (exp) => `
+                        <li class="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
+                            <span class="truncate max-w-[120px]">${exp.description}</span>
+                            <span class="font-bold text-rose-500" dir="ltr">₪ ${Number(exp.amount).toLocaleString()}</span>
+                        </li>
+                    `,
+              )
+              .join("") || '<li class="text-slate-400 italic">אין הוצאות רשומות</li>';
+        }
+
+        // Update Savings list (Monthly deduction representation)
+        const savingsList = document.getElementById("dynamic-savings-list");
+        if (savingsList) {
+          if (!financialState.savings || financialState.savings.length === 0) {
+            savingsList.innerHTML =
+              '<div class="text-slate-400 italic text-sm">אין הפקדות רשומות לחסכונות מוכרים</div>';
+          } else {
+            // Group by fund type
+            const savingsByType = financialState.savings.reduce((acc, curr) => {
+              acc[curr.fundType] = (acc[curr.fundType] || 0) + Number(curr.amount || 0);
+              return acc;
+            }, {});
+
+            const totalSavings = Object.values(savingsByType).reduce((a, b) => a + b, 0);
+
+            const savingsHtml = Object.entries(savingsByType)
+              .map(
+                ([type, amount]) => `
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-medium text-slate-700">${type}</span>
+                                <span class="font-bold text-slate-800" dir="ltr">₪ ${amount.toLocaleString()}</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5"><div class="bg-blue-500 h-1.5 rounded-full" style="width: ${totalSavings > 0 ? (amount / totalSavings) * 100 : 0}%"></div></div>
+                        </div>
+                    `,
+              )
+              .join("");
+
+            savingsList.innerHTML =
+              savingsHtml +
+              `
+                        <div class="pt-4 border-t border-slate-100 mt-4">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-500">סה"כ הפקדות (הוצאה חודשית)</span>
+                                <span class="font-semibold text-blue-600" dir="ltr">₪ ${totalSavings.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    `;
+          }
+        }
+
+        // Render chart when data updates
+        if (typeof renderExpensesChart === "function") {
+          renderExpensesChart();
+        }
+      }
+
+      let expensesChartInstance = null;
+      function renderExpensesChart() {
+        const ctx = document.getElementById("expensesPieChart");
+        const msgEl = document.getElementById("no-expenses-msg");
+        const timeframe = document.getElementById("expenses-timeframe").value;
+
+        if (!ctx) return;
+
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        // Filter projects by timeframe and having expenses > 0
+        const filteredProjects = financialState.projects.filter((proj) => {
+          if (!proj.startDate) return false;
+          const d = new Date(proj.startDate);
+
+          let matchesTimeframe = false;
+          if (timeframe === "month") {
+            matchesTimeframe = d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+          } else {
+            matchesTimeframe = d.getFullYear() === currentYear;
+          }
+
+          return matchesTimeframe && Number(proj.expenses || 0) > 0;
+        });
+
+        if (filteredProjects.length === 0) {
+          ctx.style.display = "none";
+          msgEl.classList.remove("hidden");
+          if (expensesChartInstance) expensesChartInstance.destroy();
+          return;
+        }
+
+        ctx.style.display = "block";
+        msgEl.classList.add("hidden");
+
+        // Map to project names and their expenses
+        const expensesByProject = filteredProjects.reduce((acc, curr) => {
+          const name = curr.customerName || "פרויקט ללא שם";
+          acc[name] = (acc[name] || 0) + Number(curr.expenses || 0);
+          return acc;
+        }, {});
+
+        const labels = Object.keys(expensesByProject);
+        const data = Object.values(expensesByProject);
+        const bgColors = [
+          "#3b82f6",
+          "#10b981",
+          "#f59e0b",
+          "#ef4444",
+          "#8b5cf6",
+          "#ec4899",
+          "#64748b",
+        ];
+
+        if (expensesChartInstance) {
+          expensesChartInstance.destroy();
+        }
+
+        expensesChartInstance = new Chart(ctx, {
+          type: "doughnut",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                data: data,
+                backgroundColor: bgColors.slice(0, labels.length),
+                borderWidth: 1,
+                borderColor: "#ffffff",
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "right",
+                labels: {
+                  font: { family: "Heebo", size: 10 },
+                  boxWidth: 10,
+                },
+              },
+              tooltip: {
+                callbacks: {
+                  label: function (context) {
+                    let label = context.label || "";
+                    if (label) label += ": ";
+                    if (context.parsed !== null) {
+                      label += "₪ " + context.parsed.toLocaleString();
+                    }
+                    return label;
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      async function initFinancialSync() {
+        try {
+          // Initial fetch
+          const [incomes, expenses, taxSettings, savings, projects] = await Promise.all([
+            sdk.db.get("incomes", FINANCE_CORE_ID),
+            sdk.db.get("expenses", FINANCE_CORE_ID),
+            sdk.db.get("tax_settings", FINANCE_CORE_ID),
+            sdk.db.get("savings", FINANCE_CORE_ID),
+            sdk.db.get("projects", PROJECTS_CORE_ID),
+          ]);
+
+          financialState.incomes = incomes || [];
+          financialState.expenses = expenses || [];
+          financialState.taxSettings = taxSettings;
+          financialState.savings = savings || [];
+          financialState.projects = projects || [];
+
+          calculateNetAndTotals();
+
+          // Watchers
+          sdk.watch(FINANCE_CORE_ID, "incomes", (data) => {
+            financialState.incomes = data || [];
+            calculateNetAndTotals();
+          });
+          sdk.watch(FINANCE_CORE_ID, "expenses", (data) => {
+            financialState.expenses = data || [];
+            calculateNetAndTotals();
+          });
+          sdk.watch(FINANCE_CORE_ID, "tax_settings", (data) => {
+            financialState.taxSettings = data;
+            calculateNetAndTotals();
+          });
+          sdk.watch(FINANCE_CORE_ID, "savings", (data) => {
+            financialState.savings = data || [];
+            calculateNetAndTotals();
+          });
+          sdk.watch(PROJECTS_CORE_ID, "projects", (data) => {
+            financialState.projects = data || [];
+            calculateNetAndTotals();
+          });
+        } catch (err) {
+          console.error("Error syncing financial data:", err);
+        }
+      }
+
+      initFinancialSync();
+
+      // Crypto Data Fetch (Binance API)
+      async function fetchCryptoData() {
+        try {
+          // Fetch XRP and SOL 24hr ticker data
+          const [xrpRes, solRes] = await Promise.all([
+            fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=XRPUSDT"),
+            fetch("https://api.binance.com/api/v3/ticker/24hr?symbol=SOLUSDT"),
+          ]);
+
+          const xrpData = await xrpRes.json();
+          const solData = await solRes.json();
+
+          updateCryptoField("crypto-xrp", parseFloat(xrpData.priceChangePercent));
+          updateCryptoField("crypto-sol", parseFloat(solData.priceChangePercent));
+        } catch (err) {
+          console.error("Error fetching crypto data:", err);
+          document.getElementById("crypto-xrp").textContent = "שגיאה";
+          document.getElementById("crypto-sol").textContent = "שגיאה";
+        }
+      }
+
+      function updateCryptoField(elementId, percent) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        const isPositive = percent >= 0;
+        const sign = isPositive ? "↑" : "↓";
+        const colorClass = isPositive ? "text-emerald-500" : "text-rose-500";
+
+        el.className = `font-medium ${colorClass}`;
+        el.textContent = `${sign} ${Math.abs(percent).toFixed(2)}%`;
+      }
+
+      fetchCryptoData();
+      // Update every 60 seconds
+      setInterval(fetchCryptoData, 60000);
+
+      // Global Indices Data Fetch (Yahoo Finance via Proxy)
+      async function fetchStockIndices() {
+        try {
+          const fetchIndex = async (ticker) => {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=1d`;
+            // Using allorigins as a simple CORS proxy (using /get to ensure JSON response)
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+            const res = await fetch(proxyUrl);
+            const proxyData = await res.json();
+
+            if (!proxyData.contents) throw new Error("No data returned from proxy");
+
+            const data = JSON.parse(proxyData.contents);
+
+            if (!data.chart || !data.chart.result || !data.chart.result[0]) {
+              throw new Error("Invalid data structure");
+            }
+
+            const result = data.chart.result[0];
+            const meta = result.meta;
+            const currentPrice = meta.regularMarketPrice;
+            const previousClose = meta.chartPreviousClose;
+
+            const percentChange = ((currentPrice - previousClose) / previousClose) * 100;
+            return percentChange;
+          };
+
+          const [ta125Percent, sp500Percent] = await Promise.all([
+            fetchIndex("^TA125.TA"),
+            fetchIndex("^GSPC"),
+          ]);
+
+          updateCryptoField("index-ta125", ta125Percent); // Re-using the same styling function
+          updateCryptoField("index-sp500", sp500Percent);
+        } catch (err) {
+          console.error("Error fetching indices:", err);
+          document.getElementById("index-ta125").textContent = "שגיאה";
+          document.getElementById("index-sp500").textContent = "שגיאה";
+        }
+      }
+
+      fetchStockIndices();
+      // Update indices every 5 minutes
+      setInterval(fetchStockIndices, 300000);
+    </script>
+  </body>
+</html>

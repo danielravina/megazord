@@ -1,0 +1,304 @@
+
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחשבון חכם</title>
+    <style>
+        body {
+            background: #ffffff;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .glass {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 2rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .calc-button {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .calc-button:active {
+            transform: scale(0.92);
+        }
+
+        .history-item {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hide scrollbar but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="text-slate-800 overflow-hidden">
+
+    <div class="flex flex-col md:flex-row gap-6 w-full max-w-4xl">
+        
+        <!-- Calculator Container -->
+        <div class="glass p-6 w-full md:w-2/3 flex flex-col gap-4">
+            <header class="flex justify-between items-center px-2">
+                <h1 class="text-xl font-bold text-slate-400 italic">מחשבון חכם</h1>
+                <div class="flex gap-2">
+                    <span class="w-3 h-3 rounded-full bg-red-400"></span>
+                    <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
+                    <span class="w-3 h-3 rounded-full bg-green-400"></span>
+                </div>
+            </header>
+
+            <!-- Screen -->
+            <div class="bg-slate-50 rounded-xl p-4 flex flex-col items-end justify-end min-h-[100px] gap-1 overflow-hidden border border-slate-200">
+                <div id="expression-display" class="text-sm text-slate-400 h-5 overflow-hidden text-right break-all"></div>
+                <div id="current-display" class="text-4xl font-semibold tracking-wider overflow-x-auto whitespace-nowrap no-scrollbar w-full text-right text-slate-800">0</div>
+            </div>
+
+            <!-- Keypad -->
+            <div class="grid grid-cols-4 gap-3 text-lg font-medium">
+                <!-- Row 1 -->
+                <button onclick="clearAll()" class="calc-button col-span-2 bg-red-50 text-red-600 hover:bg-red-100 p-4 rounded-xl border border-red-100" title="נקה הכל (Escape)">AC</button>
+                <button onclick="deleteLast()" class="calc-button bg-slate-100 hover:bg-slate-200 p-4 rounded-xl border border-slate-200" title="מחק (Backspace)">
+                    <i class="fa-solid fa-delete-left"></i>
+                </button>
+                <button onclick="appendOperator('/')" class="calc-button bg-blue-50 text-blue-600 hover:bg-blue-100 p-4 rounded-xl border border-blue-100" title="חילוק">÷</button>
+
+                <!-- Row 2 -->
+                <button onclick="appendNumber('7')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">7</button>
+                <button onclick="appendNumber('8')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">8</button>
+                <button onclick="appendNumber('9')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">9</button>
+                <button onclick="appendOperator('*')" class="calc-button bg-blue-50 text-blue-600 hover:bg-blue-100 p-4 rounded-xl border border-blue-100" title="כפל">×</button>
+
+                <!-- Row 3 -->
+                <button onclick="appendNumber('4')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">4</button>
+                <button onclick="appendNumber('5')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">5</button>
+                <button onclick="appendNumber('6')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">6</button>
+                <button onclick="appendOperator('-')" class="calc-button bg-blue-50 text-blue-600 hover:bg-blue-100 p-4 rounded-xl border border-blue-100" title="חיסור">−</button>
+
+                <!-- Row 4 -->
+                <button onclick="appendNumber('1')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">1</button>
+                <button onclick="appendNumber('2')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">2</button>
+                <button onclick="appendNumber('3')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">3</button>
+                <button onclick="appendOperator('+')" class="calc-button bg-blue-50 text-blue-600 hover:bg-blue-100 p-4 rounded-xl border border-blue-100" title="חיבור">+</button>
+
+                <!-- Row 5 -->
+                <button onclick="appendNumber('0')" class="calc-button col-span-2 bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200 text-center">0</button>
+                <button onclick="appendNumber('.')" class="calc-button bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-slate-200">.</button>
+                <button onclick="calculate()" class="calc-button bg-green-600 text-white hover:bg-green-700 p-4 rounded-xl shadow-lg shadow-green-200 text-xl" title="שווה (Enter)">=</button>
+            </div>
+        </div>
+
+        <!-- History Container -->
+        <div class="glass p-6 w-full md:w-1/3 flex flex-col gap-4 max-h-[500px] md:max-h-none">
+            <div class="flex items-center gap-2 text-slate-500 border-b border-slate-100 pb-3">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <h2 class="font-bold">היסטוריה (5 אחרונים)</h2>
+            </div>
+            <div id="history-list" class="flex flex-col gap-3 overflow-y-auto pr-1 no-scrollbar flex-grow">
+                <!-- History items will be injected here -->
+                <div class="text-sm text-slate-400 italic text-center py-4">אין חישובים קודמים</div>
+            </div>
+            <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-slate-600 transition-opacity mt-2 text-right">מחיקת היסטוריה</button>
+        </div>
+
+    </div>
+
+    <script>
+        let currentInput = '0';
+        let expression = '';
+        let history = [];
+        let shouldResetInput = false;
+
+        const currentDisplay = document.getElementById('current-display');
+        const expressionDisplay = document.getElementById('expression-display');
+        const historyList = document.getElementById('history-list');
+
+        // Initialization
+        async function init() {
+            try {
+                const storedHistory = await sdk.db.get('history');
+                if (storedHistory && Array.isArray(storedHistory)) {
+                    history = storedHistory.slice(0, 5);
+                    renderHistory();
+                }
+            } catch (err) {
+                console.error("Failed to fetch history", err);
+            }
+        }
+
+        function updateDisplay() {
+            currentDisplay.textContent = currentInput;
+            expressionDisplay.textContent = expression;
+            // Scroll to end of current display if it overflows
+            currentDisplay.scrollLeft = currentDisplay.scrollWidth;
+        }
+
+        function appendNumber(num) {
+            if (shouldResetInput) {
+                currentInput = num;
+                shouldResetInput = false;
+            } else {
+                if (currentInput === '0' && num !== '.') {
+                    currentInput = num;
+                } else if (!(num === '.' && currentInput.includes('.'))) {
+                    currentInput += num;
+                }
+            }
+            updateDisplay();
+        }
+
+        function appendOperator(op) {
+            if (shouldResetInput) {
+                expression = currentInput + ' ' + op + ' ';
+                shouldResetInput = false;
+            } else {
+                expression += currentInput + ' ' + op + ' ';
+            }
+            currentInput = '0';
+            updateDisplay();
+        }
+
+        function clearAll() {
+            currentInput = '0';
+            expression = '';
+            shouldResetInput = false;
+            updateDisplay();
+        }
+
+        function deleteLast() {
+            if (shouldResetInput) {
+                clearAll();
+                return;
+            }
+            if (currentInput.length > 1) {
+                currentInput = currentInput.slice(0, -1);
+            } else {
+                currentInput = '0';
+            }
+            updateDisplay();
+        }
+
+        async function calculate() {
+            if (expression === '' && !shouldResetInput) return;
+            
+            const fullExpression = expression + currentInput;
+            let result;
+
+            try {
+                // Using basic Function constructor for evaluation as it's cleaner for simple arithmetic
+                // Sanitization: Only allow numbers, spaces, and + - * / .
+                const sanitizedExpr = fullExpression.replace(/[^-0-9+*/.\s]/g, '');
+                result = Function(`"use strict"; return (${sanitizedExpr})`)();
+                
+                // Format result: limit decimals
+                if (result % 1 !== 0) {
+                    result = parseFloat(result.toFixed(8));
+                }
+
+                // Display result
+                const historyEntry = {
+                    id: Date.now().toString(),
+                    expression: fullExpression,
+                    result: result.toString(),
+                    timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+                };
+
+                addToHistory(historyEntry);
+                
+                expression = fullExpression + ' =';
+                currentInput = result.toString();
+                shouldResetInput = true;
+                updateDisplay();
+
+            } catch (e) {
+                currentInput = 'Error';
+                updateDisplay();
+                setTimeout(clearAll, 1500);
+            }
+        }
+
+        async function addToHistory(entry) {
+            history.unshift(entry);
+            history = history.slice(0, 5); // Keep last 5
+            renderHistory();
+            
+            // Save to DB
+            try {
+                await sdk.db.set('history', history);
+            } catch (err) {
+                console.error("Failed to save history", err);
+            }
+        }
+
+        function renderHistory() {
+            if (history.length === 0) {
+                historyList.innerHTML = `<div class="text-sm opacity-50 italic text-center py-4">אין חישובים קודמים</div>`;
+                return;
+            }
+
+            historyList.innerHTML = history.map(item => `
+                <div class="history-item bg-white/5 hover:bg-white/10 p-3 rounded-lg border border-white/5 group transition-all cursor-pointer" onclick="recallHistory('${item.result}')">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-[10px] opacity-40">${item.timestamp}</span>
+                        <span class="text-xs opacity-60 font-mono">${item.expression}</span>
+                    </div>
+                    <div class="text-lg font-semibold text-left">
+                        ${item.result}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function clearHistory() {
+            history = [];
+            renderHistory();
+            try {
+                await sdk.db.set('history', []);
+            } catch (err) {
+                console.error("Failed to clear history", err);
+            }
+        }
+
+        function recallHistory(val) {
+            currentInput = val;
+            expression = '';
+            shouldResetInput = false;
+            updateDisplay();
+        }
+
+        // Keyboard Support
+        window.addEventListener('keydown', (e) => {
+            if (e.key >= '0' && e.key <= '9') appendNumber(e.key);
+            if (e.key === '.') appendNumber('.');
+            if (e.key === '+') appendOperator('+');
+            if (e.key === '-') appendOperator('-');
+            if (e.key === '*') appendOperator('*');
+            if (e.key === '/') { e.preventDefault(); appendOperator('/'); }
+            if (e.key === 'Enter' || e.key === '=') { e.preventDefault(); calculate(); }
+            if (e.key === 'Backspace') deleteLast();
+            if (e.key === 'Escape') clearAll();
+        });
+
+        // Run on load
+        init();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>המשימות שלי</title>
+    <meta name="description" content="A simple, modern Todo list app in Hebrew">
+    <style>
+        /* Custom styles to enhance the Tailwind base, mostly for smooth transitions */
+        .task-enter {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Custom styling for the checkbox to make it look modern */
+        .custom-checkbox {
+            appearance: none;
+            background-color: #fff;
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 1.25em;
+            height: 1.25em;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.25em;
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .custom-checkbox::before {
+            content: "";
+            width: 0.65em;
+            height: 0.65em;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em white;
+            background-color: white;
+            transform-origin: center;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        .custom-checkbox:checked {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .custom-checkbox:checked::before {
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen w-full m-0 p-0 font-sans text-gray-800 overflow-hidden">
+
+    <!-- Main Container -->
+    <main class="w-full h-full bg-white flex flex-col">
+        
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white text-center shadow-md relative z-10">
+            <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+                <i class="fas fa-check-double opacity-80"></i>
+                המשימות שלי
+            </h1>
+        </header>
+
+        <div class="p-6 flex-1 overflow-y-auto flex flex-col">
+            <!-- Add Task Form -->
+            <form id="add-form" class="flex gap-3 mb-6 relative z-10">
+                <input 
+                    type="text" 
+                    id="task-input" 
+                    class="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner text-gray-700 placeholder-gray-400" 
+                    placeholder="מה צריך לעשות?" 
+                    required
+                    autocomplete="off"
+                >
+                <button 
+                    type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-sm flex items-center gap-2 active:transform active:scale-95"
+                >
+                    <span>הוסף</span>
+                    <i class="fas fa-plus text-sm"></i>
+                </button>
+            </form>
+
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center py-10 flex-1 flex flex-col items-center justify-center">
+                <i class="fas fa-circle-notch fa-spin text-3xl text-blue-500 mb-3"></i>
+                <p class="text-gray-500 text-sm">טוען את המשימות שלך...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="text-center py-10 flex-1 flex flex-col items-center justify-center hidden opacity-0 transition-opacity duration-300">
+                <div class="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-clipboard-check text-4xl text-blue-300"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-700 mb-1">הכל הושלם!</h3>
+                <p class="text-gray-500 text-sm">אין לך משימות פתוחות כרגע.</p>
+            </div>
+
+            <!-- Todo List -->
+            <ul id="todo-list" class="space-y-3 flex-1 overflow-y-auto pb-2 pr-1 custom-scrollbar hidden">
+                <!-- List items will be injected here by JS -->
+            </ul>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // DOM Elements
+            const form = document.getElementById('add-form');
+            const input = document.getElementById('task-input');
+            const todoList = document.getElementById('todo-list');
+            const loadingState = document.getElementById('loading-state');
+            const emptyState = document.getElementById('empty-state');
+
+            // State
+            let todos = [];
+            const RESOURCE_NAME = 'todos';
+
+            // Initialize app
+            async function init() {
+                try {
+                    // Check if user is logged in (optional but good for authenticated resources to handle UI gracefully)
+                    const user = sdk.getUser();
+                    if (!user) {
+                        loadingState.innerHTML = '<i class="fas fa-lock text-3xl text-gray-400 mb-3"></i><p class="text-gray-500">יש להתחבר כדי לצפות במשימות.</p>';
+                        form.querySelector('button').disabled = true;
+                        input.disabled = true;
+                        return;
+                    }
+
+                    // Fetch todos from sdk.db natively
+                    const data = await sdk.db.get(RESOURCE_NAME);
+                    todos = Array.isArray(data) ? data : [];
+                    
+                    renderTodos();
+                } catch (error) {
+                    console.error("Error loading todos:", error);
+                    loadingState.innerHTML = '<p class="text-red-500">שגיאה בטעינת המשימות.</p>';
+                } finally {
+                    if (sdk.getUser()) {
+                        loadingState.classList.add('hidden');
+                    }
+                }
+            }
+
+            // Render the todo list to the DOM
+            function renderTodos() {
+                todoList.innerHTML = '';
+                
+                if (todos.length === 0) {
+                    todoList.classList.add('hidden');
+                    emptyState.classList.remove('hidden');
+                    // Small delay to allow display:block to apply before opacity transition
+                    setTimeout(() => emptyState.classList.remove('opacity-0'), 10);
+                } else {
+                    emptyState.classList.add('hidden');
+                    emptyState.classList.add('opacity-0');
+                    todoList.classList.remove('hidden');
+
+                    todos.forEach(todo => {
+                        const li = document.createElement('li');
+                        li.className = `task-enter group flex items-center justify-between p-3.5 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all hover:border-blue-100 ${todo.completed ? 'bg-gray-50/50' : ''}`;
+                        
+                        li.innerHTML = `
+                            <div class="flex items-center gap-4 flex-1 overflow-hidden">
+                                <input 
+                                    type="checkbox" 
+                                    class="custom-checkbox shrink-0" 
+                                    ${todo.completed ? 'checked' : ''} 
+                                    onchange="toggleTodo('${todo.id}')"
+                                    aria-label="Mark task as completed"
+                                >
+                                <span class="text-gray-700 truncate transition-all duration-200 ${todo.completed ? 'line-through text-gray-400' : ''}">
+                                    ${escapeHTML(todo.text)}
+                                </span>
+                            </div>
+                            <button 
+                                onclick="deleteTodo('${todo.id}')" 
+                                class="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                aria-label="Delete task"
+                            >
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        `;
+                        todoList.appendChild(li);
+                    });
+                }
+            }
+
+            // Handle adding a new task
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const text = input.value.trim();
+                
+                if (!text) return;
+
+                // Create new todo object based on schema
+                const newTodo = {
+                    id: 'task_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5),
+                    text: text,
+                    completed: false
+                };
+
+                // Optimistic update
+                todos.push(newTodo);
+                input.value = '';
+                renderTodos();
+
+                // Persist to db
+                try {
+                    await sdk.db.set(RESOURCE_NAME, todos);
+                } catch (error) {
+                    console.error("Error saving todo:", error);
+                    // Revert on failure
+                    todos = todos.filter(t => t.id !== newTodo.id);
+                    renderTodos();
+                    alert("שגיאה בשמירת המשימה.");
+                }
+            });
+
+            // Toggle completion status (attached to window for inline onclick)
+            window.toggleTodo = async (id) => {
+                const todoIndex = todos.findIndex(t => t.id === id);
+                if (todoIndex === -1) return;
+
+                // Optimistic update
+                todos[todoIndex].completed = !todos[todoIndex].completed;
+                renderTodos();
+
+                // Persist
+                try {
+                    await sdk.db.set(RESOURCE_NAME, todos);
+                } catch (error) {
+                    console.error("Error updating todo:", error);
+                    // Revert
+                    todos[todoIndex].completed = !todos[todoIndex].completed;
+                    renderTodos();
+                }
+            };
+
+            // Delete a task (attached to window for inline onclick)
+            window.deleteTodo = async (id) => {
+                const todoToDelete = todos.find(t => t.id === id);
+                
+                // Optimistic update
+                todos = todos.filter(t => t.id !== id);
+                renderTodos();
+
+                // Persist
+                try {
+                    await sdk.db.set(RESOURCE_NAME, todos);
+                } catch (error) {
+                    console.error("Error deleting todo:", error);
+                    // Revert
+                    if (todoToDelete) {
+                        todos.push(todoToDelete);
+                        renderTodos();
+                    }
+                }
+            };
+
+            // Utility to prevent XSS when rendering user input
+            function escapeHTML(str) {
+                return str.replace(/[&<>'"]/g, 
+                    tag => ({
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        "'": '&#39;',
+                        '"': '&quot;'
+                    }[tag] || tag)
+                );
+            }
+
+            // Boot the app
+            init();
+        });
+    </script>
+</body>
+</html>

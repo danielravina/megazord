@@ -1,0 +1,699 @@
+
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ניהול פרויקטים</title>
+    <meta name="description" content="מערכת לניהול פרויקטים עם סנכרון ליומן">
+    <style>
+        /* Basic styles for color picker to look better */
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 100%;
+            height: 2.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 0.375rem;
+        }
+        /* Custom scrollbar for list */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white shadow-md py-4 px-6 sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <i class="fas fa-project-diagram"></i>
+                ניהול פרויקטים
+            </h1>
+            <div id="userInfo" class="text-sm font-medium"></div>
+        </div>
+    </header>
+
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6">
+        
+        <!-- Projects List Section (Full Width) -->
+        <section class="w-full">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-full min-h-[600px] flex flex-col">
+                <div class="flex justify-between items-center mb-6 border-b pb-2">
+                    <div class="flex items-center gap-4">
+                        <h2 class="text-xl font-semibold text-slate-700">
+                            <i class="fas fa-list-ul text-blue-500 ml-1"></i> פרויקטים פעילים
+                        </h2>
+                        <span id="projectCount" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">0</span>
+                    </div>
+                    
+                    <!-- Action Button to Open Form -->
+                    <button onclick="toggleModal(true)" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors flex items-center justify-center gap-2 text-sm">
+                        <i class="fas fa-plus"></i> פרויקט חדש
+                    </button>
+                </div>
+
+                <div id="loadingState" class="flex-1 flex flex-col items-center justify-center text-slate-400 py-12 hidden">
+                    <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                    <p>טוען פרויקטים...</p>
+                </div>
+
+                <div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-slate-400 py-12">
+                    <i class="fas fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                    <p class="text-lg font-medium">אין פרויקטים עדיין</p>
+                    <p class="text-sm">לחץ על "פרויקט חדש" כדי להתחיל</p>
+                </div>
+
+                <div id="projectsList" class="flex flex-col sm:flex-row sm:flex-wrap gap-4 flex-1 content-start custom-scrollbar overflow-y-auto pr-2 pb-2 hidden">
+                    <!-- Project cards will be injected here -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Overlay for Form -->
+    <div id="projectModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="toggleModal(false)"></div>
+        
+        <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg mx-4 z-10 overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 id="modalTitle" class="text-xl font-semibold text-slate-700 flex items-center gap-2">
+                    <i class="fas fa-plus-circle text-blue-500"></i> הוספת פרויקט חדש
+                </h2>
+                <button onclick="toggleModal(false)" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                <form id="projectForm" class="space-y-4">
+                    <div class="grid grid-cols-1 gap-4">
+                        <!-- Customer Name -->
+                        <div>
+                            <label for="customerName" class="block text-sm font-medium text-slate-700 mb-1">שם לקוח *</label>
+                            <input type="text" id="customerName" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                        </div>
+
+                        <!-- Location -->
+                        <div>
+                            <label for="location" class="block text-sm font-medium text-slate-700 mb-1">מיקום</label>
+                            <input type="text" id="location" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Quote Price -->
+                            <div>
+                                <label for="quotePrice" class="block text-sm font-medium text-slate-700 mb-1">מחיר הצעה (₪)</label>
+                                <input type="number" id="quotePrice" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                            </div>
+
+                            <!-- Expenses -->
+                            <div>
+                                <label for="expenses" class="block text-sm font-medium text-slate-700 mb-1">הוצאות צפויות (₪)</label>
+                                <input type="number" id="expenses" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                            </div>
+                        </div>
+
+                        <!-- Color Picker -->
+                        <div>
+                            <label for="color" class="block text-sm font-medium text-slate-700 mb-1">צבע זיהוי לפרויקט</label>
+                            <div class="flex items-center gap-3">
+                                <input type="color" id="color" value="#3b82f6" class="w-16 h-10 p-1 border border-slate-300 rounded-md cursor-pointer">
+                                <span class="text-sm text-slate-500">יופיע ביומן</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Start Date -->
+                            <div>
+                                <label for="startDate" class="block text-sm font-medium text-slate-700 mb-1">תאריך התחלה *</label>
+                                <input type="date" id="startDate" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                            </div>
+
+                            <!-- Start Time -->
+                            <div>
+                                <label for="startTime" class="block text-sm font-medium text-slate-700 mb-1">שעת התחלה</label>
+                                <input type="time" id="startTime" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Work Duration -->
+                            <div>
+                                <label for="duration" class="block text-sm font-medium text-slate-700 mb-1">משך עבודה</label>
+                                <input type="text" id="duration" placeholder="לדוג': יומיים" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                            </div>
+
+                            <!-- Closing Price -->
+                            <div>
+                                <label for="closingPrice" class="block text-sm font-medium text-slate-700 mb-1">מחיר סגירה (₪)</label>
+                                <input type="number" id="closingPrice" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                            </div>
+                        </div>
+
+                        <!-- Search Words -->
+                        <div>
+                            <label for="searchWords" class="block text-sm font-medium text-slate-700 mb-1">מילות חיפוש / תגיות</label>
+                            <input type="text" id="searchWords" placeholder="פסיק בין מילה למילה" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
+                        <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-md transition-colors flex items-center justify-center gap-2">
+                            <i class="fas fa-save"></i> שמור פרויקט
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="p-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2">
+                <button type="button" onclick="alert('פונקציית הפקת טופס תתווסף בהמשך')" class="w-full bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-3 rounded-md transition-colors text-sm border border-slate-300 flex items-center justify-center gap-1">
+                    <i class="fas fa-file-invoice"></i> הפקת הצעה
+                </button>
+                <button type="button" onclick="alert('פונקציית חלוקת ספקים תתווסף בהמשך')" class="w-full bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-3 rounded-md transition-colors text-sm border border-slate-300 flex items-center justify-center gap-1">
+                    <i class="fas fa-truck"></i> חלוקת ספקים
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Project Modal Overlay -->
+    <div id="viewProjectModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="toggleViewModal(false)"></div>
+        
+        <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg mx-4 z-10 overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="text-xl font-semibold text-slate-700 flex items-center gap-2">
+                    <i class="fas fa-project-diagram text-blue-500"></i> פרטי פרויקט
+                </h2>
+                <button onclick="toggleViewModal(false)" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div id="viewProjectDetails" class="p-5 max-h-[80vh] overflow-y-auto custom-scrollbar space-y-4">
+                <!-- Details will be injected here -->
+            </div>
+            
+            <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-between gap-2">
+                <button type="button" id="deleteProjectBtn" onclick="deleteProject(currentViewId)" class="bg-red-50 hover:bg-red-100 text-red-600 font-medium py-2 px-4 rounded-md transition-colors text-sm border border-red-200 flex items-center gap-1">
+                    <i class="fas fa-trash-alt"></i> מחק
+                </button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="editProject(currentViewId)" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors text-sm flex items-center gap-1">
+                        <i class="fas fa-edit"></i> ערוך
+                    </button>
+                    <button type="button" onclick="toggleViewModal(false)" class="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-md transition-colors text-sm border border-slate-300">
+                        סגור
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CALENDAR_ARTIFACT_ID = '747cdbe2-ebf4-48f9-a7a5-8578e8835c5e';
+        let projects = [];
+        let editingId = null; // null = create mode, string = edit mode
+        let currentViewId = null; // tracks which project is displayed in view modal
+
+        // DOM Elements
+        const form = document.getElementById('projectForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const projectsList = document.getElementById('projectsList');
+        const emptyState = document.getElementById('emptyState');
+        const loadingState = document.getElementById('loadingState');
+        const projectCount = document.getElementById('projectCount');
+        const modalTitle = document.getElementById('modalTitle');
+
+        // Set default date to today
+        document.getElementById('startDate').valueAsDate = new Date();
+
+        function toggleModal(show) {
+            const modal = document.getElementById('projectModal');
+            if (show) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            } else {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+                // Reset form mode on close if not editing
+                if (!editingId) form.reset();
+                document.getElementById('color').value = '#3b82f6';
+                document.getElementById('startDate').valueAsDate = new Date();
+            }
+        }
+
+        function toggleViewModal(show) {
+            const modal = document.getElementById('viewProjectModal');
+            if (show) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            } else {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Open edit modal with project data pre-filled
+        function editProject(id) {
+            const project = projects.find(p => p.id === id);
+            if (!project) return;
+            
+            editingId = id;
+            modalTitle.innerHTML = '<i class="fas fa-edit text-blue-500"></i> עריכת פרויקט';
+            
+            document.getElementById('customerName').value = project.customerName || '';
+            document.getElementById('location').value = project.location || '';
+            document.getElementById('quotePrice').value = project.quotePrice || '';
+            document.getElementById('expenses').value = project.expenses || '';
+            document.getElementById('color').value = project.color || '#3b82f6';
+            document.getElementById('startDate').value = project.startDate || '';
+            document.getElementById('startTime').value = project.startTime || '';
+            document.getElementById('duration').value = project.duration || '';
+            document.getElementById('closingPrice').value = project.closingPrice || '';
+            document.getElementById('searchWords').value = project.searchWords || '';
+            
+            toggleViewModal(false);
+            toggleModal(true);
+        }
+
+        // Delete project with confirmation
+        async function deleteProject(id) {
+            const project = projects.find(p => p.id === id);
+            if (!project) return;
+            if (!confirm(`האם למחוק את הפרויקט "${project.customerName}"?`)) return;
+            
+            try {
+                projects = projects.filter(p => p.id !== id);
+                await sdk.db.set('projects', projects);
+                toggleViewModal(false);
+                renderProjects();
+            } catch (error) {
+                console.error("Error deleting project:", error);
+                alert("אירעה שגיאה במחיקת הפרויקט.");
+            }
+        }
+
+        function viewProject(id) {
+            const project = projects.find(p => p.id === id);
+            if (!project) return;
+            currentViewId = id;
+            
+            const detailsContainer = document.getElementById('viewProjectDetails');
+            detailsContainer.innerHTML = `
+                <div class="space-y-4 text-sm text-slate-700">
+                    <div class="flex border-b border-slate-100 mb-4">
+                        <button onclick="switchTab('details')" id="tab-details" class="px-4 py-2 text-blue-600 border-b-2 border-blue-600 font-medium">פרטים</button>
+                        <button onclick="switchTab('docs', '${project.id}')" id="tab-docs" class="px-4 py-2 text-slate-500 hover:text-blue-600 font-medium">מסמכים <span id="docBadge" class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full text-[10px]">...</span></button>
+                    </div>
+
+                    <div id="projectDetailsContent" class="space-y-4">
+                        <div>
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">לקוח</h3>
+                            <p class="text-base font-medium">${project.customerName}</p>
+                        </div>
+                    ${project.location ? `
+                    <div>
+                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">מיקום</h3>
+                        <p>${project.location}</p>
+                    </div>` : ''}
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">תאריך התחלה</h3>
+                            <p>${formatDate(project.startDate)} ${project.startTime ? ' | ' + project.startTime : ''}</p>
+                        </div>
+                        ${project.duration ? `
+                        <div>
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">משך</h3>
+                            <p>${project.duration}</p>
+                        </div>` : ''}
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        ${project.quotePrice ? `
+                        <div>
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">מחיר הצעה</h3>
+                            <p>₪${project.quotePrice.toLocaleString()}</p>
+                        </div>` : ''}
+                        ${project.closingPrice ? `
+                        <div>
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">מחיר סגירה</h3>
+                            <p>₪${project.closingPrice.toLocaleString()}</p>
+                        </div>` : ''}
+                    </div>
+                    ${project.expenses ? `
+                    <div>
+                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">הוצאות צפויות</h3>
+                        <p>₪${project.expenses.toLocaleString()}</p>
+                    </div>` : ''}
+                    ${project.searchWords ? `
+                    <div>
+                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">תגיות</h3>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            ${project.searchWords.split(',').map(tag => tag.trim() ? '<span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100">' + tag.trim() + '</span>' : '').join('')}
+                        </div>
+                    </div>` : ''}
+                    </div>
+
+                    <div id="projectDocsContent" class="hidden">
+                        <div id="docsLoading" class="flex flex-col items-center justify-center py-12 text-slate-400">
+                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                            <p>טוען מסמכים...</p>
+                        </div>
+                        <div id="docsEmpty" class="hidden flex flex-col items-center justify-center py-12 text-slate-400">
+                            <i class="fas fa-file-invoice text-3xl mb-2 opacity-30"></i>
+                            <p>אין מסמכים לפרויקט זה עדיין</p>
+                            <p class="text-xs">סרוק מסמכים ושייך אותם לפרויקט זה בסורק</p>
+                        </div>
+                        <div id="docsGrid" class="grid grid-cols-2 gap-3 pb-4">
+                            <!-- Docs injected here -->
+                        </div>
+                    </div>
+                </div>
+            `;
+            toggleViewModal(true);
+            updateDocBadge(project.id);
+        }
+
+        const SCANNER_ARTIFACT_ID = 'b0073794-3522-4e4b-8e77-36946154f0d9'; // Updated to point to the correct copy of the scanner
+
+        function switchTab(tab, projectId) {
+            const detailsBtn = document.getElementById('tab-details');
+            const docsBtn = document.getElementById('tab-docs');
+            const detailsContent = document.getElementById('projectDetailsContent');
+            const docsContent = document.getElementById('projectDocsContent');
+
+            if (tab === 'docs') {
+                detailsBtn.className = 'px-4 py-2 text-slate-500 hover:text-blue-600 font-medium';
+                docsBtn.className = 'px-4 py-2 text-blue-600 border-b-2 border-blue-600 font-medium';
+                detailsContent.classList.add('hidden');
+                docsContent.classList.remove('hidden');
+                renderProjectDocs(projectId);
+            } else {
+                detailsBtn.className = 'px-4 py-2 text-blue-600 border-b-2 border-blue-600 font-medium';
+                docsBtn.className = 'px-4 py-2 text-slate-500 hover:text-blue-600 font-medium';
+                detailsContent.classList.remove('hidden');
+                docsContent.classList.add('hidden');
+            }
+        }
+
+        async function updateDocBadge(projectId) {
+            try {
+                const docs = await sdk.db.get('documents', SCANNER_ARTIFACT_ID);
+                const projectDocs = (Array.isArray(docs) ? docs : []).filter(d => d.projectId === projectId);
+                const badge = document.getElementById('docBadge');
+                if (badge) badge.textContent = projectDocs.length;
+            } catch (e) {
+                console.error("Error updating badge:", e);
+            }
+        }
+
+        async function renderProjectDocs(projectId) {
+            const grid = document.getElementById('docsGrid');
+            const loading = document.getElementById('docsLoading');
+            const empty = document.getElementById('docsEmpty');
+            
+            grid.innerHTML = '';
+            loading.classList.remove('hidden');
+            empty.classList.add('hidden');
+
+            try {
+                const docs = await sdk.db.get('documents', SCANNER_ARTIFACT_ID);
+                const projectDocs = (Array.isArray(docs) ? docs : []).filter(d => d.projectId === projectId);
+                
+                loading.classList.add('hidden');
+                
+                if (projectDocs.length === 0) {
+                    empty.classList.remove('hidden');
+                    return;
+                }
+
+                grid.innerHTML = projectDocs.map(doc => `
+                    <div class="border border-slate-100 rounded-lg overflow-hidden group">
+                        <div class="aspect-[3/4] bg-slate-100 relative overflow-hidden">
+                            <img src="${doc.imageUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                            <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <a href="${doc.imageUrl}" target="_blank" class="bg-white text-slate-700 p-2 rounded-full shadow-lg">
+                                    <i class="fas fa-expand"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="p-2 text-[11px] bg-white">
+                            <p class="font-bold text-slate-700 truncate" title="${doc.title}">${doc.title}</p>
+                            <p class="text-slate-400">${doc.docType || 'אחר'}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error("Error rendering docs:", e);
+                loading.classList.add('hidden');
+                empty.classList.remove('hidden');
+            }
+        }
+
+        // Check auth and load data
+        async function init() {
+            const user = await sdk.getUser();
+            if (user) {
+                document.getElementById('userInfo').innerHTML = `שלום, ${user.first_name || user.user_name || 'משתמש'}`;
+            }
+
+            await loadProjects();
+        }
+
+        // Load projects from DB
+        async function loadProjects() {
+            showLoading(true);
+            try {
+                const data = await sdk.db.get('projects');
+                projects = Array.isArray(data) ? data : [];
+                renderProjects();
+            } catch (error) {
+                console.error("Failed to load projects:", error);
+                // Graceful degradation, just start empty if error
+                projects = [];
+                renderProjects();
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Render project cards
+        function renderProjects() {
+            projectCount.textContent = projects.length;
+
+            if (projects.length === 0) {
+                emptyState.classList.remove('hidden');
+                projectsList.classList.add('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            projectsList.classList.remove('hidden');
+            
+            // Sort by start date, newest first
+            const sortedProjects = [...projects].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+            projectsList.innerHTML = sortedProjects.map(project => `
+                <div onclick="viewProject('${project.id}')" class="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white relative overflow-hidden group cursor-pointer flex flex-col">
+                    <div class="absolute top-0 right-0 w-1.5 h-full" style="background-color: ${project.color || '#3b82f6'}"></div>
+                    
+                    <div class="flex justify-between items-start mb-2 mr-2 gap-2">
+                        <h3 class="font-bold text-lg text-slate-800 break-words flex-1 leading-tight" title="${project.customerName}">${project.customerName}</h3>
+                        <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md whitespace-nowrap shrink-0">
+                            <i class="far fa-calendar-alt ml-1"></i>${formatDate(project.startDate)}
+                        </span>
+                    </div>
+                    
+                    <div class="space-y-1.5 text-sm text-slate-600 mr-2">
+                        ${project.location ? `<p class="break-words" title="${project.location}"><i class="fas fa-map-marker-alt w-4 text-center ml-1 text-slate-400"></i> ${project.location}</p>` : ''}
+                        ${project.quotePrice ? `<p><i class="fas fa-file-invoice-dollar w-4 text-center ml-1 text-slate-400"></i> מחיר הצעה: ₪${project.quotePrice.toLocaleString()}</p>` : ''}
+                        ${project.duration ? `<p class="break-words" title="${project.duration}"><i class="fas fa-clock w-4 text-center ml-1 text-slate-400"></i> משך: ${project.duration}</p>` : ''}
+                    </div>
+
+                    ${project.searchWords ? `
+                        <div class="mt-3 mr-2 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5">
+                            ${project.searchWords.split(',').map(tag => tag.trim() ? `<span class="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 break-words max-w-full" title="${tag.trim()}">${tag.trim()}</span>` : '').join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר...';
+            submitBtn.disabled = true;
+
+            const isEditing = !!editingId;
+
+            const projectData = {
+                customerName: document.getElementById('customerName').value,
+                location: document.getElementById('location').value,
+                quotePrice: parseFloat(document.getElementById('quotePrice').value) || null,
+                expenses: parseFloat(document.getElementById('expenses').value) || null,
+                color: document.getElementById('color').value,
+                startDate: document.getElementById('startDate').value,
+                duration: document.getElementById('duration').value,
+                startTime: document.getElementById('startTime').value,
+                closingPrice: parseFloat(document.getElementById('closingPrice').value) || null,
+                searchWords: document.getElementById('searchWords').value
+            };
+
+            try {
+                if (isEditing) {
+                    // Edit mode: update existing project
+                    const index = projects.findIndex(p => p.id === editingId);
+                    if (index === -1) throw new Error("Project not found");
+                    
+                    const oldProject = { ...projects[index] };
+                    projects[index] = { ...projects[index], ...projectData };
+                    
+                    renderProjects();
+                    await sdk.db.set('projects', projects);
+                    
+                    editingId = null;
+                    toggleModal(false);
+                } else {
+                    // Create mode: add new project
+                    const newProject = {
+                        id: crypto.randomUUID(),
+                        ...projectData
+                    };
+
+                    projects.push(newProject);
+                    renderProjects();
+
+                    form.reset();
+                    document.getElementById('color').value = '#3b82f6';
+                    document.getElementById('startDate').valueAsDate = new Date();
+
+                    await sdk.db.set('projects', projects);
+
+                    await syncToCalendar(newProject);
+                    await syncToFinance(newProject);
+
+                    toggleModal(false);
+                }
+
+            } catch (error) {
+                console.error("Error saving project:", error);
+                alert("אירעה שגיאה בשמירת הפרויקט.");
+            } finally {
+                submitBtn.innerHTML = originalBtnText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        const FINANCE_APP_ID = '072b639b-e0c7-4dd4-8ab3-cd883c81fd83';
+
+        async function syncToFinance(project) {
+            if (!project.closingPrice) return;
+            try {
+                let incomes = [];
+                try {
+                    const data = await sdk.db.get('incomes', FINANCE_APP_ID);
+                    incomes = Array.isArray(data) ? data : [];
+                } catch(e) {}
+                
+                incomes.push({
+                    id: crypto.randomUUID(),
+                    date: project.startDate,
+                    type: "עתידי",
+                    amount: project.closingPrice,
+                    description: `הכנסה מפרויקט: ${project.customerName}`
+                });
+                await sdk.db.set('incomes', incomes, FINANCE_APP_ID);
+            } catch (err) {
+                console.error("Failed to sync to finance:", err);
+            }
+        }
+
+        // Write directly to calendar DB
+        async function syncToCalendar(project) {
+            try {
+                let events = [];
+                try {
+                    const data = await sdk.db.get('events', CALENDAR_ARTIFACT_ID);
+                    events = Array.isArray(data) ? data : [];
+                } catch(e) {
+                    console.log("No existing events or error reading, starting fresh array.");
+                }
+                
+                const durationStr = project.duration ? String(project.duration).replace(/[^0-9]/g, '') : '1';
+                const days = Math.max(1, parseInt(durationStr) || 1);
+                
+                const [y, m, d] = project.startDate.split('-').map(Number);
+                let current = new Date(y, m - 1, d);
+                
+                for (let i = 0; i < days; i++) {
+                    const year = current.getFullYear();
+                    const month = String(current.getMonth() + 1).padStart(2, '0');
+                    const day = String(current.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+
+                    events.push({
+                        id: crypto.randomUUID(),
+                        title: `${project.customerName}${project.location ? ' - ' + project.location : ''}`,
+                        date: dateStr,
+                        color: project.color || '#3b82f6'
+                    });
+                    
+                    current.setDate(current.getDate() + 1);
+                }
+
+                await sdk.db.set('events', events, CALENDAR_ARTIFACT_ID);
+            } catch (err) {
+                console.error("Failed to sync to calendar:", err);
+            }
+        }
+
+        // Utilities
+        function showLoading(show) {
+            if (show) {
+                loadingState.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+                projectsList.classList.add('hidden');
+            } else {
+                loadingState.classList.add('hidden');
+            }
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const [year, month, day] = dateString.split('-');
+            return `${day}/${month}/${year}`;
+        }
+
+        // Bootstrap
+        init();
+    </script>
+</body>
+</html>

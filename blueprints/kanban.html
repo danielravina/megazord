@@ -1,0 +1,739 @@
+
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   
+    <title>מערכת ניהול דרישות</title>
+    <style>
+        /* Custom scrollbar for columns */
+        .kanban-col::-webkit-scrollbar {
+            width: 6px;
+        }
+        .kanban-col::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+            border-radius: 4px;
+        }
+        .kanban-col::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .kanban-col::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        /* Spinner */
+        .spinner {
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-right-color: #3b82f6;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-screen overflow-hidden flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg">
+                    <i class="fa-solid fa-layer-group text-xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">מעקב בקשות לקוח</h1>
+            </div>
+            
+
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex flex-col gap-8 min-h-0">
+        
+        <!-- Loading State -->
+        <div id="global-loading" class="flex flex-col items-center justify-center py-12 hidden">
+            <div class="spinner mb-4"></div>
+            <p class="text-gray-500">טוען נתונים...</p>
+        </div>
+
+        <!-- Client Submission Form (Hidden for Developer) -->
+        <section id="client-form-section" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300">
+            <div class="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center cursor-pointer" onclick="toggleForm()">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-blue-500"></i>
+                    בקשה חדשה
+                </h2>
+                <i id="form-chevron" class="fa-solid fa-chevron-up text-gray-400 transition-transform"></i>
+            </div>
+            
+            <div id="form-content" class="px-6 py-6">
+                <form id="new-request-form" class="space-y-6">
+                    <div>
+                        <label for="title" class="block text-sm font-medium text-gray-700 mb-1">כותרת הבקשה</label>
+                        <input type="text" id="title" required placeholder="לדוגמה: הוספת כפתור ייצוא לאקסל" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm">
+                    </div>
+
+                    <div>
+                        <label for="details" class="block text-sm font-medium text-gray-700 mb-1">פירוט הבקשה</label>
+                        <textarea id="details" required rows="5" placeholder="תאר כאן את הבקשה במלואה, אפשר להוסיף הערות וקישורים..." class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm"></textarea>
+                    </div>
+
+                    <div>
+                        <label for="priority" class="block text-sm font-medium text-gray-700 mb-1">עדיפות</label>
+                        <select id="priority" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm">
+                            <option value="high">חסם מכירות</option>
+                            <option value="medium" selected>חשוב</option>
+                            <option value="low">נחמד שיהיה</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">קבצים מצורפים (אופציונלי)</label>
+                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <div class="space-y-1 text-center">
+                                <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 mb-2"></i>
+                                <div class="flex text-sm text-gray-600 justify-center">
+                                    <label for="file-upload" class="relative cursor-pointer bg-transparent rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                        <span>בחר קבצים</span>
+                                        <input id="file-upload" name="file-upload" type="file" class="sr-only" multiple onchange="updateFileNames(this)">
+                                    </label>
+                                    <p class="pl-1 pe-1">או גרירה לכאן</p>
+                                </div>
+                                <p class="text-xs text-gray-500" id="file-names-display">לא נבחרו קבצים</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="submit" id="submit-btn" class="inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 items-center gap-2 disabled:opacity-50">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            שלח בקשה
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Kanban Board -->
+        <section class="flex-1 flex flex-col min-h-0">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 h-full min-h-0">
+                
+                <!-- Column: New -->
+                <div class="bg-gray-100/80 rounded-xl p-4 flex flex-col h-full border border-gray-200 shadow-sm min-h-0" ondragover="allowDrop(event)" ondrop="drop(event, 'new')">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-300">
+                        <h3 class="font-bold text-gray-700 flex items-center gap-2">
+                            <i class="fa-solid fa-inbox text-gray-500"></i>
+                            חדש
+                            <span id="count-new" class="bg-gray-200 text-gray-700 text-xs py-0.5 px-2 rounded-full ml-2">0</span>
+                        </h3>
+                    </div>
+                    <div id="col-new" class="kanban-col flex-1 overflow-y-auto space-y-3 pb-2">
+                        <!-- Cards will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Column: In Progress -->
+                <div class="bg-blue-50/50 rounded-xl p-4 flex flex-col h-full border border-blue-100 shadow-sm min-h-0" ondragover="allowDrop(event)" ondrop="drop(event, 'in_progress')">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-blue-200">
+                        <h3 class="font-bold text-blue-800 flex items-center gap-2">
+                            <i class="fa-solid fa-spinner text-blue-500"></i>
+                            בביצוע
+                            <span id="count-in_progress" class="bg-blue-200 text-blue-800 text-xs py-0.5 px-2 rounded-full ml-2">0</span>
+                        </h3>
+                    </div>
+                    <div id="col-in_progress" class="kanban-col flex-1 overflow-y-auto space-y-3 pb-2">
+                        <!-- Cards will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Column: Done -->
+                <div class="bg-green-50/50 rounded-xl p-4 flex flex-col h-full border border-green-100 shadow-sm min-h-0" ondragover="allowDrop(event)" ondrop="drop(event, 'done')">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-green-200">
+                        <h3 class="font-bold text-green-800 flex items-center gap-2">
+                            <i class="fa-solid fa-check-circle text-green-500"></i>
+                            הושלם
+                            <span id="count-done" class="bg-green-200 text-green-800 text-xs py-0.5 px-2 rounded-full ml-2">0</span>
+                        </h3>
+                    </div>
+                    <div id="col-done" class="kanban-col flex-1 overflow-y-auto space-y-3 pb-2">
+                        <!-- Cards will be injected here -->
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Ticket Modal -->
+        <div id="ticket-modal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeTicketModal()"></div>
+            <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+                <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                    <div class="relative transform overflow-hidden rounded-lg bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl flex flex-col">
+                        <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-right w-full">
+                                    <div class="flex justify-between items-start mb-4">
+                                        <h3 class="text-xl font-semibold leading-6 text-gray-900" id="modal-title">כותרת בקשה</h3>
+                                        <button type="button" class="text-gray-400 hover:text-gray-500 mr-4" onclick="closeTicketModal()">
+                                            <i class="fa-solid fa-xmark text-xl"></i>
+                                        </button>
+                                    </div>
+                                    <div class="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-4" id="modal-meta">
+                                        <!-- meta data -->
+                                    </div>
+                                    <div class="mt-2 text-right">
+                                        <div class="text-sm text-gray-700 whitespace-pre-wrap border border-gray-100 p-4 rounded-lg bg-gray-50 min-h-[100px] text-right" id="modal-details" style="word-break: break-word; text-align: right;"></div>
+                                    </div>
+                                    <div class="mt-4" id="modal-files">
+                                        <!-- files -->
+                                    </div>
+                                    <div class="mt-6 border-t border-gray-200 pt-4" id="modal-chat-section">
+                                        <h4 class="text-sm font-semibold text-gray-800 mb-3 text-right">שיחה</h4>
+                                        <div id="modal-chat-messages" class="flex flex-col gap-3 mb-3 max-h-60 overflow-y-auto pr-1">
+                                            <!-- comments -->
+                                        </div>
+                                        <form id="chat-form" class="flex gap-2" onsubmit="event.preventDefault(); addComment(event)">
+                                            <input type="text" id="chat-input" placeholder="הקלד הודעה..." class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 shadow-sm text-sm" required>
+                                            <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">שלח</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                            <button type="button" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto" onclick="closeTicketModal()">סגור</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // State
+        let state = {
+            requests: [],
+            isFormOpen: false, // Changed to false so form is closed by default
+            isSubmitting: false,
+            currentModalId: null
+        };
+
+        const DOM = {
+            formSection: document.getElementById('client-form-section'),
+            formContent: document.getElementById('form-content'),
+            formChevron: document.getElementById('form-chevron'),
+            form: document.getElementById('new-request-form'),
+            submitBtn: document.getElementById('submit-btn'),
+            fileDisplay: document.getElementById('file-names-display'),
+            fileInput: document.getElementById('file-upload'),
+            globalLoading: document.getElementById('global-loading'),
+            columns: {
+                new: document.getElementById('col-new'),
+                in_progress: document.getElementById('col-in_progress'),
+                done: document.getElementById('col-done')
+            },
+            counts: {
+                new: document.getElementById('count-new'),
+                in_progress: document.getElementById('count-in_progress'),
+                done: document.getElementById('count-done')
+            },
+            ticketModal: document.getElementById('ticket-modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalDetails: document.getElementById('modal-details'),
+            modalMeta: document.getElementById('modal-meta'),
+            modalFiles: document.getElementById('modal-files'),
+            modalChatMessages: document.getElementById('modal-chat-messages'),
+            chatInput: document.getElementById('chat-input')
+        };
+
+        // Initialization
+        async function init() {
+            setLoading(true);
+            try {
+                // Fetch data using sdk.db
+                const data = await sdk.db.get('requests');
+                state.requests = Array.isArray(data) ? data : [];
+                render();
+            } catch (error) {
+                console.error("Error loading requests:", error);
+                // Fallback to empty state on error to avoid breaking the UI completely
+                state.requests = [];
+                render();
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Render entire UI based on state
+        function render() {
+            renderFormVisibility();
+            renderKanban();
+        }
+
+        function toggleForm() {
+            state.isFormOpen = !state.isFormOpen;
+            renderFormVisibility();
+        }
+
+        function renderFormVisibility() {
+            DOM.formSection.style.display = 'block';
+            if (state.isFormOpen) {
+                DOM.formContent.classList.remove('hidden');
+                DOM.formChevron.classList.remove('rotate-180');
+            } else {
+                DOM.formContent.classList.add('hidden');
+                DOM.formChevron.classList.add('rotate-180');
+            }
+        }
+
+        function updateFileNames(input) {
+            if (input.files && input.files.length > 0) {
+                const names = Array.from(input.files).map(f => f.name).join(', ');
+                DOM.fileDisplay.textContent = names;
+                DOM.fileDisplay.classList.add('text-blue-600');
+            } else {
+                DOM.fileDisplay.textContent = 'לא נבחרו קבצים';
+                DOM.fileDisplay.classList.remove('text-blue-600');
+            }
+        }
+
+        // Form Submission
+        DOM.form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (state.isSubmitting) return;
+
+            state.isSubmitting = true;
+            DOM.submitBtn.disabled = true;
+            DOM.submitBtn.innerHTML = '<div class="spinner border-t-white w-4 h-4 mr-2 border-2"></div> שולח...';
+
+            try {
+                // Collect form data
+                const title = document.getElementById('title').value;
+                const details = document.getElementById('details').value;
+                const priority = document.getElementById('priority').value;
+                
+                // Handle files (Simulated upload logic returning URLs or names)
+                let uploadedFiles = [];
+                if (DOM.fileInput.files.length > 0) {
+                    // For a real implementation using sdk.uploadFile:
+                    for(let i=0; i<DOM.fileInput.files.length; i++){
+                        const file = DOM.fileInput.files[i];
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                            const res = await sdk.uploadFile(formData);
+                            uploadedFiles.push(res.url); // Use URL if upload succeeds
+                        } catch(err) {
+                            console.warn("Upload failed, falling back to name", err);
+                            uploadedFiles.push(file.name); // Fallback to name for demo
+                        }
+                    }
+                }
+
+                const newRequest = {
+                    id: 'req_' + Math.random().toString(36).substr(2, 9),
+                    title: title,
+                    details: details,
+                    priority: priority,
+                    status: 'new',
+                    created_at: Date.now(),
+                    files: uploadedFiles
+                };
+
+                // Optimistic update
+                const newRequests = [newRequest, ...state.requests];
+                state.requests = newRequests;
+                renderKanban(); // Re-render immediately
+
+                // Persist
+                await sdk.db.set('requests', newRequests);
+                
+                // Reset form
+                DOM.form.reset();
+                updateFileNames(DOM.fileInput);
+                
+            } catch (error) {
+                console.error("Failed to submit request:", error);
+                alert("אירעה שגיאה בשמירת הבקשה. אנא נסה שוב.");
+                // Rollback optimistic update would go here in a robust system
+            } finally {
+                state.isSubmitting = false;
+                DOM.submitBtn.disabled = false;
+                DOM.submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> שלח בקשה';
+            }
+        });
+
+        // Change Status Logic
+        async function changeStatus(id, newStatus) {
+            const index = state.requests.findIndex(r => r.id === id);
+            if (index === -1) return;
+
+            // Optimistic update
+            const updatedRequests = [...state.requests];
+            updatedRequests[index] = { ...updatedRequests[index], status: newStatus };
+            state.requests = updatedRequests;
+            
+            renderKanban();
+
+            try {
+                await sdk.db.set('requests', updatedRequests);
+            } catch (error) {
+                console.error("Failed to update status:", error);
+                alert("אירעה שגיאה בעדכון הסטטוס.");
+            }
+        }
+        
+        // Change Priority Logic
+        async function changePriority(id, newPriority) {
+            const index = state.requests.findIndex(r => r.id === id);
+            if (index === -1) return;
+
+            // Optimistic update
+            const updatedRequests = [...state.requests];
+            updatedRequests[index] = { ...updatedRequests[index], priority: newPriority };
+            state.requests = updatedRequests;
+            
+            renderKanban();
+
+            try {
+                await sdk.db.set('requests', updatedRequests);
+            } catch (error) {
+                console.error("Failed to update priority:", error);
+                alert("אירעה שגיאה בעדכון העדיפות.");
+            }
+        }
+
+        // Drag and Drop Logic
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drag(ev, id) {
+            ev.dataTransfer.setData("text", id);
+            
+            // יצירת עותק של הכרטיס עבור מראה הגרירה
+            const target = ev.currentTarget;
+            const clone = target.cloneNode(true);
+            
+            // עיצוב העותק - גודל מקורי, נטוי, ולא שקוף מדי
+            clone.style.position = "absolute";
+            clone.style.top = "-9999px"; 
+            clone.style.right = "-9999px";
+            clone.style.width = target.offsetWidth + "px"; 
+            clone.style.transform = "rotate(4deg)";
+            clone.style.opacity = "1";
+            clone.style.backgroundColor = "white";
+            clone.style.boxShadow = "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)";
+            clone.style.zIndex = "9999";
+            
+            document.body.appendChild(clone);
+            
+            // הגדרת תמונת הגרירה של הדפדפן לעותק שיצרנו
+            ev.dataTransfer.setDragImage(clone, target.offsetWidth / 2, 20);
+            
+            // מחיקת העותק מיד לאחר שהדפדפן "מצלם" אותו לגרירה
+            setTimeout(() => {
+                if (clone.parentNode) {
+                    clone.parentNode.removeChild(clone);
+                }
+            }, 0);
+        }
+
+        function drop(ev, newStatus) {
+            ev.preventDefault();
+            const id = ev.dataTransfer.getData("text");
+            if (id) {
+                changeStatus(id, newStatus);
+            }
+        }
+
+        function openTicketModal(id) {
+            const req = state.requests.find(r => r.id === id);
+            if (!req) return;
+            
+            DOM.modalTitle.textContent = req.title;
+            DOM.modalDetails.textContent = req.details || 'אין פירוט לבקשה זו.';
+            
+            let statusText = req.status === 'new' ? 'חדש' : req.status === 'in_progress' ? 'בביצוע' : 'הושלם';
+            let priorityText = req.priority === 'high' ? 'חסם מכירות' : req.priority === 'medium' ? 'חשוב' : 'נחמד שיהיה';
+            
+            DOM.modalMeta.innerHTML = `
+                <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">סטטוס: ${statusText}</span>
+                <span class="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">עדיפות: ${priorityText}</span>
+                <span class="text-gray-400 text-xs flex items-center gap-1"><i class="fa-regular fa-clock"></i> ${formatDate(req.created_at)}</span>
+            `;
+            
+            // Render files
+            let filesHtml = '';
+            if (req.files && req.files.length > 0) {
+                filesHtml = `<div class="mt-3 flex flex-col gap-2">
+                    <h4 class="text-sm font-medium text-gray-700">קבצים מצורפים:</h4>
+                    <div class="flex flex-wrap gap-2">
+                `;
+                filesHtml += req.files.map(f => {
+                    const isUrl = f.startsWith('http');
+                    let display = f;
+                    if (isUrl) {
+                        try { display = decodeURIComponent(f.split('/').pop().split('?')[0]) || 'קובץ מצורף'; } catch(e) { display = 'קובץ מצורף'; }
+                        return `<a href="${f}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 text-sm rounded text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors"><i class="fa-solid fa-download"></i> ${display}</a>`;
+                    } else {
+                        return `<span class="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 text-sm rounded text-gray-600 border border-gray-200"><i class="fa-solid fa-paperclip"></i> ${display}</span>`;
+                    }
+                }).join('');
+                filesHtml += `</div></div>`;
+            }
+            DOM.modalFiles.innerHTML = filesHtml;
+            
+            state.currentModalId = id;
+            renderComments(req.comments || []);
+            
+            DOM.ticketModal.classList.remove('hidden');
+        }
+
+        function renderComments(comments) {
+            if (!comments || comments.length === 0) {
+                DOM.modalChatMessages.innerHTML = '<p class="text-xs text-gray-400 text-center py-2">אין הודעות עדיין.</p>';
+                return;
+            }
+            DOM.modalChatMessages.innerHTML = comments.map(c => `
+                <div class="bg-blue-50 p-3 rounded-lg text-right text-sm">
+                    <div class="flex justify-between items-start mb-1 text-xs text-gray-500">
+                        <span class="font-medium text-gray-700">${escapeHTML(c.author)}</span>
+                        <span>${formatDate(c.created_at)}</span>
+                    </div>
+                    <div class="text-gray-800 whitespace-pre-wrap">${escapeHTML(c.text)}</div>
+                </div>
+            `).join('');
+            DOM.modalChatMessages.scrollTop = DOM.modalChatMessages.scrollHeight;
+        }
+
+        async function addComment(e) {
+            const id = state.currentModalId;
+            const text = DOM.chatInput.value.trim();
+            if (!id || !text) return;
+            
+            const index = state.requests.findIndex(r => r.id === id);
+            if (index === -1) return;
+            
+            const user = typeof sdk !== 'undefined' && sdk.getUser ? sdk.getUser() : null;
+            let author = 'אורח';
+            if (user) {
+                if (user.first_name || user.last_name) {
+                    author = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+                } else if (user.user_name) {
+                    author = user.user_name;
+                } else {
+                    author = 'משתמש';
+                }
+            }
+
+            const newComment = {
+                id: 'msg_' + Math.random().toString(36).substr(2, 9),
+                author: author,
+                text: text,
+                created_at: Date.now()
+            };
+
+            const req = state.requests[index];
+            const updatedComments = [...(req.comments || []), newComment];
+            
+            // Optimistic update
+            const updatedRequests = [...state.requests];
+            updatedRequests[index] = { ...req, comments: updatedComments };
+            state.requests = updatedRequests;
+            
+            DOM.chatInput.value = '';
+            renderComments(updatedComments);
+            renderKanban();
+
+            try {
+                if (typeof sdk !== 'undefined' && sdk.db) {
+                    await sdk.db.set('requests', updatedRequests);
+                }
+            } catch (error) {
+                console.error("Failed to add comment:", error);
+                alert("אירעה שגיאה בהוספת התגובה.");
+            }
+        }
+
+        function closeTicketModal() {
+            DOM.ticketModal.classList.add('hidden');
+            state.currentModalId = null;
+        }
+
+        // Expose to window for inline onclick handlers in generated HTML
+        window.allowDrop = allowDrop;
+        window.drag = drag;
+        window.drop = drop;
+        window.changeStatus = changeStatus;
+        window.changePriority = changePriority;
+        window.toggleForm = toggleForm;
+        window.updateFileNames = updateFileNames;
+        window.openTicketModal = openTicketModal;
+        window.closeTicketModal = closeTicketModal;
+        window.addComment = addComment;
+
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            return new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit' }).format(date);
+        }
+
+        // Render Kanban Board
+        function renderKanban() {
+            const grouped = { new: [], in_progress: [], done: [] };
+            
+            state.requests.forEach(req => {
+                if(grouped[req.status]) {
+                    grouped[req.status].push(req);
+                } else {
+                    grouped['new'].push(req); // Fallback
+                }
+            });
+
+            // Sort by priority (high > medium > low) and then created_at desc within columns
+            const priorityWeight = { high: 3, medium: 2, low: 1 };
+            Object.keys(grouped).forEach(key => {
+                grouped[key].sort((a, b) => {
+                    const weightA = priorityWeight[a.priority] || 0;
+                    const weightB = priorityWeight[b.priority] || 0;
+                    if (weightA !== weightB) {
+                        return weightB - weightA;
+                    }
+                    return b.created_at - a.created_at;
+                });
+            });
+
+            // Update Counts
+            DOM.counts.new.textContent = grouped.new.length;
+            DOM.counts.in_progress.textContent = grouped.in_progress.length;
+            DOM.counts.done.textContent = grouped.done.length;
+
+            // Render Columns
+            DOM.columns.new.innerHTML = generateCardsHTML(grouped.new);
+            DOM.columns.in_progress.innerHTML = generateCardsHTML(grouped.in_progress);
+            DOM.columns.done.innerHTML = generateCardsHTML(grouped.done);
+        }
+
+        function generateCardsHTML(requests) {
+            if (requests.length === 0) {
+                return `
+                    <div class="flex flex-col items-center justify-center p-6 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-lg h-24">
+                        אין בקשות
+                    </div>
+                `;
+            }
+
+            return requests.map(req => {
+                
+                // File rendering
+                let filesHtml = '';
+                if (req.files && req.files.length > 0) {
+                    filesHtml = `
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            ${req.files.map(f => {
+                                const isUrl = f.startsWith('http');
+                                let display = f;
+                                if (isUrl) {
+                                    try {
+                                        display = decodeURIComponent(f.split('/').pop().split('?')[0]) || 'קובץ מצורף';
+                                    } catch(e) {
+                                        display = 'קובץ מצורף';
+                                    }
+                                }
+                                if (isUrl) {
+                                    return `
+                                        <a href="${f}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-xs rounded text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors" title="פתח קובץ: ${f}">
+                                            <i class="fa-solid fa-download"></i>
+                                            <span class="truncate max-w-[100px]">${display}</span>
+                                        </a>
+                                    `;
+                                } else {
+                                    return `
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-xs rounded text-gray-600 border border-gray-200" title="${f}">
+                                            <i class="fa-solid fa-paperclip"></i>
+                                            <span class="truncate max-w-[100px]">${display}</span>
+                                        </span>
+                                    `;
+                                }
+                            }).join('')}
+                        </div>
+                    `;
+                }
+
+                // Determine priority colors
+                let priorityClasses = "bg-gray-50 border-gray-200 text-gray-700 focus:ring-blue-500 focus:border-blue-500";
+                if (req.priority === 'high') priorityClasses = "bg-red-50 border-red-200 text-red-700 focus:ring-red-500 focus:border-red-500 font-medium";
+                else if (req.priority === 'medium') priorityClasses = "bg-yellow-50 border-yellow-300 text-yellow-800 focus:ring-yellow-500 focus:border-yellow-500 font-medium";
+                else if (req.priority === 'low') priorityClasses = "bg-blue-50 border-blue-200 text-blue-700 focus:ring-blue-500 focus:border-blue-500 font-medium";
+
+                // Controls for Status and Priority
+                let controlsHtml = `
+                    <div class="mt-4 pt-3 border-t border-gray-100 flex gap-2">
+                        <select class="flex-1 text-xs border rounded px-2 py-1.5 outline-none focus:ring-1 ${priorityClasses}" onchange="changePriority('${req.id}', this.value)" onclick="event.stopPropagation()" title="עדיפות">
+                            <option value="high" ${req.priority === 'high' ? 'selected' : ''}>חסם מכירות</option>
+                            <option value="medium" ${req.priority === 'medium' ? 'selected' : ''}>חשוב</option>
+                            <option value="low" ${req.priority === 'low' ? 'selected' : ''}>נחמד שיהיה</option>
+                        </select>
+                    </div>
+                `;
+
+                return `
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex flex-col cursor-pointer" draggable="true" ondragstart="drag(event, '${req.id}')" onclick="openTicketModal('${req.id}')">
+                        <h4 class="font-semibold text-gray-800 text-sm leading-tight mb-2">${escapeHTML(req.title)}</h4>
+                        
+                        ${req.details ? `<div class="text-xs text-gray-600 mb-3 whitespace-pre-wrap line-clamp-3">${escapeHTML(req.details)}</div>` : ''}
+                        
+                        <div class="text-[10px] text-gray-400 flex items-center justify-between mt-auto">
+                            <div class="flex items-center gap-1">
+                                <i class="fa-regular fa-clock"></i>
+                                ${formatDate(req.created_at)}
+                            </div>
+                            ${(req.comments && req.comments.length > 0) ? `
+                            <div class="flex items-center gap-1 text-blue-500 font-medium bg-blue-50 px-2 py-0.5 rounded-full">
+                                <i class="fa-regular fa-comment-dots"></i>
+                                ${req.comments.length}
+                            </div>` : ''}
+                        </div>
+                        
+                        ${filesHtml}
+                        ${controlsHtml}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                DOM.globalLoading.classList.remove('hidden');
+                DOM.columns.new.innerHTML = '';
+                DOM.columns.in_progress.innerHTML = '';
+                DOM.columns.done.innerHTML = '';
+            } else {
+                DOM.globalLoading.classList.add('hidden');
+            }
+        }
+
+        // Helper to prevent XSS in innerHTML
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        }
+
+        // Start app
+        init();
+
+    </script>
+</body>
+</html>

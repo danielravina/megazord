@@ -1,0 +1,1004 @@
+
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>סורק מסמכים חכם</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Hide scrollbar for cleaner mobile look */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+
+        .fab {
+            box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
+            transition: transform 0.2s;
+        }
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        .screen {
+            display: none;
+            min-height: 100vh;
+            width: 100%;
+        }
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .doc-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .doc-card:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased overflow-x-hidden">
+
+    <!-- App Container -->
+    <div id="app" class="relative w-full max-w-md mx-auto bg-gray-100 min-h-screen shadow-2xl overflow-hidden flex flex-col">
+        
+        <!-- Header -->
+        <header class="bg-white px-4 pt-12 pb-2 shadow-sm z-10 sticky top-0">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <button id="settingsBtn" class="text-gray-400 hover:text-blue-600 transition-colors">
+                        <i class="fas fa-cog text-xl"></i>
+                    </button>
+                    <h1 class="text-2xl font-bold text-gray-900">המסמכים שלי</h1>
+                </div>
+                <div class="flex bg-gray-100 p-1 rounded-lg">
+                    <button id="listViewBtn" class="px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-blue-600">רשימה</button>
+                    <button id="folderViewBtn" class="px-3 py-1.5 text-xs font-bold rounded-md text-gray-500">תיקיות</button>
+                </div>
+            </div>
+            <div class="relative">
+                <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                <input type="text" id="searchInput" placeholder="חיפוש מסמכים או תגיות..." 
+                    class="w-full bg-gray-100 rounded-xl py-2.5 pr-10 pl-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm">
+            </div>
+        </header>
+
+        <!-- Main Screen: Document List -->
+        <div id="mainScreen" class="screen active flex-1 overflow-y-auto pb-24 px-4 pt-4">
+            <div id="foldersGrid" class="hidden grid grid-cols-2 gap-4">
+                <!-- Folders injected here -->
+            </div>
+            
+            <div id="loadingState" class="flex flex-col items-center justify-center h-48 text-gray-400 hidden">
+                <div class="loading-spinner mb-4"></div>
+                <p>טוען מסמכים...</p>
+            </div>
+
+            <div id="emptyState" class="flex flex-col items-center justify-center h-64 text-center hidden">
+                <div class="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-file-invoice text-3xl text-blue-500"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-800 mb-1">אין מסמכים עדיין</h3>
+                <p class="text-gray-500 text-sm">לחץ על כפתור המצלמה למטה כדי לסרוק את המסמך הראשון שלך.</p>
+            </div>
+
+            <div id="documentsGrid" class="grid grid-cols-1 gap-4">
+                <!-- Document cards injected here -->
+            </div>
+        </div>
+
+        <!-- Processing Screen -->
+        <div id="processingScreen" class="screen flex-1 bg-white items-center justify-center px-6 text-center">
+            <div class="relative mb-8">
+                <div class="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+                <div class="bg-white relative z-10 p-4 rounded-full shadow-lg">
+                    <div class="loading-spinner w-16 h-16 border-4"></div>
+                </div>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-800 mb-2">מנתח מסמך...</h2>
+            <p class="text-gray-500">הבינה המלאכותית קוראת את הטקסט ומזהה את סוג המסמך</p>
+        </div>
+
+        <!-- Confirmation Screen -->
+        <div id="confirmationScreen" class="screen flex-1 bg-gray-50 flex-col">
+            <div class="bg-white px-4 pt-12 pb-4 shadow-sm flex items-center justify-between sticky top-0 z-10">
+                <button id="cancelSaveBtn" class="text-gray-500 p-2">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+                <h2 class="text-lg font-bold">פרטי מסמך</h2>
+                <button id="saveDocBtn" class="text-blue-600 font-medium p-2">שמור</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-6 pb-8">
+                <!-- Image Preview -->
+                <div class="bg-white rounded-2xl shadow-sm overflow-hidden flex justify-center border border-gray-100">
+                    <img id="previewImage" src="" alt="Scanned Document" class="max-h-64 object-contain w-full bg-gray-900">
+                </div>
+
+                <!-- Form Fields -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">כותרת המסמך</label>
+                        <input type="text" id="docTitle" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">סוג מסמך</label>
+                            <select id="docType" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                                <option value="Invoice">חשבונית מס</option>
+                                <option value="Delivery Note">תעודת משלוח</option>
+                                <option value="Proforma Invoice">חשבונית פרופורמה</option>
+                                <option value="Other">אחר</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">סכום לתשלום (₪)</label>
+                            <input type="number" id="docTotalAmount" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" step="0.01">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">תאריך במסמך</label>
+                        <input type="date" id="docDateOnDoc" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">שיוך לפרויקט</label>
+                        <select id="docProjectId" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <option value="">ללא פרויקט (כללי)</option>
+                            <option value="new_project">+ פרויקט חדש...</option>
+                        </select>
+                        <input type="text" id="newProjectName" placeholder="שם פרויקט חדש" class="hidden w-full mt-2 bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">תיקייה (למסמכים כלליים)</label>
+                        <select id="docFolder" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <option value="">ללא תיקייה</option>
+                            <option value="Bank">בנק</option>
+                            <option value="VAT">מע"מ</option>
+                            <option value="Income Tax">מס הכנסה</option>
+                            <option value="National Insurance">ביטוח לאומי</option>
+                            <option value="Accountant">רואה חשבון</option>
+                            <option value="Suppliers">ספקים</option>
+                            <option value="Employees">עובדים</option>
+                            <option value="Other">אחר</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2 py-1">
+                        <input type="checkbox" id="docIsInvestment" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <label for="docIsInvestment" class="text-sm font-medium text-gray-700">השקעה בעסק (רכוש קבוע)</label>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">תגיות (מופרדות בפסיק)</label>
+                        <input type="text" id="docTags" class="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1 pl-1">טקסט שחולץ</label>
+                        <textarea id="docExtractedText" rows="4" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" readonly></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail Modal (View saved doc) -->
+        <div id="detailModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm hidden flex-col justify-end">
+            <div class="bg-white w-full max-w-md mx-auto rounded-t-3xl h-[85vh] flex flex-col transform transition-transform translate-y-full" id="detailSheet">
+                <div class="flex justify-center pt-3 pb-2">
+                    <div class="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+                </div>
+                <div class="px-4 pb-2 flex justify-between items-center border-b border-gray-100">
+                    <h3 class="text-xl font-bold truncate pr-2" id="detailTitle">כותרת</h3>
+                    <button id="closeDetailBtn" class="bg-gray-100 text-gray-600 rounded-full w-8 h-8 flex items-center justify-center">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 space-y-5">
+                    <div class="rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+                        <img id="detailImage" src="" class="w-full h-auto max-h-[40vh] object-contain">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <div>
+                            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">סוג מסמך</span>
+                            <span id="detailDocType" class="text-sm text-gray-800 font-medium">-</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">סכום לתשלום</span>
+                            <span id="detailTotalAmount" class="text-sm text-gray-800 font-medium">-</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">תאריך במסמך</span>
+                            <span id="detailDateOnDoc" class="text-sm text-gray-800 font-medium">-</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">תיקייה</span>
+                            <span id="detailFolder" class="text-sm text-gray-800 font-medium">-</span>
+                        </div>
+                        <div class="col-span-2">
+                            <span class="text-[10px] font-bold text-gray-500 uppercase block mb-1">רכוש קבוע / השקעה</span>
+                            <span id="detailIsInvestment" class="text-sm text-gray-800 font-medium">-</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase block mb-2">תגיות</span>
+                        <div class="flex flex-wrap gap-2" id="detailTags">
+                            <!-- Tags injected here -->
+                        </div>
+                    </div>
+
+                    <div class="text-xs text-gray-400 flex items-center gap-2 border-t border-gray-100 pt-4">
+                        <i class="far fa-clock"></i>
+                        <span>נוסף למערכת: </span><span id="detailDate">תאריך</span>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-2">טקסט שחולץ</h4>
+                        <p id="detailText" class="text-sm text-gray-700 whitespace-pre-wrap max-h-40 overflow-y-auto"></p>
+                    </div>
+                    
+                    <button id="deleteDocBtn" class="w-full py-3 mt-4 text-red-500 font-medium flex items-center justify-center gap-2 border border-red-200 rounded-xl hover:bg-red-50 transition-colors">
+                        <i class="far fa-trash-alt"></i>
+                        מחק מסמך
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Action Button -->
+        <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+            <label for="cameraInput" class="fab bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl cursor-pointer hover:bg-blue-700">
+                <i class="fas fa-camera"></i>
+            </label>
+            <input type="file" accept="image/*" capture="environment" id="cameraInput" class="hidden">
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm hidden flex-col justify-center px-6">
+            <div class="bg-white rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-800">הגדרות ודיווח</h3>
+                    <button id="closeSettingsBtn" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="p-6 space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">אימייל רואה חשבון</label>
+                        <input type="email" id="accountantEmail" placeholder="example@accountant.co.il" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <p class="text-[10px] text-gray-400 mt-1">כתובת האימייל תופיע על גבי הדוח המופק להורדה.</p>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-gray-100">
+                        <h4 class="text-sm font-bold text-gray-800 mb-3">ייצוא דוח חודשי</h4>
+                        <button id="generateReportBtn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                            <i class="fas fa-file-pdf"></i>
+                            הפק דוח חודש נוכחי
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm transition-opacity duration-300 opacity-0 pointer-events-none z-50">
+            הודעה
+        </div>
+
+    </div>
+
+    <!-- Hidden Canvas for Image Compression -->
+    <canvas id="compressCanvas" class="hidden"></canvas>
+
+    <script>
+        // App State
+        let documents = [];
+        let currentTempDoc = null;
+        let selectedDocId = null;
+
+        // Mock Data for AI Simulation
+        const mockCategories = [
+            { title: 'חשבונית מס', tags: ['חשבונית', 'הוצאות', 'מס'], text: 'חשבונית מס מס 4829\nסכום לתשלום: 450 ש"ח\nמע"מ: 17%\nתודה שקנית אצלנו.' },
+            { title: 'מרשם רפואי', tags: ['רפואי', 'בריאות', 'תרופות'], text: 'שם מטופל: ישראל ישראלי\nתרופה: מוקסיפן 500מג\nמינון: פעמיים ביום ל-5 ימים.' },
+            { title: 'קבלת דלק', tags: ['דלק', 'רכב', 'הוצאות'], text: 'תחנת דלק פז\nבנזין 95 - 40 ליטר\nסה"כ לתשלום: 320 ש"ח.' },
+            { title: 'תעודת אחריות', tags: ['אחריות', 'מוצרי חשמל', 'חשוב'], text: 'תעודת אחריות למקרר\nתקף לשנה מתאריך הרכישה.\nמספר סידורי: XJ9000-22.' },
+            { title: 'פתק ישיבה', tags: ['עבודה', 'פגישה', 'הערות'], text: 'נקודות לישיבת צוות:\n1. סיום פרויקט עד יום חמישי\n2. חלוקת תפקידים חדשה\n3. תיאום לו"ז חופשות.' }
+        ];
+
+        // DOM Elements
+        const screens = {
+            main: document.getElementById('mainScreen'),
+            processing: document.getElementById('processingScreen'),
+            confirmation: document.getElementById('confirmationScreen')
+        };
+        
+        const ui = {
+            cameraInput: document.getElementById('cameraInput'),
+            compressCanvas: document.getElementById('compressCanvas'),
+            previewImage: document.getElementById('previewImage'),
+            docTitle: document.getElementById('docTitle'),
+            docType: document.getElementById('docType'),
+            docTotalAmount: document.getElementById('docTotalAmount'),
+            docDateOnDoc: document.getElementById('docDateOnDoc'),
+            docProjectId: document.getElementById('docProjectId'),
+            newProjectName: document.getElementById('newProjectName'),
+            docFolder: document.getElementById('docFolder'),
+            docIsInvestment: document.getElementById('docIsInvestment'),
+            docTags: document.getElementById('docTags'),
+            docExtractedText: document.getElementById('docExtractedText'),
+            saveDocBtn: document.getElementById('saveDocBtn'),
+            cancelSaveBtn: document.getElementById('cancelSaveBtn'),
+            documentsGrid: document.getElementById('documentsGrid'),
+            foldersGrid: document.getElementById('foldersGrid'),
+            listViewBtn: document.getElementById('listViewBtn'),
+            folderViewBtn: document.getElementById('folderViewBtn'),
+            searchInput: document.getElementById('searchInput'),
+            loadingState: document.getElementById('loadingState'),
+            emptyState: document.getElementById('emptyState'),
+            detailModal: document.getElementById('detailModal'),
+            detailSheet: document.getElementById('detailSheet'),
+            closeDetailBtn: document.getElementById('closeDetailBtn'),
+            deleteDocBtn: document.getElementById('deleteDocBtn'),
+            toast: document.getElementById('toast')
+        };
+
+        const FOLDERS = [
+            { id: 'Bank', name: 'בנק', icon: 'fa-university', color: 'bg-blue-100 text-blue-600' },
+            { id: 'VAT', name: 'מע"מ', icon: 'fa-percentage', color: 'bg-emerald-100 text-emerald-600' },
+            { id: 'Income Tax', name: 'מס הכנסה', icon: 'fa-hand-holding-usd', color: 'bg-orange-100 text-orange-600' },
+            { id: 'National Insurance', name: 'ביטוח לאומי', icon: 'fa-shield-alt', color: 'bg-purple-100 text-purple-600' },
+            { id: 'Accountant', name: 'רואה חשבון', icon: 'fa-user-tie', color: 'bg-slate-100 text-slate-600' },
+            { id: 'Suppliers', name: 'ספקים', icon: 'fa-truck', color: 'bg-amber-100 text-amber-600' },
+            { id: 'Employees', name: 'עובדים', icon: 'fa-users', color: 'bg-pink-100 text-pink-600' },
+            { id: 'Other', name: 'אחר', icon: 'fa-folder', color: 'bg-gray-100 text-gray-600' }
+        ];
+
+        let currentView = 'list'; // 'list' or 'folder'
+        let currentFolderFilter = null;
+
+        // Event listeners are set up after init
+
+        async function openSettings() {
+            try {
+                const settings = await sdk.db.get('settings') || {};
+                document.getElementById('accountantEmail').value = settings.accountantEmail || '';
+            } catch (e) {}
+            document.getElementById('settingsModal').classList.remove('hidden');
+            document.getElementById('settingsModal').classList.add('flex');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+            document.getElementById('settingsModal').classList.remove('flex');
+        }
+
+        async function saveSettings() {
+            const email = document.getElementById('accountantEmail').value;
+            try {
+                await sdk.db.set('settings', { accountantEmail: email });
+                showToast('הגדרות נשמרו');
+            } catch (e) {
+                showToast('שגיאה בשמירת הגדרות');
+            }
+        }
+
+        async function generateMonthlyReport() {
+            const btn = document.getElementById('generateReportBtn');
+            const originalText = btn.innerHTML;
+            
+            const email = document.getElementById('accountantEmail').value;
+            if (!email) {
+                showToast('נא להזין אימייל רואה חשבון בהגדרות');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מפיק דוח...';
+
+            // Filter docs from current month
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            const monthDocs = documents.filter(doc => {
+                const docDate = new Date(doc.date);
+                return docDate.getMonth() === currentMonth && docDate.getFullYear() === currentYear;
+            });
+
+            if (monthDocs.length === 0) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                showToast('אין מסמכים לחודש הנוכחי');
+                return;
+            }
+
+            // Create a temporary element for the PDF content
+            const reportDiv = document.createElement('div');
+            reportDiv.style.padding = '20px';
+            reportDiv.style.fontFamily = 'Arial, sans-serif';
+            reportDiv.dir = 'rtl';
+            reportDiv.style.background = '#ffffff';
+            
+            let totalSum = 0;
+            let tableRows = '';
+            
+            monthDocs.forEach(doc => {
+                const amount = doc.totalAmount || 0;
+                totalSum += amount;
+                tableRows += `
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${doc.dateOnDoc || new Date(doc.date).toLocaleDateString()}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${doc.title}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${doc.docType}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">₪${amount.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            reportDiv.innerHTML = `
+                <div style="padding: 20px;">
+                    <h1 style="text-align: center; color: #3b82f6;">דוח הוצאות והכנסות</h1>
+                    <h3 style="text-align: center;">חודש: ${currentMonth + 1}/${currentYear}</h3>
+                    <p><strong>אימייל רואה חשבון:</strong> ${email}</p>
+                    <p><strong>סה"כ מסמכים:</strong> ${monthDocs.length}</p>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                        <thead>
+                            <tr style="background-color: #f3f4f6;">
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">תאריך</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">תיאור</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">סוג מסמך</th>
+                                <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">סכום</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" style="border: 1px solid #ddd; padding: 8px; font-weight: bold; text-align: left;">סה"כ:</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">₪${totalSum.toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            `;
+
+            try {
+                if (typeof html2pdf !== 'undefined') {
+                    const opt = {
+                        margin: 1,
+                        filename: `report_${currentMonth + 1}_${currentYear}.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2 },
+                        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                    };
+                    await html2pdf().set(opt).from(reportDiv).save();
+                    alert(`הופק והורד דוח הכולל ${monthDocs.length} מסמכים.`);
+                } else {
+                    alert('שגיאה: ספריית PDF לא נטענה');
+                }
+                closeSettings();
+            } catch(e) {
+                console.error("PDF generation error:", e);
+                showToast("שגיאה בהפקת הדוח");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function switchView(view) {
+            currentView = view;
+            currentFolderFilter = null;
+            ui.searchInput.value = '';
+
+            if (view === 'list') {
+                ui.listViewBtn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+                ui.listViewBtn.classList.remove('text-gray-500');
+                ui.folderViewBtn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                ui.folderViewBtn.classList.add('text-gray-500');
+                
+                ui.foldersGrid.classList.add('hidden');
+                ui.documentsGrid.classList.remove('hidden');
+                renderDocuments();
+            } else {
+                ui.folderViewBtn.classList.add('bg-white', 'shadow-sm', 'text-blue-600');
+                ui.folderViewBtn.classList.remove('text-gray-500');
+                ui.listViewBtn.classList.remove('bg-white', 'shadow-sm', 'text-blue-600');
+                ui.listViewBtn.classList.add('text-gray-500');
+                
+                ui.documentsGrid.classList.add('hidden');
+                ui.foldersGrid.classList.remove('hidden');
+                renderFolders();
+            }
+        }
+
+        function renderFolders() {
+            ui.foldersGrid.innerHTML = '';
+            ui.emptyState.classList.add('hidden');
+
+            FOLDERS.forEach(folder => {
+                const count = documents.filter(d => d.folder === folder.id).length;
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow active:scale-95';
+                card.onclick = () => {
+                    currentFolderFilter = folder.id;
+                    ui.foldersGrid.classList.add('hidden');
+                    ui.documentsGrid.classList.remove('hidden');
+                    renderDocuments();
+                };
+
+                card.innerHTML = `
+                    <div class="${folder.color} w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-xl">
+                        <i class="fas ${folder.icon}"></i>
+                    </div>
+                    <h4 class="font-bold text-gray-800 text-sm mb-1">${folder.name}</h4>
+                    <span class="text-xs text-gray-400">${count} מסמכים</span>
+                `;
+                ui.foldersGrid.appendChild(card);
+            });
+        }
+
+        // Render document list
+        function renderDocuments(searchQuery = '') {
+            ui.documentsGrid.innerHTML = '';
+            
+            let filteredDocs = [...documents];
+
+            // Filter by folder if active
+            if (currentFolderFilter) {
+                filteredDocs = filteredDocs.filter(d => d.folder === currentFolderFilter);
+                // Add "Back to Folders" header if filtering
+                const header = document.createElement('div');
+                header.className = 'col-span-full flex items-center justify-between mb-2';
+                const folderName = FOLDERS.find(f => f.id === currentFolderFilter).name;
+                header.innerHTML = `
+                    <button onclick="switchView('folder')" class="text-blue-600 text-xs font-medium flex items-center gap-1">
+                        <i class="fas fa-chevron-right"></i> חזרה לתיקיות
+                    </button>
+                    <span class="text-xs font-bold text-gray-500">${folderName}</span>
+                `;
+                ui.documentsGrid.appendChild(header);
+            }
+
+            if(filteredDocs.length === 0 && !currentFolderFilter) {
+                ui.emptyState.classList.remove('hidden');
+                return;
+            } else {
+                ui.emptyState.classList.add('hidden');
+            }
+
+            const query = searchQuery.toLowerCase();
+            filteredDocs = filteredDocs.filter(doc => {
+                const textMatch = doc.title.toLowerCase().includes(query) || doc.extractedText.toLowerCase().includes(query);
+                const tagMatch = doc.tags.some(tag => tag.toLowerCase().includes(query));
+                return textMatch || tagMatch;
+            });
+
+            if(filteredDocs.length === 0) {
+                ui.documentsGrid.innerHTML += '<div class="text-center text-gray-500 py-8">לא נמצאו מסמכים התואמים לחיפוש.</div>';
+                return;
+            }
+
+            filteredDocs.forEach(doc => {
+                const dateObj = new Date(doc.date);
+                const formattedDate = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth()+1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+                
+                const card = document.createElement('div');
+                card.className = 'doc-card bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex gap-4 cursor-pointer mb-3';
+                card.onclick = () => openDetailModal(doc);
+
+                card.innerHTML = `
+                    <div class="w-20 h-24 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 border border-gray-200">
+                        <img src="${doc.imageUrl}" class="w-full h-full object-cover" alt="${doc.title}">
+                    </div>
+                    <div class="flex-1 min-w-0 flex flex-col justify-center">
+                        <h3 class="font-semibold text-gray-800 text-base truncate mb-1">${doc.title}</h3>
+                        <p class="text-xs text-gray-400 mb-2 flex items-center gap-1">
+                            <i class="far fa-calendar-alt"></i> ${formattedDate}
+                            ${doc.docType ? `<span class="mx-1">•</span> ${doc.docType}` : ''}
+                        </p>
+                        <div class="flex flex-wrap gap-1 mt-auto">
+                            ${doc.tags.slice(0,2).map(tag => `<span class="bg-blue-50 text-blue-600 text-[10px] px-2 py-0.5 rounded-md font-medium border border-blue-100">${tag}</span>`).join('')}
+                            ${doc.tags.length > 2 ? `<span class="bg-gray-50 text-gray-500 text-[10px] px-1.5 py-0.5 rounded-md border border-gray-200">+${doc.tags.length - 2}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+                ui.documentsGrid.appendChild(card);
+            });
+        }
+
+        const PROJECTS_APP_ID = '2f59833e-4ade-450b-9f5d-4d2c64ae5273';
+        const FINANCE_APP_ID = '072b639b-e0c7-4dd4-8ab3-cd883c81fd83';
+
+        // Initialize
+        async function init() {
+            showLoading(true);
+            try {
+                await Promise.all([fetchDocuments(), fetchProjects()]);
+            } catch (e) {
+                console.error("Init error:", e);
+            } finally {
+                showLoading(false);
+                setupEventListeners();
+            }
+        }
+
+        async function fetchProjects() {
+            try {
+                const projects = await sdk.db.get('projects', PROJECTS_APP_ID);
+                console.log("Fetched projects:", projects); // Debug
+                if (Array.isArray(projects)) {
+                    // Keep the first two default options
+                    ui.docProjectId.innerHTML = `
+                        <option value="">ללא פרויקט (כללי)</option>
+                        <option value="new_project">+ פרויקט חדש...</option>
+                    `;
+                    projects.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = p.customerName || p.name || 'פרויקט ללא שם';
+                        ui.docProjectId.appendChild(opt);
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching projects:", error);
+            }
+        }
+
+        // Fetch from sdk.db
+        async function fetchDocuments() {
+            try {
+                const data = await sdk.db.get('documents');
+                documents = Array.isArray(data) ? data : [];
+                // Sort by date newest first
+                documents.sort((a, b) => new Date(b.date) - new Date(a.date));
+                renderDocuments();
+            } catch (error) {
+                console.error("Error fetching docs:", error);
+                showToast("שגיאה בטעינת מסמכים");
+            }
+        }
+
+        // Save to sdk.db
+        async function saveToDb() {
+            try {
+                await sdk.db.set('documents', documents);
+            } catch (error) {
+                console.error("Error saving docs:", error);
+                showToast("שגיאה בשמירת הנתונים");
+                throw error;
+            }
+        }
+
+        // Setup Event Listeners
+        function setupEventListeners() {
+            ui.cameraInput.addEventListener('change', handleCameraCapture);
+            ui.cancelSaveBtn.addEventListener('click', () => switchScreen('main'));
+            ui.saveDocBtn.addEventListener('click', saveNewDocument);
+            ui.searchInput.addEventListener('input', () => renderDocuments(ui.searchInput.value));
+            
+            ui.listViewBtn.addEventListener('click', () => switchView('list'));
+            ui.folderViewBtn.addEventListener('click', () => switchView('folder'));
+
+            ui.docProjectId.addEventListener('change', () => {
+                if(ui.docProjectId.value === 'new_project') {
+                    ui.newProjectName.classList.remove('hidden');
+                } else {
+                    ui.newProjectName.classList.add('hidden');
+                }
+            });
+
+            // Detail modal events
+            ui.closeDetailBtn.addEventListener('click', closeDetailModal);
+            ui.detailModal.addEventListener('click', (e) => {
+                if(e.target === ui.detailModal) closeDetailModal();
+            });
+            ui.deleteDocBtn.addEventListener('click', deleteDocument);
+
+            // Settings events
+            document.getElementById('settingsBtn').addEventListener('click', openSettings);
+            document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+            document.getElementById('generateReportBtn').addEventListener('click', generateMonthlyReport);
+            document.getElementById('accountantEmail').addEventListener('change', saveSettings);
+        }
+
+        // Screen Navigation
+        function switchScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[screenName].classList.add('active');
+            
+            // Reset input if going to main
+            if(screenName === 'main') {
+                ui.cameraInput.value = '';
+                ui.newProjectName.classList.add('hidden');
+                ui.docProjectId.value = '';
+                ui.docIsInvestment.checked = false;
+            }
+        }
+
+        // Handle Image Capture and Upload
+        async function handleCameraCapture(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            switchScreen('processing');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Upload the image using the file upload SDK
+                const uploadRes = await sdk.uploadFile(formData);
+                const imageUrl = uploadRes.url;
+                
+                // Call actual AI with the generated URL
+                await processWithRealAI(imageUrl);
+            } catch (error) {
+                console.error("Upload error:", error);
+                showToast("שגיאה בהעלאת התמונה");
+                switchScreen('main');
+            }
+        }
+
+        // Real AI LLM extraction
+        async function processWithRealAI(imageUrl) {
+            try {
+                const schema = {
+                    title: "string (Short descriptive title in Hebrew)",
+                    tags: ["string (Relevant tags in Hebrew)"],
+                    extractedText: "string (The full text extracted from the document)",
+                    docType: "string (One of: Invoice, Delivery Note, Proforma Invoice, Other)",
+                    dateOnDoc: "string (YYYY-MM-DD format if found, otherwise empty)",
+                    totalAmount: "number (The total numeric amount in NIS if found, otherwise null)",
+                    folderSuggestion: "string (One of: Bank, VAT, Income Tax, National Insurance, Accountant, Suppliers, Employees, Other)",
+                    isInvestment: "boolean (True if this is a capital investment like equipment, furniture, or long-term assets)"
+                };
+                
+                const prompt = `Please analyze this document image. 
+                1. Extract all text clearly. 
+                2. Provide a descriptive title in Hebrew. 
+                3. Identify the document type.
+                4. Extract the DATE and TOTAL AMOUNT (numeric).
+                5. Categorize into a folder: Bank (bank docs), VAT (tax related), Suppliers (regular vendor bills), Employees (payslips/contracts), or Investment (if it's for equipment/long-term assets).
+                6. Set 'isInvestment' to true if the item purchased is a fixed asset (not a recurring expense).`;
+                
+                const aiResult = await sdk.callAI(prompt, schema, [imageUrl]);
+                
+                currentTempDoc = {
+                    id: 'doc_' + Date.now(),
+                    imageUrl: imageUrl,
+                    title: aiResult.title || 'מסמך חדש',
+                    tags: aiResult.tags || ['כללי'],
+                    extractedText: aiResult.extractedText || '',
+                    docType: aiResult.docType || 'Other',
+                    dateOnDoc: aiResult.dateOnDoc || '',
+                    totalAmount: aiResult.totalAmount || null,
+                    folder: aiResult.folderSuggestion || '',
+                    isInvestment: aiResult.isInvestment || false,
+                    date: new Date().toISOString()
+                };
+            } catch (error) {
+                console.error("AI error:", error);
+                currentTempDoc = {
+                    id: 'doc_' + Date.now(),
+                    imageUrl: imageUrl,
+                    title: 'מסמך ללא שם',
+                    tags: ['שגיאה'],
+                    extractedText: 'שגיאה בפענוח המסמך. ניתן לערוך ידנית.',
+                    docType: 'Other',
+                    dateOnDoc: '',
+                    totalAmount: null,
+                    folder: '',
+                    isInvestment: false,
+                    date: new Date().toISOString()
+                };
+                showToast("שגיאה בניתוח התמונה");
+            }
+
+            // Populate confirmation screen
+            ui.previewImage.src = currentTempDoc.imageUrl;
+            ui.docTitle.value = currentTempDoc.title;
+            ui.docTags.value = currentTempDoc.tags.join(', ');
+            ui.docExtractedText.value = currentTempDoc.extractedText;
+            ui.docType.value = currentTempDoc.docType;
+            ui.docTotalAmount.value = currentTempDoc.totalAmount || '';
+            ui.docDateOnDoc.value = currentTempDoc.dateOnDoc;
+            ui.docFolder.value = currentTempDoc.folder;
+            ui.docIsInvestment.checked = currentTempDoc.isInvestment;
+
+            switchScreen('confirmation');
+        }
+
+        async function saveNewDocument() {
+            if (!currentTempDoc) return;
+            
+            const title = ui.docTitle.value.trim() || 'מסמך ללא שם';
+            const projectId = ui.docProjectId.value;
+            let finalProjectId = projectId;
+            
+            if (projectId === 'new_project') {
+                const newName = ui.newProjectName.value.trim();
+                if (!newName) {
+                    showToast('נא להזין שם לפרויקט החדש');
+                    return;
+                }
+                const newProject = { id: 'proj_' + Date.now(), customerName: newName, status: 'Active', budget: 0, expenses: 0 };
+                try {
+                    let projects = await sdk.db.get('projects', PROJECTS_APP_ID) || [];
+                    projects.push(newProject);
+                    await sdk.db.set('projects', projects, PROJECTS_APP_ID);
+                    finalProjectId = newProject.id;
+                    await fetchProjects();
+                } catch (e) {
+                    showToast('שגיאה ביצירת פרויקט חדש');
+                    return;
+                }
+            }
+            
+            const docToSave = {
+                ...currentTempDoc,
+                title: title,
+                docType: ui.docType.value,
+                totalAmount: parseFloat(ui.docTotalAmount.value) || 0,
+                dateOnDoc: ui.docDateOnDoc.value,
+                projectId: finalProjectId !== 'new_project' ? finalProjectId : '',
+                folder: ui.docFolder.value,
+                isInvestment: ui.docIsInvestment.checked,
+                tags: ui.docTags.value.split(',').map(t => t.trim()).filter(t => t)
+            };
+            
+            documents.push(docToSave);
+            
+            if (finalProjectId && docToSave.totalAmount > 0 && docToSave.docType !== 'Proforma Invoice' && docToSave.docType !== 'Delivery Note') {
+                try {
+                    let projects = await sdk.db.get('projects', PROJECTS_APP_ID) || [];
+                    const pIndex = projects.findIndex(p => p.id === finalProjectId);
+                    if (pIndex >= 0) {
+                        projects[pIndex].expenses = (projects[pIndex].expenses || 0) + docToSave.totalAmount;
+                        await sdk.db.set('projects', projects, PROJECTS_APP_ID);
+                    }
+                } catch (e) { console.error('Failed to sync expense', e); }
+            }
+
+            if (docToSave.totalAmount > 0 && docToSave.docType !== 'Proforma Invoice' && docToSave.docType !== 'Delivery Note') {
+                try {
+                    let expenses = await sdk.db.get('expenses', FINANCE_APP_ID) || [];
+                    expenses.push({
+                        id: crypto.randomUUID(),
+                        date: docToSave.dateOnDoc || new Date().toISOString().split('T')[0],
+                        amount: docToSave.totalAmount,
+                        isPaid: true,
+                        category: docToSave.folder || 'כללי',
+                        description: `הוצאה ממסמך: ${docToSave.title}`
+                    });
+                    await sdk.db.set('expenses', expenses, FINANCE_APP_ID);
+                } catch (e) { console.error('Failed to sync expense to finance app', e); }
+            }
+            
+            try {
+                await saveToDb();
+                showToast('המסמך נשמר בהצלחה');
+                renderDocuments();
+                switchScreen('main');
+            } catch (error) {}
+        }
+
+        async function deleteDocument() {
+            if (!selectedDocId) return;
+            if (!confirm('האם אתה בטוח שברצונך למחוק מסמך זה?')) return;
+            
+            documents = documents.filter(d => d.id !== selectedDocId);
+            try {
+                await saveToDb();
+                closeDetailModal();
+                renderDocuments();
+                showToast('המסמך נמחק');
+            } catch (e) {}
+        }
+
+        // Modal Logic
+        function openDetailModal(doc) {
+            selectedDocId = doc.id;
+            
+            document.getElementById('detailTitle').textContent = doc.title || 'ללא כותרת';
+            document.getElementById('detailImage').src = doc.imageUrl;
+            document.getElementById('detailText').textContent = doc.extractedText || 'אין טקסט';
+            
+            const docTypeMap = {
+                'Invoice': 'חשבונית מס',
+                'Delivery Note': 'תעודת משלוח',
+                'Proforma Invoice': 'חשבונית פרופורמה',
+                'Other': 'אחר'
+            };
+            document.getElementById('detailDocType').textContent = docTypeMap[doc.docType] || doc.docType || '-';
+            
+            document.getElementById('detailTotalAmount').textContent = doc.totalAmount ? `₪ ${doc.totalAmount.toLocaleString()}` : '-';
+            
+            document.getElementById('detailDateOnDoc').textContent = doc.dateOnDoc ? doc.dateOnDoc.split('-').reverse().join('/') : '-';
+            
+            const folderObj = FOLDERS.find(f => f.id === doc.folder);
+            document.getElementById('detailFolder').textContent = folderObj ? folderObj.name : 'ללא תיקייה';
+            
+            document.getElementById('detailIsInvestment').textContent = doc.isInvestment ? 'כן' : 'לא';
+            
+            const dateObj = new Date(doc.date);
+            document.getElementById('detailDate').textContent = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth()+1).toString().padStart(2, '0')}/${dateObj.getFullYear()} ${dateObj.getHours().toString().padStart(2,'0')}:${dateObj.getMinutes().toString().padStart(2,'0')}`;
+
+            const tagsContainer = document.getElementById('detailTags');
+            tagsContainer.innerHTML = (doc.tags && doc.tags.length > 0) ? doc.tags.map(tag => 
+                `<span class="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-lg border border-blue-100">${tag}</span>`
+            ).join('') : '<span class="text-sm text-gray-400">אין תגיות</span>';
+
+            ui.detailModal.classList.remove('hidden');
+            ui.detailModal.classList.add('flex');
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                ui.detailSheet.classList.remove('translate-y-full');
+            });
+        }
+
+        function closeDetailModal() {
+            ui.detailSheet.classList.add('translate-y-full');
+            setTimeout(() => {
+                ui.detailModal.classList.add('hidden');
+                ui.detailModal.classList.remove('flex');
+                selectedDocId = null;
+            }, 300); // match tailwind transition
+        }
+
+        // Utils
+        function showLoading(show) {
+            if(show) {
+                ui.loadingState.classList.remove('hidden');
+                ui.documentsGrid.classList.add('hidden');
+            } else {
+                ui.loadingState.classList.add('hidden');
+                ui.documentsGrid.classList.remove('hidden');
+            }
+        }
+
+        let toastTimeout;
+        function showToast(msg) {
+            ui.toast.textContent = msg;
+            ui.toast.classList.remove('opacity-0');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                ui.toast.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        // Run
+        document.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
