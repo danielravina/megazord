@@ -126,15 +126,23 @@ export function KanbanPage() {
   }
 
   async function changeStatus(id: string, newStatus: string) {
+    const previous = requests;
     setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: newStatus as KanbanRequest["status"] } : r));
     const { error } = await supabase.from("requests").update({ status: newStatus }).eq("id", id);
-    if (error) toast("שגיאה בעדכון", "error");
+    if (error) {
+      setRequests(previous);
+      toast("שגיאה בעדכון", "error");
+    }
   }
 
   async function changePriority(id: string, newPriority: string) {
+    const previous = requests;
     setRequests((prev) => prev.map((r) => r.id === id ? { ...r, priority: newPriority as KanbanRequest["priority"] } : r));
     const { error } = await supabase.from("requests").update({ priority: newPriority }).eq("id", id);
-    if (error) toast("שגיאה בעדכון", "error");
+    if (error) {
+      setRequests(previous);
+      toast("שגיאה בעדכון", "error");
+    }
   }
 
   async function addComment() {
@@ -180,7 +188,7 @@ export function KanbanPage() {
     return acc;
   }, {});
 
-  if (loading) {
+  if (loading && requests.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
@@ -214,7 +222,7 @@ export function KanbanPage() {
                 placeholder="תאר כאן את הבקשה במלואה..."
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select label="עדיפות" value={priority} onChange={(e) => setPriority(e.target.value)} options={[
                 { value: "high", label: "חסם מכירות" },
                 { value: "medium", label: "חשוב" },

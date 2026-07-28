@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatDate } from "@/components/shared/format-date";
 import { generateId } from "@/components/shared/generate-id";
 import {
-  FolderKanban, Plus, MapPin, Receipt, Clock,
-  Trash2, Edit, Save,
+  FolderKanban, Plus, MapPin, Receipt, Clock, Save,
 } from "lucide-react";
 import type { Project, ProjectFormData } from "./project-types";
 
@@ -27,12 +27,11 @@ const emptyForm: ProjectFormData = {
 export function ProjectsPage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [viewingId, setViewingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProjectFormData>({ ...emptyForm });
 
@@ -40,6 +39,12 @@ export function ProjectsPage() {
     if (!user) return;
     loadProjects();
   }, [user]);
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      openNew();
+    }
+  }, [searchParams]);
 
   async function loadProjects() {
     setLoading(true);
@@ -54,33 +59,8 @@ export function ProjectsPage() {
   }
 
   function openNew() {
-    setEditingId(null);
     setForm({ ...emptyForm, start_date: new Date().toISOString().split("T")[0] });
     setModalOpen(true);
-  }
-
-  function openEdit(id: string) {
-    const p = projects.find((pr) => pr.id === id);
-    if (!p) return;
-    setEditingId(id);
-    setForm({
-      customer_name: p.customer_name,
-      location: p.location || "",
-      quote_price: p.quote_price,
-      expenses: p.expenses,
-      color: p.color,
-      start_date: p.start_date || "",
-      start_time: p.start_time || "",
-      duration: p.duration || "",
-      closing_price: p.closing_price,
-      search_words: p.search_words || "",
-    });
-    setModalOpen(true);
-  }
-
-  function openView(id: string) {
-    setViewingId(id);
-    setViewModalOpen(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -88,6 +68,7 @@ export function ProjectsPage() {
     if (!user) return;
     setSaving(true);
 
+    const newId = generateId();
     const projectData = {
       user_id: user.id,
       customer_name: form.customer_name,
@@ -102,58 +83,48 @@ export function ProjectsPage() {
       search_words: form.search_words || null,
     };
 
-    if (editingId) {
-      setProjects((prev) =>
-        prev.map((p) =>
-          p.id === editingId ? { ...p, ...projectData, id: editingId } as Project : p,
-        ),
-      );
-      const { error } = await supabase.from("projects").update(projectData).eq("id", editingId);
-      if (error) { toast("שגיאה בעדכון", "error"); await loadProjects(); }
-      else { toast("הפרויקט עודכן", "success"); }
+    const newProject: Project = { id: newId, ...projectData, created_at: new Date().toISOString() } as Project;
+    setProjects((prev) => [newProject, ...prev]);
+
+    const { error } = await supabase.from("projects").insert({ id: newId, ...projectData });
+    if (error) {
+      setProjects((prev) => prev.filter((p) => p.id !== newId));
+      toast("שגיאה בשמירה", "error");
     } else {
-      const newId = generateId();
-      const newProject: Project = {
-        id: newId, ...projectData, created_at: new Date().toISOString(),
-      } as Project;
-      setProjects((prev) => [newProject, ...prev]);
-      const { error } = await supabase.from("projects").insert({ id: newId, ...projectData });
-      if (error) {
-        setProjects((prev) => prev.filter((p) => p.id !== newId));
-        toast("שגיאה בשמירה", "error");
-      } else {
-        toast("הפרויקט נוצר", "success");
-        // Cross-app: sync to calendar events
-        if (form.start_date) {
-          const days = Math.max(1, parseInt((form.duration || "1").replace(/[^0-9]/g, "")) || 1);
-          const [y, m, d] = form.start_date.split("-").map(Number);
-          const events = [];
-          const current = new Date(y, m - 1, d);
-          for (let i = 0; i < days; i++) {
-            const dateStr = current.toISOString().split("T")[0];
-            events.push({
-              id: generateId(),
-              user_id: user.id,
-              title: `${form.customer_name}${form.location ? " - " + form.location : ""}`,
-              date: dateStr,
-              color: form.color,
-              is_project: true,
-            });
-            current.setDate(current.getDate() + 1);
-          }
-          await supabase.from("events").insert(events);
-        }
-        // Cross-app: sync to finance incomes
-        if (form.closing_price && form.start_date) {
-          await supabase.from("incomes").insert({
-            id: generateId(),
-            user_id: user.id,
-            date: form.start_date,
-            type: "עתידי",
-            amount: form.closing_price,
-            description: `הכנסה מפרויקט: ${form.customer_name}`,
-          });
-        }
+      toast("הפרויקט נוצר", "success");
+      // Sync to calendar events
+      if (form.start_date) {
+        const days = Math.max(1, parseInt(form.duration || "1") || 1);
+        const [y, m, d] = form.start_date.split("-").map(Number);
+        const startDate = new Date(y, m - 1, d);
+        const endDate = new Date(y, m - 1, d + days - 1);
+
+        const startStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
+        const endStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+
+        const { error: eventError } = await supabase.from("events").insert({
+          id: generateId(),
+          user_id: user.id,
+          title: `${form.customer_name}${form.location ? " - " + form.location : ""}`,
+          date: startStr,
+          end_date: days > 1 ? endStr : null,
+          color: form.color,
+          is_project: true,
+          project_id: newId,
+        });
+        if (eventError) toast("הפרויקט נוצר אך אירוע היומן לא נשמר", "info");
+      }
+      // Sync to finance incomes
+      if (form.closing_price && form.start_date) {
+        const { error: incomeError } = await supabase.from("incomes").insert({
+          id: generateId(),
+          user_id: user.id,
+          date: form.start_date,
+          type: "עתידי",
+          amount: form.closing_price,
+          description: `הכנסה מפרויקט: ${form.customer_name}`,
+        });
+        if (incomeError) toast("הפרויקט נוצר אך ההכנסה לא נרשמה", "info");
       }
     }
 
@@ -161,20 +132,7 @@ export function ProjectsPage() {
     setModalOpen(false);
   }
 
-  async function handleDelete(id: string) {
-    const project = projects.find((p) => p.id === id);
-    if (!project) return;
-    if (!confirm(`האם למחוק את הפרויקט "${project.customer_name}"?`)) return;
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    setViewModalOpen(false);
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) { toast("שגיאה במחיקה", "error"); loadProjects(); }
-    else { toast("הפרויקט נמחק", "success"); }
-  }
-
-  const viewingProject = projects.find((p) => p.id === viewingId);
-
-  if (loading) {
+  if (loading && projects.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
@@ -202,11 +160,11 @@ export function ProjectsPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <div
               key={project.id}
-              onClick={() => openView(project.id)}
+              onClick={() => router.push(`/projects/detail/?project=${project.id}`)}
               className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden group"
             >
               <div className="absolute top-0 right-0 w-1.5 h-full" style={{ backgroundColor: project.color }} />
@@ -220,7 +178,7 @@ export function ProjectsPage() {
                     <p className="flex items-center gap-1"><Receipt size={14} className="text-slate-400" /> מחיר הצעה: ₪{project.quote_price.toLocaleString()}</p>
                   )}
                   {project.duration && (
-                    <p className="flex items-center gap-1"><Clock size={14} className="text-slate-400" /> משך: {project.duration}</p>
+                    <p className="flex items-center gap-1"><Clock size={14} className="text-slate-400" /> משך: {project.duration} ימים</p>
                   )}
                 </div>
                 {project.start_date && (
@@ -241,11 +199,11 @@ export function ProjectsPage() {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* New Project Modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? "עריכת פרויקט" : "הוספת פרויקט חדש"}
+        title="הוספת פרויקט חדש"
         size="lg"
         footer={
           <div className="flex gap-2">
@@ -257,97 +215,25 @@ export function ProjectsPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="שם לקוח *" value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} required />
           <Input label="מיקום" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="מחיר הצעה (₪)" type="number" min="0" value={form.quote_price ?? ""} onChange={(e) => setForm({ ...form, quote_price: parseFloat(e.target.value) || null })} />
-            <Input label="הוצאות צפויות (₪)" type="number" min="0" value={form.expenses ?? ""} onChange={(e) => setForm({ ...form, expenses: parseFloat(e.target.value) || null })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="מחיר הצעה (₪)" type="number" min="0" value={form.quote_price ?? ""} onChange={(e) => { const v = e.target.value; setForm({ ...form, quote_price: v === "" ? null : parseFloat(v) }); }} />
+            <Input label="הוצאות צפויות (₪)" type="number" min="0" value={form.expenses ?? ""} onChange={(e) => { const v = e.target.value; setForm({ ...form, expenses: v === "" ? null : parseFloat(v) }); }} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">צבע זיהוי</label>
             <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-16 h-10 border rounded-md cursor-pointer" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="תאריך התחלה" type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} required />
             <Input label="שעת התחלה" type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="משך עבודה" placeholder='לדוג: "יומיים"' value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} />
-            <Input label="מחיר סגירה (₪)" type="number" min="0" value={form.closing_price ?? ""} onChange={(e) => setForm({ ...form, closing_price: parseFloat(e.target.value) || null })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="משך עבודה (ימים)" type="number" min="1" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} />
+            <Input label="מחיר סגירה (₪)" type="number" min="0" value={form.closing_price ?? ""} onChange={(e) => { const v = e.target.value; setForm({ ...form, closing_price: v === "" ? null : parseFloat(v) }); }} />
           </div>
           <Input label="מילות חיפוש / תגיות" placeholder="פסיק בין מילה למילה" value={form.search_words} onChange={(e) => setForm({ ...form, search_words: e.target.value })} />
         </form>
       </Modal>
-
-      {/* View Modal */}
-      <Modal
-        open={viewModalOpen}
-        onClose={() => setViewModalOpen(false)}
-        title={viewingProject?.customer_name || "פרטי פרויקט"}
-        size="lg"
-        footer={
-          <div className="flex gap-2 justify-between w-full">
-            <Button variant="danger" onClick={() => viewingId && handleDelete(viewingId)}><Trash2 size={14} /> מחק</Button>
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setViewModalOpen(false)}>סגור</Button>
-              <Button onClick={() => { setViewModalOpen(false); if (viewingId) openEdit(viewingId); }}><Edit size={14} /> ערוך</Button>
-            </div>
-          </div>
-        }
-      >
-        {viewingProject && (
-          <div className="space-y-4 text-sm">
-            {viewingProject.location && (
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase mb-1">מיקום</p>
-                <p>{viewingProject.location}</p>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase mb-1">תאריך התחלה</p>
-                <p>{formatDate(viewingProject.start_date || "")} {viewingProject.start_time || ""}</p>
-              </div>
-              {viewingProject.duration && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-1">משך</p>
-                  <p>{viewingProject.duration}</p>
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {viewingProject.quote_price != null && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-1">מחיר הצעה</p>
-                  <p>₪{viewingProject.quote_price?.toLocaleString()}</p>
-                </div>
-              )}
-              {viewingProject.closing_price != null && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase mb-1">מחיר סגירה</p>
-                  <p>₪{viewingProject.closing_price?.toLocaleString()}</p>
-                </div>
-              )}
-            </div>
-            {viewingProject.expenses != null && viewingProject.expenses > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase mb-1">הוצאות צפויות</p>
-                <p>₪{viewingProject.expenses?.toLocaleString()}</p>
-              </div>
-            )}
-            {viewingProject.search_words && (
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase mb-1">תגיות</p>
-                <div className="flex flex-wrap gap-1">
-                  {viewingProject.search_words.split(",").map((tag) => tag.trim() && (
-                    <span key={tag} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100">{tag.trim()}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
-
-

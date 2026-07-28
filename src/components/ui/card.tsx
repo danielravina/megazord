@@ -14,11 +14,7 @@ export function Card({
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-sm border border-slate-200 ${
-        hover || onClick
-          ? "hover:shadow-md hover:border-slate-300 transition-shadow cursor-pointer"
-          : ""
-      } ${className}`}
+      className={`bg-white rounded-xl shadow-sm border border-slate-200 ${onClick ? "cursor-pointer" : ""} ${hover ? "hover:shadow-md hover:border-slate-300 transition-shadow" : ""} ${className}`}
     >
       {children}
     </div>

@@ -10,7 +10,7 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "Megazord - מערכת ניהול אישית",
+  title: "עצמאי - מערכת ניהול אישית",
   description: "Personal management system",
 };
 

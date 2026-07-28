@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { generateId } from "@/components/shared/generate-id";
 import {
-  Calendar as CalendarIcon, ChevronRight, ChevronLeft, Plus,
+  Calendar as CalendarIcon, ChevronRight, ChevronLeft, Plus, FolderKanban,
 } from "lucide-react";
 
 interface CalendarEvent {
@@ -18,8 +19,10 @@ interface CalendarEvent {
   user_id: string;
   title: string;
   date: string;
+  end_date: string | null;
   color: string | null;
   is_project: boolean;
+  project_id: string | null;
 }
 
 const MONTHS = [
@@ -80,29 +83,52 @@ export function CalendarPage() {
     if (!eventTitle.trim() || !user) return;
     setSaving(true);
 
-    if (editingEvent) {
-      setEvents((prev) => prev.map((e) => (e.id === editingEvent.id ? { ...e, title: eventTitle } : e)));
-      await supabase.from("events").update({ title: eventTitle }).eq("id", editingEvent.id);
-    } else {
-      const newEvent: CalendarEvent = {
-        id: generateId(), user_id: user.id, title: eventTitle,
-        date: selectedDate, color: null, is_project: false,
-      };
-      setEvents((prev) => [...prev, newEvent]);
-      await supabase.from("events").insert({
-        id: newEvent.id, user_id: user.id, title: eventTitle,
-        date: selectedDate, is_project: false,
-      });
-    }
+    try {
+      if (editingEvent) {
+        const prevEvents = events;
+        setEvents((prev) => prev.map((e) => (e.id === editingEvent.id ? { ...e, title: eventTitle } : e)));
+        const { error } = await supabase.from("events").update({ title: eventTitle }).eq("id", editingEvent.id);
+        if (error) {
+          setEvents(prevEvents);
+          toast("שגיאה בעדכון האירוע", "error");
+          setSaving(false);
+          return;
+        }
+      } else {
+        const newEvent: CalendarEvent = {
+          id: generateId(), user_id: user.id, title: eventTitle,
+          date: selectedDate, color: null, is_project: false,
+        };
+        setEvents((prev) => [...prev, newEvent]);
+        const { error } = await supabase.from("events").insert({
+          id: newEvent.id, user_id: user.id, title: eventTitle,
+          date: selectedDate, is_project: false,
+        });
+        if (error) {
+          setEvents((prev) => prev.filter((e) => e.id !== newEvent.id));
+          toast("שגיאה בשמירת האירוע", "error");
+          setSaving(false);
+          return;
+        }
+      }
 
-    setSaving(false);
-    setModalOpen(false);
+      setSaving(false);
+      setModalOpen(false);
+    } catch {
+      toast("שגיאה בשמירת האירוע", "error");
+      setSaving(false);
+    }
   }
 
   async function deleteEvent(id: string) {
     if (!confirm("האם למחוק אירוע זה?")) return;
+    const removed = events.find((e) => e.id === id);
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    await supabase.from("events").delete().eq("id", id);
+    const { error } = await supabase.from("events").delete().eq("id", id);
+    if (error) {
+      if (removed) setEvents((prev) => [...prev, removed]);
+      toast("שגיאה במחיקת האירוע", "error");
+    }
   }
 
   const year = currentDate.getFullYear();
@@ -128,7 +154,7 @@ export function CalendarPage() {
 
   const daysOfWeek = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-  if (loading) {
+  if (loading && events.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
@@ -155,43 +181,65 @@ export function CalendarPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="grid grid-cols-7 bg-slate-50 text-center py-3 text-sm font-semibold text-slate-600 border-b">
+        <div className="grid grid-cols-7 bg-slate-50 text-center py-3 text-[10px] sm:text-sm font-semibold text-slate-600 border-b">
           {daysOfWeek.map((d) => <div key={d}>{d}</div>)}
         </div>
-        <div className="grid grid-cols-7" style={{ gridAutoRows: "minmax(100px, auto)" }}>
-          {cells.map((cell, i) => {
-            const isToday = cell.dateStr === todayStr;
-            const cellEvents = events.filter((e) => e.date === cell.dateStr);
-            return (
-              <div
-                key={i}
-                onClick={() => openAddModal(cell.dateStr)}
-                className={`p-1 border-b border-l cursor-pointer transition-colors hover:bg-slate-50 ${
-                  cell.isOtherMonth ? "bg-slate-50/50 text-slate-400" : ""
-                } ${isToday ? "bg-blue-50/50" : ""}`}
-              >
-                <div className={`text-xs font-semibold mb-1 px-1 ${isToday ? "text-blue-600" : ""}`}>
-                  {cell.day}
+        {/* Calendar grid with spanning events */}
+        <div className="overflow-x-auto">
+          <div className="grid grid-cols-7" style={{ gridAutoRows: "minmax(60px, auto)" }}>
+            {cells.map((cell, i) => {
+              const isToday = cell.dateStr === todayStr;
+              const cellEvents = events.filter((e) => e.date === cell.dateStr && !e.end_date);
+              const spanningStarts = events.filter((e) => e.end_date && e.date === cell.dateStr);
+
+              return (
+                <div
+                  key={i}
+                  onClick={() => openAddModal(cell.dateStr)}
+                  className={`p-1 border-b border-l cursor-pointer transition-colors hover:bg-slate-50 relative ${
+                    cell.isOtherMonth ? "bg-slate-50/50 text-slate-400" : ""
+                  } ${isToday ? "bg-blue-50/50" : ""}`}
+                >
+                  <div className={`text-xs font-semibold mb-1 px-1 ${isToday ? "text-blue-600" : ""}`}>
+                    {cell.day}
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    {cellEvents.slice(0, 3).map((ev) => (
+                      <div
+                        key={ev.id}
+                        onClick={(e) => { e.stopPropagation(); openEditModal(ev); }}
+                        className="text-[10px] px-1.5 py-0.5 rounded truncate text-white cursor-pointer hover:opacity-80 flex items-center gap-1"
+                        style={{ backgroundColor: ev.color || "#3b82f6" }}
+                      >
+                        {ev.is_project && <span className="opacity-60 text-[8px]">P</span>}
+                        {ev.title}
+                      </div>
+                    ))}
+                    {cellEvents.length > 3 && (
+                      <div className="text-[10px] text-slate-400 px-1">+{cellEvents.length - 3}</div>
+                    )}
+                  </div>
+                  {/* Render spanning event starts */}
+                  {spanningStarts.map((ev) => {
+                    return (
+                      <div
+                        key={ev.id}
+                        onClick={(e) => { e.stopPropagation(); openEditModal(ev); }}
+                        className="absolute top-0.5 left-0.5 right-0.5 h-5 rounded text-[10px] px-1.5 flex items-center gap-1 text-white cursor-pointer hover:opacity-80 truncate"
+                        style={{
+                          backgroundColor: ev.color || "#3b82f6",
+                          zIndex: 5,
+                        }}
+                      >
+                        {ev.is_project && <span className="opacity-60 text-[8px] shrink-0">P</span>}
+                        <span className="truncate">{ev.title}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  {cellEvents.slice(0, 3).map((ev) => (
-                    <div
-                      key={ev.id}
-                      onClick={(e) => { e.stopPropagation(); openEditModal(ev); }}
-                      className="text-[10px] px-1.5 py-0.5 rounded truncate text-white cursor-pointer hover:opacity-80 flex items-center gap-1"
-                      style={{ backgroundColor: ev.color || "#3b82f6" }}
-                    >
-                      {ev.is_project && <span className="opacity-60 text-[8px]">P</span>}
-                      {ev.title}
-                    </div>
-                  ))}
-                  {cellEvents.length > 3 && (
-                    <div className="text-[10px] text-slate-400 px-1">+{cellEvents.length - 3}</div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </Card>
 
@@ -200,16 +248,18 @@ export function CalendarPage() {
         onClose={() => setModalOpen(false)}
         title={editingEvent ? "ערוך אירוע" : "הוסף אירוע"}
         footer={
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-between w-full">
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setModalOpen(false)}>ביטול</Button>
+              <Button loading={saving} onClick={handleSave}>
+                <Plus size={14} /> {editingEvent ? "עדכן" : "שמור"}
+              </Button>
+            </div>
             {editingEvent && !editingEvent.is_project && (
               <Button variant="danger" onClick={() => { deleteEvent(editingEvent.id); setModalOpen(false); }}>
                 מחק
               </Button>
             )}
-            <Button variant="ghost" onClick={() => setModalOpen(false)}>ביטול</Button>
-            <Button loading={saving} onClick={handleSave}>
-              <Plus size={14} /> {editingEvent ? "עדכן" : "שמור"}
-            </Button>
           </div>
         }
       >
@@ -225,6 +275,15 @@ export function CalendarPage() {
             placeholder={editingEvent?.is_project ? "לא ניתן לערוך אירוע פרויקט" : "הזן כותרת..."}
             required
           />
+          {editingEvent?.project_id && (
+            <Link
+              href={`/projects/detail/?project=${editingEvent.project_id}`}
+              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
+            >
+              <FolderKanban size={16} />
+              צפה בפרויקט
+            </Link>
+          )}
         </div>
       </Modal>
     </div>

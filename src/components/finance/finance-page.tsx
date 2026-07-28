@@ -15,6 +15,7 @@ import { formatDate } from "@/components/shared/format-date";
 import { todayISO } from "@/components/shared/format-date";
 import { generateId } from "@/components/shared/generate-id";
 import { calculateTaxes } from "./tax-engine";
+import { ExpensePieChart } from "@/components/ui/expense-pie-chart";
 import {
   PieChart, Wallet, Coins, Receipt, Scale, PiggyBank,
   TrendingUp, TrendingDown, Plus, Save, Check, Clock,
@@ -52,9 +53,11 @@ const INCOME_TYPES = [
 
 function getNextBillingDay(day: number): string {
   const today = new Date();
-  const target = new Date(today.getFullYear(), today.getMonth(), day);
-  if (today.getDate() >= day) {
-    target.setMonth(today.getMonth() + 1);
+  const maxDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const safeDay = Math.min(day, maxDay);
+  const target = new Date(today.getFullYear(), today.getMonth(), safeDay);
+  if (today.getDate() >= safeDay) {
+    target.setMonth(target.getMonth() + 1);
   }
   return target.toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
 }
@@ -97,6 +100,10 @@ export function FinancePage() {
         supabase.from("tax_settings").select("*").eq("user_id", uid).maybeSingle(),
       ]);
       if (cancelled) return;
+      if (incRes.error) toast("שגיאה בטעינת הכנסות", "error");
+      if (expRes.error) toast("שגיאה בטעינת הוצאות", "error");
+      if (savRes.error) toast("שגיאה בטעינת חסכונות", "error");
+      if (taxRes.error && taxRes.error.code !== "PGRST116") toast("שגיאה בטעינת הגדרות מס", "error");
       setIncomes(incRes.data || []);
       setExpenses(expRes.data || []);
       setSavings(savRes.data || []);
@@ -185,7 +192,7 @@ export function FinancePage() {
     setTaxSaving(false);
   }
 
-  if (loading) {
+  if (loading && incomes.length === 0 && expenses.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
@@ -195,12 +202,12 @@ export function FinancePage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-          <Wallet size={28} className="text-blue-600" />
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Wallet size={24} className="text-blue-500" />
           ניהול כספים
         </h1>
-      </header>
+      </div>
 
       {/* Totals Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -208,7 +215,7 @@ export function FinancePage() {
           <div>
             <p className="text-sm text-slate-500 mb-1">סך הכנסות</p>
             <p className="text-3xl font-bold text-emerald-600">
-              {formatCurrency(incomes.reduce((s, i) => s + i.amount, 0))}
+              {formatCurrency(incomes.reduce((s, i) => s + Number(i.amount), 0))}
             </p>
           </div>
           <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
@@ -219,7 +226,7 @@ export function FinancePage() {
           <div>
             <p className="text-sm text-slate-500 mb-1">סך הוצאות</p>
             <p className="text-3xl font-bold text-rose-600">
-              {formatCurrency(expenses.reduce((s, e) => s + e.amount, 0))}
+              {formatCurrency(expenses.reduce((s, e) => s + Number(e.amount), 0))}
             </p>
           </div>
           <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
@@ -264,7 +271,7 @@ export function FinancePage() {
                 <div className="bg-amber-50 border border-amber-100 p-5 rounded-xl">
                   <p className="text-sm text-amber-800 mb-1">הוצאות עסקיות</p>
                   <p className="text-3xl font-bold text-amber-600">
-                    {formatCurrency(expenses.reduce((s, e) => s + e.amount, 0) + savings.reduce((s, sv) => s + sv.amount, 0))}
+                    {formatCurrency(expenses.reduce((s, e) => s + Number(e.amount), 0) + savings.reduce((s, sv) => s + Number(sv.amount), 0))}
                   </p>
                 </div>
                 <div className="bg-rose-50 border border-rose-100 p-5 rounded-xl">
@@ -296,9 +303,13 @@ export function FinancePage() {
                 </Card>
                 <Card className="p-5">
                   <h3 className="text-lg font-bold mb-4 border-b pb-2">מאזן כספי</h3>
-                  <div className="text-center py-8 text-slate-400 text-sm">
-                    גרף מאזן יוצג כאן (Chart.js)
-                  </div>
+                  <ExpensePieChart
+                    data={EXPENSE_CATEGORIES.map((cat) => ({
+                      label: cat.label,
+                      amount: expenses.filter((e) => e.category === cat.value).reduce((s, e) => s + Number(e.amount), 0),
+                      color: "",
+                    }))}
+                  />
                 </Card>
               </div>
             </div>
@@ -364,7 +375,7 @@ export function FinancePage() {
                   <Checkbox label="שולם?" checked={expPaid} onChange={(e) => setExpPaid(e.target.checked)} />
                 </div>
                 <div className="md:col-span-6 flex justify-end">
-                  <Button type="submit" variant="danger"><Plus size={14} /> הוסף הוצאה</Button>
+                  <Button type="submit" variant="secondary"><Plus size={14} /> הוסף הוצאה</Button>
                 </div>
               </form>
               {expenses.length === 0 ? (

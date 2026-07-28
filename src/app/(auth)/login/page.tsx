@@ -45,7 +45,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-800">Megazord</h1>
+            <h1 className="text-2xl font-bold text-slate-800">עצמאי</h1>
             <p className="text-sm text-slate-500 mt-1">התחברות למערכת</p>
           </div>
 
@@ -105,7 +105,7 @@ export default function LoginPage() {
 
           <p className="text-xs text-slate-400 text-center mt-6">
             אין לך חשבון?{" "}
-            <Link href="/auth/register" className="text-blue-600 hover:underline">
+            <Link href="/register" className="text-blue-600 hover:underline">
               הרשם כאן
             </Link>
           </p>

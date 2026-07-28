@@ -106,7 +106,7 @@ export function TodoList() {
     }
   }
 
-  if (loading) {
+  if (loading && todos.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
         <Spinner size="lg" />
@@ -115,10 +115,10 @@ export function TodoList() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto h-full flex flex-col">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 -mx-6 -mt-6 px-6 pt-6 pb-6 mb-6 text-white">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ClipboardList className="opacity-80" size={24} />
+    <div className="max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <ClipboardList size={24} className="text-blue-500" />
           המשימות שלי
         </h1>
       </div>

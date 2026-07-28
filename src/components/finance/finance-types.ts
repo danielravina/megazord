@@ -29,6 +29,12 @@ export interface TaxSettings {
   bituah_leumi: number;
   bituah_leumi_billing_day: number;
   credit_points: number;
+  business_name: string | null;
+  vat_number: string | null;
+  business_address: string | null;
+  business_phone: string | null;
+  accountant_email: string | null;
+  owner_name: string | null;
 }
 
 export interface Saving {
