@@ -77,7 +77,7 @@ export function ProjectDetailPage() {
           if (url) localStorage.setItem(key, JSON.stringify({ url, ts: Date.now() }));
         }
         if (url) {
-          setDisplayUrls((prev) => ({ ...prev, [doc.image_url]: url }));
+          setDisplayUrls((prev) => ({ ...prev, [doc.image_url!]: url }));
         }
       }
     });

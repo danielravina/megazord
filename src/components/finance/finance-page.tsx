@@ -184,6 +184,12 @@ export function FinancePage() {
       bituah_leumi: parseFloat(fd.get("bituah_leumi") as string) || 5,
       bituah_leumi_billing_day: parseInt(fd.get("bituah_leumi_billing_day") as string) || 15,
       credit_points: parseFloat(fd.get("credit_points") as string) || 2.25,
+      business_name: null,
+      vat_number: null,
+      business_address: null,
+      business_phone: null,
+      accountant_email: null,
+      owner_name: null,
     };
     setTaxSettings(settings);
     const { error } = await supabase.from("tax_settings").upsert(settings);

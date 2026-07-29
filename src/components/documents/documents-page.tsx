@@ -154,7 +154,7 @@ export function DocumentsPage() {
   }, [docs]);
 
   async function loadDocs() {
-    const { data } = await supabase.from("documents").select("*").eq("user_id", user!.id).order("date", { ascending: false });
+    const { data } = await supabase.from("documents").select("*").eq("user_id", user!.id).order("date_on_doc", { ascending: false, nullsFirst: false }).order("date", { ascending: false });
     setDocs(data || []);
   }
 

@@ -98,6 +98,7 @@ export function CalendarPage() {
         const newEvent: CalendarEvent = {
           id: generateId(), user_id: user.id, title: eventTitle,
           date: selectedDate, color: null, is_project: false,
+          end_date: null, project_id: null,
         };
         setEvents((prev) => [...prev, newEvent]);
         const { error } = await supabase.from("events").insert({

@@ -9,7 +9,8 @@ export function VatCalculator() {
   const [rate, setRate] = useState(18);
 
   const parsed = parseFloat(amount) || 0;
-  const result = mode === "add" ? addVat(parsed, rate) : removeVat(parsed, rate);
+  const addResult = addVat(parsed, rate);
+  const removeResult = removeVat(parsed, rate);
 
   return (
     <div className="space-y-4">
@@ -61,30 +62,30 @@ export function VatCalculator() {
             <>
               <div className="flex justify-between">
                 <span className="text-slate-500">סכום לפני מע״מ</span>
-                <span className="font-bold">₪{result.amount.toLocaleString()}</span>
+                <span className="font-bold">₪{addResult.amount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">מע״מ ({rate}%)</span>
-                <span className="font-bold text-blue-600">₪{result.vat.toLocaleString()}</span>
+                <span className="font-bold text-blue-600">₪{addResult.vat.toLocaleString()}</span>
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="font-medium">סה״כ כולל מע״מ</span>
-                <span className="font-bold text-lg">₪{result.total.toLocaleString()}</span>
+                <span className="font-bold text-lg">₪{addResult.total.toLocaleString()}</span>
               </div>
             </>
           ) : (
             <>
               <div className="flex justify-between">
                 <span className="text-slate-500">סה״כ כולל מע״מ</span>
-                <span className="font-bold">₪{result.total.toLocaleString()}</span>
+                <span className="font-bold">₪{removeResult.total.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">מע״מ ({rate}%)</span>
-                <span className="font-bold text-blue-600">₪{result.vat.toLocaleString()}</span>
+                <span className="font-bold text-blue-600">₪{removeResult.vat.toLocaleString()}</span>
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="font-medium">סכום לפני מע״מ</span>
-                <span className="font-bold text-lg">₪{result.net.toLocaleString()}</span>
+                <span className="font-bold text-lg">₪{removeResult.net.toLocaleString()}</span>
               </div>
             </>
           )

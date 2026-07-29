@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { formatCurrency } from "@/components/shared/format-currency";
-import { Download, Send, FileText } from "lucide-react";
+import { Download, Send, FileText, Mail } from "lucide-react";
 
 interface Doc {
   id: string;
@@ -47,7 +47,7 @@ export function MonthlyExport({ open, onClose, docs, businessName, vatNumber, bu
   const [month, setMonth] = useState(today.getMonth()); // 0-indexed
   const [year, setYear] = useState(today.getFullYear());
   const [sending, setSending] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const [confirmSend, setConfirmSend] = useState(false);
 
   const filteredDocs = docs.filter((d) => {
     const dateStr = d.date_on_doc || d.date.split("T")[0];
@@ -67,34 +67,94 @@ export function MonthlyExport({ open, onClose, docs, businessName, vatNumber, bu
 
   const grandTotal = filteredDocs.reduce((s, d) => s + (d.total_amount || 0), 0);
 
-  async function generatePDFBase64(): Promise<string> {
-    if (!previewRef.current) return "";
-    const html2pdf = (await import("html2pdf.js")).default;
-    const canvas = await html2pdf().set({
-      margin: 10,
-      filename: `דוח-חודשי-${MONTHS[month]}-${year}.pdf`,
-      image: { type: "jpeg", quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    }).from(previewRef.current).outputPdf("arraybuffer");
+  function buildPdfHtml(): string {
+    const rows = grouped.map((g) => `
+      <div style="margin-bottom:16px">
+        <h3 style="font-size:14px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;color:#334155">${g.name}</h3>
+        ${g.docs.map((doc) => `
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px;color:#1e293b">
+            <span>${doc.title} <span style="color:#94a3b8;font-size:10px">${doc.date_on_doc?.split("-").reverse().join("/") || "-"}</span></span>
+            <span style="font-weight:600">${doc.total_amount ? formatCurrency(doc.total_amount) : "-"}</span>
+          </div>
+        `).join("")}
+        <div style="display:flex;justify-content:space-between;padding:4px 0;font-weight:600;font-size:12px;color:#475569">
+          <span>סה״כ ${g.name}</span><span>${formatCurrency(g.total)}</span>
+        </div>
+      </div>
+    `).join("");
 
-    const bytes = new Uint8Array(canvas);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
+    return `
+      <div style="font-family:Arial;direction:rtl;color:#1e293b;padding:8px;background:#fff;max-width:700px;overflow:hidden">
+        <div style="text-align:center;margin-bottom:20px">
+          <h1 style="font-size:22px;margin:0;color:#1e293b">${businessName || "עצמאי"}</h1>
+          ${vatNumber ? `<p style="margin:4px 0;font-size:12px;color:#64748b">ע.מ: ${vatNumber}</p>` : ""}
+          ${businessAddress ? `<p style="margin:4px 0;font-size:12px;color:#64748b">${businessAddress} ${businessPhone ? `| ${businessPhone}` : ""}</p>` : ""}
+          <h2 style="font-size:16px;margin-top:12px;color:#1e293b">דוח חודשי - ${MONTHS[month]} ${year}</h2>
+        </div>
+        ${rows}
+        <div style="border-top:2px solid #1e293b;padding-top:8px;margin-top:12px;display:flex;justify-content:space-between;font-weight:700;font-size:14px">
+          <span>סה״כ</span><span>${formatCurrency(grandTotal)}</span>
+        </div>
+      </div>`;
+  }
+
+  async function generatePDFBase64(): Promise<string> {
+    const html2pdf = (await import("html2pdf.js")).default;
+    const el = document.createElement("div");
+    el.innerHTML = buildPdfHtml();
+    el.style.width = "700px";
+    document.body.appendChild(el);
+    // Wait for layout
+    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const canvas = await html2pdf()
+        .set({
+          margin: 10,
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(el.firstElementChild as HTMLElement)
+        .outputPdf("arraybuffer");
+      const bytes = new Uint8Array(canvas);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    } finally {
+      document.body.removeChild(el);
+    }
   }
 
   async function handleDownload() {
-    const base64 = await generatePDFBase64();
-    if (!base64) return;
-    const link = document.createElement("a");
-    link.href = `data:application/pdf;base64,${base64}`;
-    link.download = `דוח-חודשי-${MONTHS[month]}-${year}.pdf`;
-    link.click();
+    const html2pdf = (await import("html2pdf.js")).default;
+    const el = document.createElement("div");
+    el.innerHTML = buildPdfHtml();
+    el.style.width = "700px";
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 100));
+    try {
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: `דוח-חודשי-${MONTHS[month]}-${year}.pdf`,
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(el.firstElementChild as HTMLElement)
+        .save();
+    } finally {
+      document.body.removeChild(el);
+    }
   }
 
   async function handleSend() {
     if (!accountantEmail) return;
+    setConfirmSend(true);
+  }
+
+  async function doSend() {
+    setConfirmSend(false);
     setSending(true);
     try {
       const base64 = await generatePDFBase64();
@@ -172,37 +232,11 @@ export function MonthlyExport({ open, onClose, docs, businessName, vatNumber, bu
         <p className="text-center text-slate-400 py-12">אין מסמכים לחודש זה</p>
       ) : (
         <>
-          {/* Off-screen preview for PDF generation */}
-          <div ref={previewRef} className="absolute opacity-0 pointer-events-none" style={{ fontFamily: "Arial", direction: "rtl", width: "210mm" }}>
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <h1 style={{ fontSize: 22, margin: 0 }}>{businessName || "עצמאי"}</h1>
-              {vatNumber && <p style={{ margin: "4px 0", color: "#666" }}>ע.מ: {vatNumber}</p>}
-              {businessAddress && <p style={{ margin: "4px 0", color: "#666" }}>{businessAddress} {businessPhone ? `| ${businessPhone}` : ""}</p>}
-              <h2 style={{ fontSize: 16, marginTop: 12 }}>דוח חודשי - {MONTHS[month]} {year}</h2>
-            </div>
-
-            {grouped.map((g) => (
-              <div key={g.id} style={{ marginBottom: 16 }}>
-                <h3 style={{ fontSize: 14, borderBottom: "1px solid #e2e8f0", paddingBottom: 4 }}>{g.name}</h3>
-                {g.docs.map((doc) => (
-                  <div key={doc.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f5f9", fontSize: 12 }}>
-                    <span>{doc.title} <span style={{ color: "#94a3b8", fontSize: 10 }}>{doc.date_on_doc?.split("-").reverse().join("/") || "-"}</span></span>
-                    <span style={{ fontWeight: 600 }}>{doc.total_amount ? formatCurrency(doc.total_amount) : "-"}</span>
-                  </div>
-                ))}
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontWeight: 600, fontSize: 12, color: "#475569" }}>
-                  <span>סה״כ {g.name}</span><span>{formatCurrency(g.total)}</span>
-                </div>
-              </div>
-            ))}
-
-            <div style={{ borderTop: "2px solid #334155", paddingTop: 8, marginTop: 12, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14 }}>
-              <span>סה״כ</span><span>{formatCurrency(grandTotal)}</span>
-            </div>
-          </div>
 
           {/* Live preview */}
-          <div className="border rounded-xl p-4 bg-white overflow-y-auto" style={{ maxHeight: "calc(50vh - 100px)" }}>
+
+          {/* Visible preview */}
+          <div className="border rounded-xl p-4 bg-white overflow-y-auto max-h-[50vh]">
             <div style={{ textAlign: "center", marginBottom: 16 }}>
               <h2 className="text-lg font-bold">{businessName || "עצמאי"}</h2>
               {vatNumber && <p className="text-xs text-slate-500">ע.מ: {vatNumber}</p>}
@@ -229,14 +263,25 @@ export function MonthlyExport({ open, onClose, docs, businessName, vatNumber, bu
             </div>
           </div>
 
-          {accountantEmail && (
-            <p className="text-xs text-slate-400 text-center">ישלח אל: {accountantEmail}</p>
-          )}
-          {!accountantEmail && (
-            <p className="text-xs text-amber-600 text-center">יש להזין אימייל רואה חשבון בהעדפות כדי לשלוח במייל</p>
-          )}
         </>
       )}
+
+      <Modal open={confirmSend} onClose={() => setConfirmSend(false)} title="שליחת דוח" size="sm"
+        footer={
+          <div className="flex gap-2 justify-between w-full">
+            <Button variant="ghost" onClick={() => setConfirmSend(false)}>ביטול</Button>
+            <Button loading={sending} onClick={doSend}><Send size={14} /> שלח</Button>
+          </div>
+        }
+      >
+        <div className="flex items-center gap-3 p-2">
+          <Mail size={24} className="text-blue-500 shrink-0" />
+          <div>
+            <p className="text-sm text-slate-700">הדוח החודשי ישלח אל:</p>
+            <p className="text-sm font-bold text-slate-800">{accountantEmail}</p>
+          </div>
+        </div>
+      </Modal>
     </Modal>
   );
 }
