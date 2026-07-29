@@ -1,5 +1,7 @@
 # Backlog — עצמאי (Atzma'i)
 
+**Deployed:** https://atzmai.pages.dev
+
 ## Legend
 - ✅ Done — verified implemented
 - 🔴 P0 — must have (blocking / core flow broken)
