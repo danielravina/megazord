@@ -5,7 +5,6 @@ import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Settings, Save, Building } from "lucide-react";
@@ -14,9 +13,6 @@ import type { TaxSettings } from "@/components/finance/finance-types";
 const FIELD_NAMES = [
   "owner_name", "business_name", "vat_number", "business_phone", "business_address",
   "accountant_email",
-  "vat_rate", "vat_billing_day", "vat_frequency",
-  "income_tax_billing_day", "income_tax_advance",
-  "bituah_leumi", "bituah_leumi_billing_day", "credit_points",
 ];
 
 function getInitialValues(settings: TaxSettings | null): Record<string, string> {
@@ -27,14 +23,6 @@ function getInitialValues(settings: TaxSettings | null): Record<string, string> 
     business_phone: settings?.business_phone || "",
     business_address: settings?.business_address || "",
     accountant_email: settings?.accountant_email || "",
-    vat_rate: String(settings?.vat_rate ?? 17),
-    vat_billing_day: String(settings?.vat_billing_day ?? 15),
-    vat_frequency: settings?.vat_frequency || "bimonthly",
-    income_tax_billing_day: String(settings?.income_tax_billing_day ?? 15),
-    income_tax_advance: String(settings?.income_tax_advance ?? 0),
-    bituah_leumi: String(settings?.bituah_leumi ?? 5),
-    bituah_leumi_billing_day: String(settings?.bituah_leumi_billing_day ?? 15),
-    credit_points: String(settings?.credit_points ?? 2.25),
   };
 }
 
@@ -90,14 +78,14 @@ export function PreferencesPage() {
 
     const payload: TaxSettings = {
       user_id: user.id,
-      vat_rate: parseFloat(fd.get("vat_rate") as string) || 17,
-      vat_frequency: fd.get("vat_frequency") as string || "bimonthly",
-      vat_billing_day: parseInt(fd.get("vat_billing_day") as string) || 15,
-      income_tax_advance: parseFloat(fd.get("income_tax_advance") as string) || 0,
-      income_tax_billing_day: parseInt(fd.get("income_tax_billing_day") as string) || 15,
-      bituah_leumi: parseFloat(fd.get("bituah_leumi") as string) || 5,
-      bituah_leumi_billing_day: parseInt(fd.get("bituah_leumi_billing_day") as string) || 15,
-      credit_points: parseFloat(fd.get("credit_points") as string) || 2.25,
+      vat_rate: settings?.vat_rate ?? 17,
+      vat_frequency: settings?.vat_frequency || "bimonthly",
+      vat_billing_day: settings?.vat_billing_day ?? 15,
+      income_tax_advance: settings?.income_tax_advance ?? 0,
+      income_tax_billing_day: settings?.income_tax_billing_day ?? 15,
+      bituah_leumi: settings?.bituah_leumi ?? 5,
+      bituah_leumi_billing_day: settings?.bituah_leumi_billing_day ?? 15,
+      credit_points: settings?.credit_points ?? 2.25,
       business_name: (fd.get("business_name") as string) || null,
       vat_number: (fd.get("vat_number") as string) || null,
       business_address: (fd.get("business_address") as string) || null,
@@ -170,23 +158,6 @@ export function PreferencesPage() {
           <p className="text-xs text-slate-400 mt-2">
             האימייל ישמש לשליחת דוחות חודשיים לרואה החשבון.
           </p>
-        </Card>
-
-        {/* Tax Settings */}
-        <Card className="p-6">
-          <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">
-            הגדרות מיסים
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label='מע"מ (%)' name="vat_rate" type="number" min="0" max="100" step="0.1" defaultValue={settings?.vat_rate ?? 17} />
-            <Input label="יום חיוב מע״מ" name="vat_billing_day" type="number" min="1" max="31" defaultValue={settings?.vat_billing_day ?? 15} />
-            <Select label="תדירות דיווח מע״מ" name="vat_frequency" options={[{ value: "bimonthly", label: "דו-חודשי" }, { value: "monthly", label: "חודשי" }]} defaultValue={settings?.vat_frequency ?? "bimonthly"} />
-            <Input label="יום חיוב מס הכנסה" name="income_tax_billing_day" type="number" min="1" max="31" defaultValue={settings?.income_tax_billing_day ?? 15} />
-            <Input label="מקדמות מס הכנסה (%)" name="income_tax_advance" type="number" min="0" max="100" step="0.1" defaultValue={settings?.income_tax_advance ?? 0} />
-            <Input label="ביטוח לאומי (%)" name="bituah_leumi" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bituah_leumi ?? 5} />
-            <Input label="יום חיוב ביטוח לאומי" name="bituah_leumi_billing_day" type="number" min="1" max="31" defaultValue={settings?.bituah_leumi_billing_day ?? 15} />
-            <Input label="נקודות זכות" name="credit_points" type="number" min="0" max="20" step="0.25" defaultValue={settings?.credit_points ?? 2.25} />
-          </div>
         </Card>
       </form>
     </div>
