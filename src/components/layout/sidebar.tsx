@@ -60,7 +60,6 @@ export function Sidebar() {
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-800">עצמאי</h1>
-            <p className="text-xs text-slate-400 mt-0.5">מערכת ניהול אישית v2 — auto-deploy ✈️</p>
           </div>
           <button
             onClick={closeMobile}
