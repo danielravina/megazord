@@ -2,11 +2,12 @@
 
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { formatCurrencyShort } from "@/components/shared/format-currency";
-import type { HeroData } from "@/components/dashboard/dashboard-types";
+import { TIME_RANGE_LABELS } from "@/components/dashboard/dashboard-types";
+import type { HeroData, TimeRange } from "@/components/dashboard/dashboard-types";
 
 interface Props {
   data: unknown;
-  tile: { id: string; type: string; span: number; title?: string };
+  tile: { id: string; type: string; span: number; title?: string; timeRange?: TimeRange };
 }
 
 export function HeroWidget({ data, tile }: Props) {
@@ -28,7 +29,7 @@ export function HeroWidget({ data, tile }: Props) {
       <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 tracking-tight">
         {formatCurrencyShort(d.value)}
       </div>
-      <div className="text-xs text-slate-500">{d.label}</div>
+      <div className="text-xs text-slate-500">{TIME_RANGE_LABELS[tile.timeRange || "this_month"]}</div>
       {d.sublabel && <div className="text-[10px] text-slate-400">{d.sublabel}</div>}
       {d.trend && (
         <div className={`flex items-center gap-1 text-xs font-semibold ${d.trend.direction === "up" ? "text-emerald-600" : d.trend.direction === "down" ? "text-rose-600" : "text-slate-400"}`}>

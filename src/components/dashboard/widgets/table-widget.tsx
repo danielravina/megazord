@@ -10,7 +10,7 @@ interface Props {
 export function TableWidget({ data, tile }: Props) {
   const d = data as TableData | null;
 
-  if (!d || !d.columns.length || !d.rows.length) {
+  if (!d || !Array.isArray(d.columns) || !Array.isArray(d.rows) || d.columns.length === 0 || d.rows.length === 0) {
     return (
       <div className="flex flex-col h-full">
         {tile.title && <div className="text-xs font-bold text-slate-500 mb-2">{tile.title}</div>}

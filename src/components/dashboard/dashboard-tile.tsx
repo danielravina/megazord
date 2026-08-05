@@ -1,18 +1,15 @@
 "use client";
 
-import {
-  GripHorizontal,
-  X,
-  BarChart3,
-  Calendar,
-} from "lucide-react";
+import { GripHorizontal, MoreVertical, X } from "lucide-react";
 import type { DashboardTile, WidgetType, WidgetData, TimeRange } from "@/components/dashboard/dashboard-types";
 import {
   RESIZABLE_TYPES,
   STATIC_WIDGETS,
+  TIME_RANGE_LABELS,
 } from "@/components/dashboard/dashboard-types";
 import { widgetRegistry, widgetMeta } from "@/components/dashboard/widgets/widget-registry";
 import { DATA_SOURCES } from "@/components/dashboard/data-sources/sources";
+import { Dropdown, MenuLabel, MenuItem } from "@/components/ui/dropdown";
 
 interface TileProps {
   tile: DashboardTile;
@@ -30,6 +27,13 @@ const TIME_RANGES: TimeRange[] = [
   "this_month", "last_month", "this_quarter", "this_year", "last_30_days", "all_time",
 ];
 
+const SPAN_LABELS: Record<number, string> = {
+  1: "¼ (1/4)",
+  2: "½ (2/4)",
+  3: "¾ (3/4)",
+  4: "מלא (4/4)",
+};
+
 export function DashboardTileComponent({
   tile,
   data,
@@ -37,31 +41,21 @@ export function DashboardTileComponent({
   onSpanChange,
   onRemove,
   onChangeType,
-  onChangeSource: _onChangeSource,
   onChangeTimeRange,
   dragHandleProps,
 }: TileProps) {
   const WidgetComponent = widgetRegistry[tile.type];
-  const isResizable = RESIZABLE_TYPES.includes(tile.type);
   const isStatic = STATIC_WIDGETS.includes(tile.type);
+  const isResizable = RESIZABLE_TYPES.includes(tile.type);
+  const sourceDef = tile.dataSource ? DATA_SOURCES.find((s) => s.key === tile.dataSource) : undefined;
+  const title = tile.title || sourceDef?.label || "";
 
-  function cycleType() {
-    const compatible = isStatic
-      ? (Object.keys(widgetMeta) as WidgetType[])
-      : DATA_SOURCES
-          .filter((s) => s.key === tile.dataSource)
-          .flatMap((s) => s.compatibleTypes);
-    const unique = [...new Set(compatible)];
-    const idx = unique.indexOf(tile.type);
-    const next = unique[(idx + 1) % unique.length];
-    onChangeType(tile.id, next);
-  }
-
-  function cycleTimeRange() {
-    if (isStatic) return;
-    const idx = TIME_RANGES.indexOf(tile.timeRange || "this_month");
-    const next = TIME_RANGES[(idx + 1) % TIME_RANGES.length];
-    onChangeTimeRange(tile.id, next);
+  if (!WidgetComponent) {
+    return (
+      <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+        תצוגה לא נתמכת
+      </div>
+    );
   }
 
   return (
@@ -73,10 +67,101 @@ export function DashboardTileComponent({
       style={{ minHeight: tile.type === "calculator" ? 260 : 100 }}
       {...(dragHandleProps || {})}
     >
-      {/* Drag handle */}
-      {customizing && (
-        <div className="absolute top-2 right-2 cursor-grab active:cursor-grabbing opacity-40 hover:opacity-100 transition-opacity z-10">
-          <GripHorizontal size={14} />
+      {(customizing || !isStatic) && (
+        <div className="flex items-center gap-2 mb-2">
+          {customizing && (
+            <GripHorizontal size={14} className="text-slate-400 cursor-grab active:cursor-grabbing shrink-0 opacity-50" />
+          )}
+          {!isStatic && <h3 className="text-xs font-bold text-slate-500 truncate">{title}</h3>}
+          <div className="flex-1" />
+          {customizing && (
+            <Dropdown
+              align="left"
+              trigger={
+                <button
+                  className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                  title="אפשרויות"
+                  aria-label="אפשרויות טייל"
+                >
+                  <MoreVertical size={14} />
+                </button>
+              }
+            >
+              {(close) => (
+                <div>
+                  {!isStatic && sourceDef && sourceDef.compatibleTypes.length > 1 && (
+                    <>
+                      <MenuLabel>תצוגה</MenuLabel>
+                      {sourceDef.compatibleTypes.map((vt) => {
+                        const meta = widgetMeta[vt];
+                        const Icon = meta.icon;
+                        return (
+                          <MenuItem
+                            key={vt}
+                            active={tile.type === vt}
+                            icon={<Icon size={14} />}
+                            onClick={() => {
+                              onChangeType(tile.id, vt);
+                              close();
+                            }}
+                          >
+                            {meta.label}
+                          </MenuItem>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {isResizable && (
+                    <>
+                      <MenuLabel>רוחב</MenuLabel>
+                      {([1, 2, 3, 4] as const).map((n) => (
+                        <MenuItem
+                          key={n}
+                          active={tile.span === n}
+                          onClick={() => {
+                            onSpanChange(tile.id, n);
+                            close();
+                          }}
+                        >
+                          {SPAN_LABELS[n]}
+                        </MenuItem>
+                      ))}
+                    </>
+                  )}
+
+                  {!isStatic && sourceDef?.needsTimeRange && (
+                    <>
+                      <MenuLabel>טווח זמן</MenuLabel>
+                      {TIME_RANGES.map((r) => (
+                        <MenuItem
+                          key={r}
+                          active={tile.timeRange === r}
+                          onClick={() => {
+                            onChangeTimeRange(tile.id, r);
+                            close();
+                          }}
+                        >
+                          {TIME_RANGE_LABELS[r]}
+                        </MenuItem>
+                      ))}
+                    </>
+                  )}
+
+                  <div className="my-1 border-t border-slate-100" />
+                  <MenuItem
+                    onClick={() => {
+                      onRemove(tile.id);
+                      close();
+                    }}
+                    icon={<X size={14} />}
+                  >
+                    <span className="text-red-600">הסר</span>
+                  </MenuItem>
+                </div>
+              )}
+            </Dropdown>
+          )}
         </div>
       )}
 
@@ -84,64 +169,6 @@ export function DashboardTileComponent({
       <div className="flex-1 min-h-0">
         <WidgetComponent data={data} tile={tile} />
       </div>
-
-      {/* Edit overlay — hover in customize mode */}
-      {customizing && (
-        <div className="absolute top-0 left-0 right-0 flex items-center justify-center gap-1 p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto z-20">
-          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-slate-200 px-1.5 py-1">
-            {/* Data tile controls */}
-            {!isStatic && (
-              <>
-                <button
-                  onClick={(e) => { e.stopPropagation(); cycleType(); }}
-                  className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                  title="שנה תצוגה"
-                >
-                  <BarChart3 size={14} />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); cycleTimeRange(); }}
-                  className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                  title="שנה טווח זמן"
-                >
-                  <Calendar size={14} />
-                </button>
-                <div className="w-px h-4 bg-slate-200 mx-0.5" />
-              </>
-            )}
-
-            {/* Size buttons — only for resizable tiles */}
-            {isResizable && (
-              <>
-                {([1, 2, 3, 4] as const).map((n) => (
-                  <button
-                    key={n}
-                    onClick={(e) => { e.stopPropagation(); onSpanChange(tile.id, n); }}
-                    className={`px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
-                      tile.span === n
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-slate-400 hover:bg-slate-100"
-                    }`}
-                    title={`רוחב ${n}/4`}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <div className="w-px h-4 bg-slate-200 mx-0.5" />
-              </>
-            )}
-
-            {/* Remove button */}
-            <button
-              onClick={(e) => { e.stopPropagation(); onRemove(tile.id); }}
-              className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
-              title="הסר"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

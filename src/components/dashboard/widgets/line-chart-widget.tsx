@@ -1,24 +1,26 @@
 "use client";
 
-import { Bar } from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Tooltip,
   Legend,
+  Filler,
 } from "chart.js";
 import type { BarData } from "@/components/dashboard/dashboard-types";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
 interface Props {
   data: unknown;
   tile: { id: string; type: string; span: number; title?: string };
 }
 
-export function BarChartWidget({ data, tile }: Props) {
+export function LineChartWidget({ data, tile }: Props) {
   const d = data as BarData | null;
 
   if (!d || !Array.isArray(d.labels) || !Array.isArray(d.datasets) || d.labels.length === 0) {
@@ -35,16 +37,19 @@ export function BarChartWidget({ data, tile }: Props) {
     datasets: d.datasets.map((ds) => ({
       label: ds.label,
       data: ds.data,
+      borderColor: ds.color,
       backgroundColor: ds.color,
-      borderRadius: 4,
-      borderWidth: 0,
+      pointRadius: 3,
+      pointHoverRadius: 4,
+      borderWidth: 2,
+      tension: 0.35,
+      fill: false,
     })),
   };
 
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    indexAxis: "y" as const,
     plugins: {
       legend: {
         position: "bottom" as const,
@@ -58,6 +63,9 @@ export function BarChartWidget({ data, tile }: Props) {
     },
     scales: {
       x: {
+        grid: { display: false },
+      },
+      y: {
         ticks: {
           callback: (value: string | number) => {
             const v = Number(value);
@@ -73,7 +81,7 @@ export function BarChartWidget({ data, tile }: Props) {
     <div className="flex flex-col h-full">
       {tile.title && <div className="text-xs font-bold text-slate-500 mb-1">{tile.title}</div>}
       <div className="flex-1 min-h-0" style={{ minHeight: 150 }}>
-        <Bar data={chartData} options={options} />
+        <Line data={chartData} options={options} />
       </div>
     </div>
   );

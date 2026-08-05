@@ -1,9 +1,9 @@
 import type { Income, Expense, TaxSettings, Saving } from "@/components/finance/finance-types";
 import type { Project } from "@/components/projects/project-types";
 
-export type WidgetType = "hero" | "table" | "bar" | "doughnut" | "calculator" | "clock" | "weather";
+export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "calculator" | "clock" | "weather";
 
-export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "doughnut"];
+export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut"];
 export const LOCKED_1x1: WidgetType[] = ["calculator", "clock", "weather"];
 export const STATIC_WIDGETS: WidgetType[] = ["calculator", "clock", "weather"];
 

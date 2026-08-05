@@ -122,7 +122,7 @@ export function DashboardGrid({
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-auto">
           {tiles.map((tile) => {
             const widgetData = tile.dataSource
-              ? resolveDataSource(rawData, tile.dataSource, tile.timeRange || "this_month")
+              ? resolveDataSource(rawData, tile.dataSource, tile.timeRange || "this_month", tile.type)
               : null;
 
             const content = (

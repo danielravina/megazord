@@ -19,7 +19,7 @@ interface Props {
 export function DoughnutChartWidget({ data, tile }: Props) {
   const d = data as DoughnutData | null;
 
-  if (!d || !d.segments.length) {
+  if (!d || !Array.isArray(d.labels) || !Array.isArray(d.segments) || d.segments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[120px] text-slate-400 text-sm">
         {tile.title && <div className="text-xs font-bold text-slate-500 mb-1">{tile.title}</div>}
