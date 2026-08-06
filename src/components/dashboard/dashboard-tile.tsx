@@ -14,6 +14,7 @@ import { Dropdown, MenuLabel, MenuItem } from "@/components/ui/dropdown";
 interface TileProps {
   tile: DashboardTile;
   data: WidgetData;
+  loading?: boolean;
   customizing: boolean;
   onSpanChange: (id: string, span: number) => void;
   onRemove: (id: string) => void;
@@ -34,9 +35,47 @@ const SPAN_LABELS: Record<number, string> = {
   4: "מלא (4/4)",
 };
 
+function TileSkeleton({ type }: { type: string }) {
+  if (type === "hero") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 flex-1 animate-pulse">
+        <div className="w-24 h-8 rounded-lg bg-slate-200" />
+        <div className="w-16 h-3 rounded bg-slate-100" />
+      </div>
+    );
+  }
+
+  if (type === "table") {
+    return (
+      <div className="flex flex-col gap-2.5 pt-1 animate-pulse">
+        {[100, 88, 76, 64].map((w, i) => (
+          <div key={i} className="h-3 rounded bg-slate-100" style={{ width: `${w}%` }} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 animate-pulse">
+      <div className="h-full min-h-[120px] rounded-lg bg-slate-100 flex items-center justify-center">
+        {type === "doughnut" ? (
+          <div className="w-24 h-24 rounded-full bg-slate-200/70" />
+        ) : (
+          <div className="flex items-end gap-2 h-3/4">
+            {[40, 70, 50, 90, 60, 80].map((h, i) => (
+              <div key={i} className="w-3 rounded-t bg-slate-200/70" style={{ height: `${h}%` }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function DashboardTileComponent({
   tile,
   data,
+  loading = false,
   customizing,
   onSpanChange,
   onRemove,
@@ -167,7 +206,11 @@ export function DashboardTileComponent({
 
       {/* Widget content */}
       <div className="flex-1 min-h-0">
-        <WidgetComponent data={data} tile={tile} />
+        {loading && !isStatic ? (
+          <TileSkeleton type={tile.type} />
+        ) : (
+          <WidgetComponent data={data} tile={tile} />
+        )}
       </div>
     </div>
   );

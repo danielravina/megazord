@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,10 @@ import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { generateId } from "@/components/shared/generate-id";
 import { formatDate } from "@/components/shared/format-date";
 import { formatCurrency } from "@/components/shared/format-currency";
-import { MonthlyExport } from "./monthly-export";
 import {
-  FileText, Camera, Search, Folder, Trash2, X,
+  FileText, Search, Folder, Trash2, X,
   Building, Shield, User, Truck, Users,
   FileSpreadsheet,
 } from "lucide-react";
@@ -67,15 +65,11 @@ const DOC_TYPES = [
 export function DocumentsPage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [docs, setDocs] = useState<Document[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [businesses, setBusinesses] = useState<{ id: string; name: string; vat_number: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
-  const [showExport, setShowExport] = useState(false);
-  const [bizDetails, setBizDetails] = useState({ business_name: "", vat_number: "", business_address: "", business_phone: "", accountant_email: "" });
   const [editingView, setEditingView] = useState(false);
   const [showExtracted, setShowExtracted] = useState(false);
   const [viewEdit, setViewEdit] = useState({ title: "", docType: "Other", dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false, tags: "", projectId: "", businessId: "", direction: "expense" });
@@ -83,8 +77,6 @@ export function DocumentsPage() {
   const [currentView, setCurrentView] = useState<"list" | "folders">("list");
   const [folderFilter, setFolderFilter] = useState<string | null>(null);
 
-  // Confirmation screen state
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [displayUrls, setDisplayUrls] = useState<Record<string, string>>({});
 
   async function getSignedUrl(storagePath: string): Promise<string> {
@@ -110,39 +102,17 @@ export function DocumentsPage() {
     }
     return url;
   }
-  const [tempDoc, setTempDoc] = useState<{
-    imageUrl: string;
-    title: string;
-    tags: string[];
-    extractedText: string;
-    docType: string;
-    dateOnDoc: string;
-    totalAmount: string;
-    folder: string;
-    isInvestment: boolean;
-    direction: string;
-    projectId: string;
-    newProjectName: string;
-    businessId: string;
-    businessVat: string;
-    newBusinessName: string;
-  }>({
-    imageUrl: "", title: "", tags: [], extractedText: "", docType: "Other",
-    dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false,
-    direction: "expense", projectId: "", newProjectName: "",
-    businessId: "", businessVat: "", newBusinessName: "",
-  });
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([loadDocs(), loadProjects(), loadBusinesses(), loadBizDetails()]).finally(() => setLoading(false));
+    Promise.all([loadDocs(), loadProjects(), loadBusinesses()]).finally(() => setLoading(false));
   }, [user]);
 
-  // Load signed URLs when viewing or confirming a document
+  // Load signed URLs when viewing a document
   useEffect(() => {
-    const path = viewing?.image_url || (confirmOpen ? tempDoc.imageUrl : null);
+    const path = viewing?.image_url;
     if (path && !path.startsWith("http")) getSignedUrl(path);
-  }, [viewId, confirmOpen]);
+  }, [viewId]);
 
   // Preload signed URLs for all visible doc thumbnails
   useEffect(() => {
@@ -166,200 +136,6 @@ export function DocumentsPage() {
   async function loadBusinesses() {
     const { data } = await supabase.from("businesses").select("id, name, vat_number").eq("user_id", user!.id);
     setBusinesses(data || []);
-  }
-
-  async function loadBizDetails() {
-    const { data } = await supabase.from("tax_settings").select("business_name, vat_number, business_address, business_phone, accountant_email").eq("user_id", user!.id).maybeSingle();
-    if (data) setBizDetails(data);
-  }
-
-  async function handleCapture(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    setProcessing(true);
-
-    try {
-      const path = `${user.id}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
-      if (uploadError) {
-        toast("שגיאה בהעלאת התמונה", "error");
-        setProcessing(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
-      const { data: signedData } = await supabase.storage.from("documents").createSignedUrl(path, 604800);
-      const signedUrl = signedData?.signedUrl || "";
-
-      // OCR: call Supabase Edge Function
-      let ocr = await tryOCR(signedUrl);
-      if (!ocr) {
-        ocr = { title: file.name.replace(/\.[^.]+$/, ""), tags: ["כללי"], extractedText: "", docType: "Other", dateOnDoc: "", totalAmount: null, folderSuggestion: "", isInvestment: false };
-      }
-
-      // Immediately save business if VAT detected and not already exists
-      let bizId = "";
-      const bizName = ocr.businessName || "";
-      const bizVat = ocr.businessVat || "";
-      if (bizVat) {
-        const { data: existing } = await supabase.from("businesses")
-          .select("id").eq("user_id", user.id).eq("vat_number", bizVat).maybeSingle();
-        if (existing) {
-          bizId = existing.id;
-        } else {
-          const newBizId = generateId();
-          const { error: bizError } = await supabase.from("businesses").insert({
-            id: newBizId, user_id: user.id, name: bizName || "עסק",
-            vat_number: bizVat,
-            address: ocr.businessAddress || null,
-            phone: ocr.businessPhone || null,
-          });
-          if (!bizError) {
-            bizId = newBizId;
-            await loadBusinesses();
-          }
-        }
-      }
-
-      setTempDoc({
-        imageUrl: path, title: ocr.title || file.name, tags: ocr.tags || ["כללי"],
-        extractedText: ocr.extractedText || "", docType: ocr.docType || "Other",
-        dateOnDoc: ocr.dateOnDoc || "", totalAmount: ocr.totalAmount?.toString() || "",
-        folder: ocr.folderSuggestion || "", isInvestment: ocr.isInvestment || false,
-        direction: "expense", projectId: "", newProjectName: "",
-        businessId: bizId, businessVat: bizVat, newBusinessName: "",
-      });
-      setConfirmOpen(true);
-    } catch {
-      toast("שגיאה בהעלאת התמונה", "error");
-    } finally {
-      setProcessing(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
-  async function tryOCR(imageUrl: string) {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ocr-document`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
-        body: JSON.stringify({ imageUrl }),
-      });
-      if (res.ok) return await res.json();
-    } catch {}
-    return null;
-  }
-
-  async function saveDocument() {
-    if (!user) return;
-    let finalProjectId = tempDoc.projectId;
-
-    if (tempDoc.projectId === "new" && tempDoc.newProjectName.trim()) {
-      const newId = generateId();
-      const { error: projError } = await supabase.from("projects").insert({ id: newId, user_id: user.id, customer_name: tempDoc.newProjectName.trim() });
-      if (projError) {
-        toast("שגיאה ביצירת הפרויקט", "error");
-        return;
-      }
-      finalProjectId = newId;
-      loadProjects();
-    }
-
-    // Auto-link or create business from OCR data or manual entry
-    let finalBusinessId = tempDoc.businessId;
-    if (tempDoc.businessId === "new" && tempDoc.newBusinessName.trim()) {
-      const newBizId = generateId();
-      const { error: bizError } = await supabase.from("businesses").insert({
-        id: newBizId, user_id: user.id, name: tempDoc.newBusinessName.trim(), vat_number: tempDoc.businessVat || null,
-      });
-      if (!bizError) {
-        finalBusinessId = newBizId;
-        loadBusinesses();
-      }
-    } else if (!finalBusinessId && tempDoc.businessVat) {
-      // Check if business with this VAT already exists
-      const { data: existing } = await supabase.from("businesses")
-        .select("id").eq("user_id", user.id).eq("vat_number", tempDoc.businessVat).maybeSingle();
-      if (existing) {
-        finalBusinessId = existing.id;
-      } else {
-        // Create new business
-        const bizName = tempDoc.title || "עסק חדש";
-        const newBizId = generateId();
-        const { error: bizError } = await supabase.from("businesses").insert({
-          id: newBizId, user_id: user.id, name: bizName, vat_number: tempDoc.businessVat,
-        });
-        if (!bizError) {
-          finalBusinessId = newBizId;
-          loadBusinesses();
-        }
-      }
-    }
-
-    const doc: Document = {
-      id: generateId(), user_id: user.id, title: tempDoc.title || "מסמך ללא שם",
-      image_url: tempDoc.imageUrl, tags: tempDoc.tags,
-      extracted_text: tempDoc.extractedText, doc_type: tempDoc.docType,
-      date_on_doc: tempDoc.dateOnDoc || null,
-      total_amount: parseFloat(tempDoc.totalAmount) || null,
-      project_id: finalProjectId || null,
-      folder: tempDoc.folder || null,
-      is_investment: tempDoc.isInvestment,
-      direction: tempDoc.direction,
-      is_paid: tempDoc.docType !== "Delivery Note",
-      business_id: finalBusinessId || null,
-      date: new Date().toISOString(),
-    };
-
-    setDocs((prev) => [doc, ...prev]);
-    setConfirmOpen(false);
-
-    const { error: insertError } = await supabase.from("documents").insert({
-      id: doc.id, user_id: user.id, title: doc.title, image_url: doc.image_url,
-      tags: doc.tags, extracted_text: doc.extracted_text, doc_type: doc.doc_type,
-      date_on_doc: doc.date_on_doc, total_amount: doc.total_amount,
-      project_id: doc.project_id, folder: doc.folder, is_investment: doc.is_investment,
-      direction: doc.direction, is_paid: doc.is_paid, business_id: doc.business_id,
-    });
-
-    if (insertError) {
-      setDocs((prev) => prev.filter((d) => d.id !== doc.id));
-      toast("שגיאה בשמירת המסמך", "error");
-      return;
-    }
-
-    // Sync to finance
-    if ((doc.total_amount ?? 0) > 0) {
-      if (doc.direction === "income") {
-        const { error: incError } = await supabase.from("incomes").insert({
-          id: generateId(), user_id: user.id,
-          date: doc.date_on_doc || new Date().toISOString().split("T")[0],
-          amount: doc.total_amount, type: "שוטף",
-          description: `הכנסה ממסמך: ${doc.title}`,
-        });
-        if (incError) toast("המסמך נשמר אך לא נוצרה הכנסה אוטומטית", "info");
-      } else if (doc.direction !== "other" && doc.is_paid && doc.doc_type !== "Proforma Invoice") {
-        const { error: expError } = await supabase.from("expenses").insert({
-          id: generateId(), user_id: user.id,
-          date: doc.date_on_doc || new Date().toISOString().split("T")[0],
-          amount: doc.total_amount, is_paid: true,
-          category: doc.folder || "כללי",
-          description: `הוצאה ממסמך: ${doc.title}`,
-        });
-        if (expError) toast("המסמך נשמר אך לא נוצרה הוצאה אוטומטית", "info");
-      }
-      // Update project expenses
-      if (finalProjectId) {
-        const { data: proj, error: projFetchError } = await supabase.from("projects").select("expenses").eq("id", finalProjectId).single();
-        if (!projFetchError && proj) {
-          const { error: projUpdateError } = await supabase.from("projects").update({ expenses: (proj.expenses || 0) + (doc.total_amount ?? 0) }).eq("id", finalProjectId);
-          if (projUpdateError) {
-            toast("המסמך נשמר אך הוצאות הפרויקט לא עודכנו", "info");
-          }
-        }
-      }
-    }
-
-    toast("המסמך נשמר", "success");
   }
 
   function startEditView() {
@@ -430,16 +206,6 @@ export function DocumentsPage() {
     );
   }
 
-  if (processing) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Spinner size="lg" />
-        <p className="text-slate-500">מנתח מסמך...</p>
-        <p className="text-xs text-slate-400">הבינה המלאכותית קוראת את הטקסט ומזהה את סוג המסמך</p>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -448,14 +214,6 @@ export function DocumentsPage() {
           המסמכים שלי
         </h1>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setShowExport(true)}>
-            <FileText size={14} />
-            ייצוא חודשי
-          </Button>
-          <Button onClick={() => fileInputRef.current?.click()}>
-            <Camera size={14} />
-            סרוק מסמך
-          </Button>
           <div className="flex bg-slate-100 p-1 rounded-lg">
             <button onClick={() => { setCurrentView("list"); setFolderFilter(null); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "list" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>רשימה</button>
             <button onClick={() => setCurrentView("folders")} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "folders" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>תיקיות</button>
@@ -506,7 +264,7 @@ export function DocumentsPage() {
               <EmptyState
                 icon={<FileText size={40} className="text-blue-300" />}
                 title="אין מסמכים עדיין"
-                description="לחץ על כפתור המצלמה למטה כדי לסרוק מסמך"
+                description="סרוק מסמך מהלוח בקרה כדי להוסיף מסמך חדש"
               />
             </Card>
           ) : (
@@ -514,7 +272,14 @@ export function DocumentsPage() {
               {filteredDocs.map((doc) => (
                 <div key={doc.id} onClick={() => setViewId(doc.id)} className="bg-white p-3 rounded-2xl shadow-sm border flex gap-4 cursor-pointer hover:shadow-md transition-shadow">
                   <div className="w-20 h-24 bg-slate-100 rounded-xl overflow-hidden shrink-0 border">
-                    {doc.image_url && <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover" />}
+                    {doc.image_url && (/\.pdf$/i.test(doc.image_url) ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-400">
+                        <FileText size={22} />
+                        <span className="text-[9px]">PDF</span>
+                      </div>
+                    ) : (
+                      <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover" />
+                    ))}
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <h3 className="font-semibold truncate mb-1">{doc.title}</h3>
@@ -535,21 +300,6 @@ export function DocumentsPage() {
           )}
         </>
       )}
-
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
-
-      <MonthlyExport
-        open={showExport}
-        onClose={() => setShowExport(false)}
-        docs={docs}
-        businessName={bizDetails.business_name}
-        vatNumber={bizDetails.vat_number}
-        businessAddress={bizDetails.business_address}
-        businessPhone={bizDetails.business_phone}
-        accountantEmail={bizDetails.accountant_email}
-        supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL || ""}
-        supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}
-      />
 
       {/* Detail Modal */}
       <Modal
@@ -637,68 +387,18 @@ export function DocumentsPage() {
             </div>
             {viewing.image_url && (
               <div className="md:w-1/2 shrink-0 bg-slate-100 border flex items-center justify-center h-64 md:h-full">
-                <img src={displayUrls[viewing.image_url] || viewing.image_url} alt="" className="w-full h-full object-contain" />
+                {/\.pdf$/i.test(viewing.image_url) ? (
+                  <div className="flex flex-col items-center gap-2 text-slate-400">
+                    <FileText size={44} />
+                    <span className="text-xs">קובץ PDF</span>
+                  </div>
+                ) : (
+                  <img src={displayUrls[viewing.image_url] || viewing.image_url} alt="" className="w-full h-full object-contain" />
+                )}
               </div>
             )}
           </div>
         )}
-      </Modal>
-
-      {/* Confirmation Modal */}
-      <Modal
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        title="פרטי מסמך"
-        size="full"
-        footer={
-          <div className="flex gap-2 justify-between w-full">
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>ביטול</Button>
-            <Button onClick={saveDocument}>שמור</Button>
-          </div>
-        }
-      >
-        <div className="flex flex-col md:flex-row gap-0 h-full">
-          <div className="flex-1 space-y-4 min-w-0 overflow-y-auto p-1">
-            <Select label="שיוך לפרויקט" options={[
-              { value: "", label: "ללא פרויקט" },
-              ...projects.map((p) => ({ value: p.id, label: p.customer_name })),
-            ]} value={tempDoc.projectId} onChange={(e) => setTempDoc({ ...tempDoc, projectId: e.target.value })} />
-            <Select label="ספק" options={[
-              { value: "", label: "ללא ספק" },
-              ...businesses.map((b) => ({ value: b.id, label: b.name })),
-              { value: "new", label: "+ הוסף ספק" },
-            ]} value={tempDoc.businessId} onChange={(e) => setTempDoc({ ...tempDoc, businessId: e.target.value })} />
-            {tempDoc.businessId === "new" && (
-              <Input label="שם הספק" value={tempDoc.newBusinessName} onChange={(e) => setTempDoc({ ...tempDoc, newBusinessName: e.target.value })} />
-            )}
-            <Input label="כותרת המסמך" value={tempDoc.title} onChange={(e) => setTempDoc({ ...tempDoc, title: e.target.value })} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select label="סוג מסמך" options={DOC_TYPES} value={tempDoc.docType} onChange={(e) => setTempDoc({ ...tempDoc, docType: e.target.value })} />
-              <Input label="סכום (₪)" type="number" step="0.01" value={tempDoc.totalAmount} onChange={(e) => setTempDoc({ ...tempDoc, totalAmount: e.target.value })} />
-            </div>
-            <Input label="תאריך במסמך" type="date" value={tempDoc.dateOnDoc} onChange={(e) => setTempDoc({ ...tempDoc, dateOnDoc: e.target.value })} />
-            <Select label="תיקייה" options={[
-            { value: "", label: "ללא תיקייה" },
-            ...FOLDERS.map((f) => ({ value: f.id, label: f.name })),
-          ]} value={tempDoc.folder} onChange={(e) => setTempDoc({ ...tempDoc, folder: e.target.value })} />
-          <Select label="הוצאה / הכנסה" options={[
-            { value: "expense", label: "הוצאה" },
-            { value: "income", label: "הכנסה" },
-            { value: "other", label: "אחר" },
-          ]} value={tempDoc.direction} onChange={(e) => setTempDoc({ ...tempDoc, direction: e.target.value })} />
-            <Checkbox label="השקעה בעסק (רכוש קבוע)" checked={tempDoc.isInvestment} onChange={(e) => setTempDoc({ ...tempDoc, isInvestment: e.target.checked })} />
-            <Input label="תגיות (מופרדות בפסיק)" value={tempDoc.tags.join(", ")} onChange={(e) => setTempDoc({ ...tempDoc, tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })} />
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">טקסט שחולץ</label>
-              <textarea rows={4} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm" value={tempDoc.extractedText} onChange={(e) => setTempDoc({ ...tempDoc, extractedText: e.target.value })} readOnly />
-            </div>
-          </div>
-          {tempDoc.imageUrl && (
-            <div className="md:w-1/2 shrink-0 bg-slate-900 flex items-center justify-center h-64 md:h-full">
-              <img src={displayUrls[tempDoc.imageUrl] || tempDoc.imageUrl} alt="" className="w-full h-full object-contain" />
-            </div>
-          )}
-        </div>
       </Modal>
     </div>
   );

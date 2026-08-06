@@ -7,12 +7,14 @@ import { useDashboardData } from "@/components/dashboard/data-sources/use-dashbo
 import { useDashboardLayout } from "@/components/dashboard/dashboard-storage";
 import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
 import { AddTilePicker } from "@/components/dashboard/add-tile-picker";
+import { DocumentScanner } from "@/components/documents/document-scanner";
+import { MonthlyExport } from "@/components/documents/monthly-export";
 import type {
   DashboardTile,
   WidgetType,
   TimeRange,
 } from "@/components/dashboard/dashboard-types";
-import { RefreshCw, Settings } from "lucide-react";
+import { RefreshCw, Settings, FileText } from "lucide-react";
 
 export function DashboardPage() {
   const { rawData, refresh, isRefreshing, dataLoading } = useDashboardData();
@@ -20,6 +22,7 @@ export function DashboardPage() {
     useDashboardLayout();
   const [customizing, setCustomizing] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const handleChangeType = (id: string, type: WidgetType) => {
     updateTile(id, { type });
@@ -37,7 +40,7 @@ export function DashboardPage() {
     updateTile(id, { span: span as DashboardTile["span"] });
   };
 
-  if (layoutLoading || (dataLoading && layout.length === 0)) {
+  if (layoutLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Spinner size="lg" />
@@ -51,6 +54,11 @@ export function DashboardPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-700">לוח בקרה</h2>
         <div className="flex items-center gap-2">
+          <DocumentScanner onScanned={refresh} />
+          <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>
+            <FileText size={14} />
+            דוח חודשי
+          </Button>
           <button
             onClick={() => refresh()}
             disabled={isRefreshing}
@@ -78,6 +86,7 @@ export function DashboardPage() {
       <DashboardGrid
         tiles={layout}
         rawData={rawData}
+        loading={dataLoading}
         customizing={customizing}
         onReorder={reorderTiles}
         onSpanChange={handleSpanChange}
@@ -92,6 +101,19 @@ export function DashboardPage() {
         open={showPicker}
         onClose={() => setShowPicker(false)}
         onAdd={addTile}
+      />
+
+      <MonthlyExport
+        open={showReport}
+        onClose={() => setShowReport(false)}
+        docs={rawData.documents}
+        businessName={rawData.taxSettings?.business_name || ""}
+        vatNumber={rawData.taxSettings?.vat_number || ""}
+        businessAddress={rawData.taxSettings?.business_address || ""}
+        businessPhone={rawData.taxSettings?.business_phone || ""}
+        accountantEmail={rawData.taxSettings?.accountant_email || ""}
+        supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL || ""}
+        supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}
       />
     </div>
   );

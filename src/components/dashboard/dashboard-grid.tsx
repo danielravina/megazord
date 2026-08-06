@@ -38,6 +38,7 @@ function spanClass(span: number) {
 interface GridProps {
   tiles: DashboardTileType[];
   rawData: DashboardRawData;
+  loading: boolean;
   customizing: boolean;
   onReorder: (tiles: DashboardTileType[]) => void;
   onSpanChange: (id: string, span: number) => void;
@@ -78,6 +79,7 @@ function SortableTile({
 export function DashboardGrid({
   tiles,
   rawData,
+  loading,
   customizing,
   onReorder,
   onSpanChange,
@@ -129,6 +131,7 @@ export function DashboardGrid({
               <DashboardTileComponent
                 tile={tile}
                 data={widgetData}
+                loading={loading}
                 customizing={customizing}
                 onSpanChange={onSpanChange}
                 onRemove={onRemove}
