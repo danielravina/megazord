@@ -52,13 +52,8 @@ export function DashboardPage() {
     <div className="max-w-7xl mx-auto space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-700">לוח בקרה</h2>
         <div className="flex items-center gap-2">
-          <DocumentScanner onScanned={refresh} />
-          <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>
-            <FileText size={14} />
-            דוח חודשי
-          </Button>
+          <h2 className="text-2xl font-bold text-slate-700">לוח בקרה</h2>
           <button
             onClick={() => refresh()}
             disabled={isRefreshing}
@@ -70,6 +65,13 @@ export function DashboardPage() {
               className={isRefreshing ? "animate-spin text-blue-500" : "text-slate-500"}
             />
           </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <DocumentScanner onScanned={refresh} />
+          <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>
+            <FileText size={14} />
+            דוח חודשי
+          </Button>
           <Button
             variant={customizing ? "primary" : "secondary"}
             size="sm"

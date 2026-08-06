@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { generateId } from "@/components/shared/generate-id";
-import { ScanLine, FileText } from "lucide-react";
+import { ScanLine } from "lucide-react";
 
 interface Project {
   id: string;
@@ -356,12 +356,9 @@ export function DocumentScanner({ onScanned }: Props) {
             </div>
           </div>
           {tempDoc.imageUrl && (
-            <div className="md:w-1/2 shrink-0 bg-slate-900 flex items-center justify-center h-64 md:h-full">
+            <div className="md:w-1/2 shrink-0 bg-slate-100 border flex items-center justify-center h-64 md:h-full overflow-hidden">
               {/\.pdf$/i.test(tempDoc.imageUrl) ? (
-                <div className="flex flex-col items-center gap-2 text-slate-400">
-                  <FileText size={40} />
-                  <span className="text-xs">קובץ PDF</span>
-                </div>
+                <iframe src={tempDoc.previewUrl} title="קובץ PDF" className="w-full h-full" />
               ) : (
                 <img src={tempDoc.previewUrl} alt="" className="w-full h-full object-contain" />
               )}

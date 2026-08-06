@@ -386,12 +386,9 @@ export function DocumentsPage() {
               )}
             </div>
             {viewing.image_url && (
-              <div className="md:w-1/2 shrink-0 bg-slate-100 border flex items-center justify-center h-64 md:h-full">
+              <div className="md:w-1/2 shrink-0 bg-slate-100 border flex items-center justify-center h-64 md:h-full overflow-hidden">
                 {/\.pdf$/i.test(viewing.image_url) ? (
-                  <div className="flex flex-col items-center gap-2 text-slate-400">
-                    <FileText size={44} />
-                    <span className="text-xs">קובץ PDF</span>
-                  </div>
+                  <iframe src={displayUrls[viewing.image_url] || viewing.image_url} title="קובץ PDF" className="w-full h-full" />
                 ) : (
                   <img src={displayUrls[viewing.image_url] || viewing.image_url} alt="" className="w-full h-full object-contain" />
                 )}
