@@ -9,8 +9,9 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
+import { Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown";
 import { generateId } from "@/components/shared/generate-id";
-import { ScanLine } from "lucide-react";
+import { ScanLine, Camera, Upload } from "lucide-react";
 
 interface Project {
   id: string;
@@ -75,6 +76,7 @@ export function DocumentScanner({ onScanned }: Props) {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [processing, setProcessing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -129,7 +131,7 @@ export function DocumentScanner({ onScanned }: Props) {
       if (uploadError) {
         toast("שגיאה בהעלאת הקובץ", "error");
         setProcessing(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        resetInputs();
         return;
       }
       const { data: signedData } = await supabase.storage.from("documents").createSignedUrl(path, 604800);
@@ -184,8 +186,13 @@ export function DocumentScanner({ onScanned }: Props) {
       toast("שגיאה בהעלאת הקובץ", "error");
     } finally {
       setProcessing(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      resetInputs();
     }
+  }
+
+  function resetInputs() {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }
 
   async function saveDocument() {
@@ -291,10 +298,47 @@ export function DocumentScanner({ onScanned }: Props) {
         className="hidden"
         onChange={handleCapture}
       />
-      <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-        <ScanLine size={14} />
-        סרוק מסמך
-      </Button>
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleCapture}
+      />
+      <Dropdown
+        align="left"
+        trigger={
+          <Button variant="secondary" size="sm">
+            <ScanLine size={14} />
+            סרוק מסמך
+          </Button>
+        }
+      >
+        {(close) => (
+          <div>
+            <MenuLabel>סריקה</MenuLabel>
+            <MenuItem
+              icon={<Camera size={14} />}
+              onClick={() => {
+                cameraInputRef.current?.click();
+                close();
+              }}
+            >
+              מצלמה
+            </MenuItem>
+            <MenuItem
+              icon={<Upload size={14} />}
+              onClick={() => {
+                fileInputRef.current?.click();
+                close();
+              }}
+            >
+              העלאת קובץ (PDF/תמונה)
+            </MenuItem>
+          </div>
+        )}
+      </Dropdown>
 
       {/* Processing overlay */}
       <Modal open={processing} onClose={() => {}} title="מנתח מסמך" size="sm">
