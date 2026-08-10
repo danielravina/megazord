@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton, SkeletonText, SkeletonCircle } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency } from "@/components/shared/format-currency";
 import { formatDate } from "@/components/shared/format-date";
@@ -200,8 +200,50 @@ export function FinancePage() {
 
   if (loading && incomes.length === 0 && expenses.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <Skeleton className="w-48 h-8" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center justify-between">
+              <div className="space-y-2">
+                <SkeletonText className="w-24" />
+                <Skeleton className="h-8 w-32" />
+              </div>
+              <SkeletonCircle className="w-12 h-12" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+          <div className="flex border-b border-slate-200 px-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-4 w-20 my-4 mx-2 rounded" />
+            ))}
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="p-5 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
+                  <SkeletonText className="w-24" />
+                  <Skeleton className="h-7 w-28" />
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-slate-200 p-5">
+                  <Skeleton className="w-40 h-5 mb-4" />
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

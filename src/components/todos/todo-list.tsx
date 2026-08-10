@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { TodoItem } from "./todo-item";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton, SkeletonButton, SkeletonText } from "@/components/ui/skeleton";
 import { ClipboardList, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { generateId } from "@/components/shared/generate-id";
@@ -108,8 +108,22 @@ export function TodoList() {
 
   if (loading && todos.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Spinner size="lg" />
+      <div className="max-w-2xl mx-auto">
+        <div className="mb-6">
+          <Skeleton className="w-48 h-8" />
+        </div>
+        <div className="flex gap-3 mb-6">
+          <Skeleton className="flex-1 h-12 rounded-xl" />
+          <SkeletonButton className="w-24 h-12" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+              <Skeleton className="w-5 h-5 rounded-full" />
+              <SkeletonText className="flex-1" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

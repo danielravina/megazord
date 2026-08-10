@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { Card } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton, SkeletonButton, SkeletonText } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/components/shared/format-date";
 import { generateId } from "@/components/shared/generate-id";
@@ -190,8 +190,31 @@ export function KanbanPage() {
 
   if (loading && requests.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="max-w-7xl mx-auto h-full flex flex-col">
+        <div className="flex justify-between items-center mb-6">
+          <Skeleton className="w-64 h-8" />
+          <SkeletonButton className="w-32" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 min-h-0">
+          {Array.from({ length: 3 }).map((_, col) => (
+            <div key={col} className="bg-slate-100 rounded-xl p-4 border">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b">
+                <Skeleton className="w-24 h-4" />
+                <Skeleton className="w-6 h-5 rounded-full" />
+              </div>
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-white p-4 rounded-lg shadow-sm border border-slate-100">
+                    <SkeletonText className="w-3/4 mb-3" />
+                    <SkeletonText className="w-full mb-2" />
+                    <SkeletonText className="w-1/2 mb-3" />
+                    <Skeleton className="h-8 w-full rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

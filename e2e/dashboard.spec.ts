@@ -5,6 +5,17 @@ async function authGuard(page: Page) {
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 }
 
+// Reliably remove the first tile in customize mode: open its options menu and click "הסר"
+async function removeFirstTile(page: Page) {
+  const tile = page.locator("[data-tile]").first();
+  await tile.hover();
+  await page.waitForTimeout(200);
+  await tile.locator("button[aria-label='אפשרויות טייל']").click();
+  await page.waitForTimeout(200);
+  await page.locator("button:has-text('הסר')").last().click();
+  await page.waitForTimeout(300);
+}
+
 async function resetLayout(page: Page) {
   await authGuard(page);
   await page.locator("button:has-text('התאמה אישית')").click();
@@ -12,13 +23,7 @@ async function resetLayout(page: Page) {
   let tiles = page.locator("[data-tile]");
   let count = await tiles.count();
   while (count > 0) {
-    const t = tiles.first();
-    await t.hover();
-    await page.waitForTimeout(200);
-    const btns = t.locator("button");
-    const btnCount = await btns.count();
-    if (btnCount > 0) await btns.last().click();
-    await page.waitForTimeout(300);
+    await removeFirstTile(page);
     tiles = page.locator("[data-tile]");
     count = await tiles.count();
   }
@@ -34,14 +39,7 @@ async function resetLayout(page: Page) {
 
   // remove that tile so layout is empty → next reload loads defaults
   await page.locator("button:has-text('התאמה אישית')").click();
-  tiles = page.locator("[data-tile]");
-  const t = tiles.first();
-  await t.hover();
-  await page.waitForTimeout(200);
-  const btns = t.locator("button");
-  const btnCount = await btns.count();
-  if (btnCount > 0) await btns.last().click();
-  await page.waitForTimeout(300);
+  await removeFirstTile(page);
 
   await page.locator("button:has-text('סיום')").click();
   await page.waitForTimeout(500);
@@ -61,12 +59,7 @@ test("reset layout to defaults so other tests have clean state", async ({ page }
   let tiles = page.locator("[data-tile]");
   let count = await tiles.count();
   while (count > 0) {
-    const t = tiles.first();
-    await t.hover();
-    await page.waitForTimeout(200);
-    const btns = t.locator("button");
-    if ((await btns.count()) > 0) await btns.last().click();
-    await page.waitForTimeout(200);
+    await removeFirstTile(page);
     tiles = page.locator("[data-tile]");
     count = await tiles.count();
   }
@@ -265,19 +258,14 @@ test("layout persists after page reload", async ({ page }) => {
   await page.locator("button:has-text('התאמה אישית')").click();
   const tileCountBefore = await page.locator("[data-tile]").count();
 
-  const firstTile = page.locator("[data-tile]").first();
-  await firstTile.hover();
-  await page.waitForTimeout(300);
-  const btns = firstTile.locator("button");
-  if ((await btns.count()) > 0) await btns.last().click();
-  await page.waitForTimeout(300);
+  await removeFirstTile(page);
 
   await page.locator("button:has-text('סיום')").click();
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(3000);
 
   await page.reload();
   await authGuard(page);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1500);
 
   const tileCountAfter = await page.locator("[data-tile]").count();
   expect(tileCountAfter).toBe(tileCountBefore - 1);

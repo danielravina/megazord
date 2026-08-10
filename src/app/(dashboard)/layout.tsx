@@ -12,7 +12,7 @@ export default function DashboardLayout({
       <ToastProvider>
         <div className="flex min-h-screen">
           <Sidebar />
-          <main className="mr-0 lg:mr-64 flex-1 p-4 lg:p-6 pt-16 lg:pt-6 overflow-y-auto">{children}</main>
+          <main className="mr-14 flex-1 p-4 lg:p-6 overflow-y-auto">{children}</main>
         </div>
       </ToastProvider>
     </AuthGuard>

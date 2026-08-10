@@ -20,8 +20,8 @@ test("documents page has search input", async ({ page }) => {
   await expect(page.locator("input[placeholder='חיפוש מסמכים או תגיות...']")).toBeVisible();
 });
 
-test("documents page has camera button in header", async ({ page }) => {
-  await page.goto("/documents/");
+test("scan document button exists on dashboard", async ({ page }) => {
+  await page.goto("/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
   await expect(page.locator("button:has-text('סרוק מסמך')")).toBeVisible({ timeout: 5000 });
 });

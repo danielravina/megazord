@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { useDashboardData } from "@/components/dashboard/data-sources/use-dashboard-data";
 import { useDashboardLayout } from "@/components/dashboard/dashboard-storage";
 import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
@@ -42,8 +42,26 @@ export function DashboardPage() {
 
   if (layoutLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="max-w-7xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Skeleton className="w-40 h-8" />
+            <Skeleton className="w-8 h-8" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="w-24 h-9 rounded-lg" />
+            <Skeleton className="w-28 h-9 rounded-lg" />
+            <Skeleton className="w-28 h-9 rounded-lg" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 h-40">
+              <SkeletonText className="w-24 mb-3" />
+              <Skeleton className="w-full h-20 rounded-lg" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

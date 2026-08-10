@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton, SkeletonButton, SkeletonText } from "@/components/ui/skeleton";
 import { Settings, Save, Building } from "lucide-react";
 import type { TaxSettings } from "@/components/finance/finance-types";
 
@@ -107,8 +107,30 @@ export function PreferencesPage() {
 
   if (loading && !settings) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="w-36 h-8" />
+          <SkeletonButton className="w-36" />
+        </div>
+        <div className="space-y-8">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <Skeleton className="w-40 h-6 mb-5" />
+            <div className="space-y-4">
+              <Skeleton className="w-full h-9 rounded-lg" />
+              <Skeleton className="w-full h-9 rounded-lg" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Skeleton className="w-full h-9 rounded-lg" />
+                <Skeleton className="w-full h-9 rounded-lg" />
+              </div>
+              <Skeleton className="w-full h-9 rounded-lg" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <Skeleton className="w-40 h-6 mb-5" />
+            <Skeleton className="w-full h-9 rounded-lg" />
+            <SkeletonText className="w-1/2 mt-3" />
+          </div>
+        </div>
       </div>
     );
   }
