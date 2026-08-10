@@ -11,12 +11,9 @@ import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown";
 import { generateId } from "@/components/shared/generate-id";
+import type { Project, ProjectRow } from "@/components/projects/project-types";
+import { normalizeProject } from "@/components/projects/project-types";
 import { ScanLine, Camera, Upload } from "lucide-react";
-
-interface Project {
-  id: string;
-  customer_name: string;
-}
 
 interface Business {
   id: string;
@@ -90,8 +87,8 @@ export function DocumentScanner({ onScanned }: Props) {
   }, [user]);
 
   async function loadProjects() {
-    const { data } = await supabase.from("projects").select("id, customer_name").eq("user_id", user!.id);
-    setProjects(data || []);
+    const { data } = await supabase.from("projects").select("id, customer_id, customers(name)").eq("user_id", user!.id);
+    setProjects(((data || []) as ProjectRow[]).map(normalizeProject));
   }
 
   async function loadBusinesses() {
@@ -201,7 +198,15 @@ export function DocumentScanner({ onScanned }: Props) {
 
     if (tempDoc.projectId === "new" && tempDoc.newProjectName.trim()) {
       const newId = generateId();
-      const { error: projError } = await supabase.from("projects").insert({ id: newId, user_id: user.id, customer_name: tempDoc.newProjectName.trim() });
+      const custId = generateId();
+      const { error: custError } = await supabase.from("customers").insert({
+        id: custId, user_id: user.id, name: tempDoc.newProjectName.trim(),
+      });
+      if (custError) {
+        toast("שגיאה ביצירת הלקוח", "error");
+        return;
+      }
+      const { error: projError } = await supabase.from("projects").insert({ id: newId, user_id: user.id, customer_id: custId });
       if (projError) {
         toast("שגיאה ביצירת הפרויקט", "error");
         return;
@@ -367,7 +372,7 @@ export function DocumentScanner({ onScanned }: Props) {
           <div className="flex-1 space-y-4 min-w-0 overflow-y-auto p-1">
             <Select label="שיוך לפרויקט" options={[
               { value: "", label: "ללא פרויקט" },
-              ...projects.map((p) => ({ value: p.id, label: p.customer_name })),
+              ...projects.map((p) => ({ value: p.id, label: p.customer_name || "ללא שם" })),
             ]} value={tempDoc.projectId} onChange={(e) => setTempDoc({ ...tempDoc, projectId: e.target.value })} />
             <Select label="ספק" options={[
               { value: "", label: "ללא ספק" },

@@ -9,7 +9,7 @@ import type {
   DoughnutData,
   TimeRange,
 } from "@/components/dashboard/dashboard-types";
-import { calculateTaxes } from "@/components/finance/tax-engine";
+import { calculateTaxes, totalVat } from "@/components/finance/tax-engine";
 
 const CHART_COLORS = [
   "#3b82f6", "#ef4444", "#10b981", "#f59e0b",
@@ -117,6 +117,7 @@ export const DATA_SOURCES: DataSourceDef[] = [
   { key: "documents:receivables", label: "חובות לקוחות", compatibleTypes: ["hero"], needsTimeRange: false },
   { key: "todos:open", label: "משימות פתוחות", compatibleTypes: ["table", "hero"], needsTimeRange: false },
   { key: "events:upcoming", label: "אירועים קרובים", compatibleTypes: ["table", "hero"], needsTimeRange: false },
+  { key: "calendar:today", label: "יומן", compatibleTypes: ["calendar"], needsTimeRange: false },
   { key: "requests:open", label: "בקשות פתוחות", compatibleTypes: ["table", "hero"], needsTimeRange: false },
   { key: "requests:by_status", label: "בקשות לפי סטטוס", compatibleTypes: ["doughnut", "bar", "table"], needsTimeRange: false },
 ];
@@ -363,8 +364,8 @@ export function resolveDataSource(
       const incTaxRate = s?.income_tax_advance ?? 0;
       const blRate = s?.bituah_leumi ?? 5;
       const totalIncome = raw.incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-      const grossWithoutVat = totalIncome - (totalIncome - totalIncome / (1 + vatRate / 100));
-      const estVat = Math.round(totalIncome - totalIncome / (1 + vatRate / 100));
+      const estVat = Math.round(totalVat(raw.incomes, vatRate));
+      const grossWithoutVat = totalIncome - estVat;
       const estIncTax = Math.round(grossWithoutVat * (incTaxRate / 100));
       const estBL = Math.round(grossWithoutVat * (blRate / 100));
       const vatFreq = s?.vat_frequency || "bimonthly";
@@ -523,7 +524,7 @@ export function resolveDataSource(
           { key: "start_date", label: "תאריך", align: "left" as const },
         ],
         raw.projects.slice(0, 10).map((p) => ({
-          customer_name: p.customer_name,
+          customer_name: p.customer_name || "-",
           quote_price: p.quote_price ? fmtNIS(p.quote_price) : "-",
           start_date: fmtDate(p.start_date),
         })),
@@ -549,7 +550,7 @@ export function resolveDataSource(
           { key: "start_date", label: "תאריך", align: "left" as const },
         ],
         items.map((p) => ({
-          customer_name: p.customer_name,
+          customer_name: p.customer_name || "-",
           quote_price: p.quote_price ? fmtNIS(p.quote_price) : "-",
           start_date: fmtDate(p.start_date),
         })),
@@ -602,6 +603,10 @@ export function resolveDataSource(
     }
 
     // ── Events ──────────────
+    case "calendar:today": {
+      return { events: raw.events };
+    }
+
     case "events:upcoming": {
       const today = new Date().toISOString().slice(0, 10);
       const upcoming = raw.events

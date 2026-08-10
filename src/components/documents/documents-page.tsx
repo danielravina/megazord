@@ -9,11 +9,13 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/ui/modal";
 import { Card } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/components/shared/format-date";
 import { formatCurrency } from "@/components/shared/format-currency";
+import type { Project, ProjectRow } from "@/components/projects/project-types";
+import { normalizeProject } from "@/components/projects/project-types";
 import {
   FileText, Search, Folder, Trash2, X,
   Building, Shield, User, Truck, Users,
@@ -37,11 +39,6 @@ interface Document {
   is_paid: boolean;
   business_id: string | null;
   date: string;
-}
-
-interface Project {
-  id: string;
-  customer_name: string;
 }
 
 const FOLDERS = [
@@ -129,8 +126,8 @@ export function DocumentsPage() {
   }
 
   async function loadProjects() {
-    const { data } = await supabase.from("projects").select("id, customer_name").eq("user_id", user!.id);
-    setProjects(data || []);
+    const { data } = await supabase.from("projects").select("id, customer_id, customers(name)").eq("user_id", user!.id);
+    setProjects(((data || []) as ProjectRow[]).map(normalizeProject));
   }
 
   async function loadBusinesses() {
@@ -200,8 +197,27 @@ export function DocumentsPage() {
 
   if (loading && docs.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="w-48 h-8" />
+          <Skeleton className="w-32 h-9" />
+        </div>
+        <Skeleton className="w-full h-11 rounded-xl mb-4" />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-white p-3 rounded-2xl shadow-sm border flex gap-4">
+              <Skeleton className="w-20 h-24 rounded-xl shrink-0" />
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+                <SkeletonText className="w-2/3" />
+                <SkeletonText className="w-1/3" />
+                <div className="flex gap-1.5 mt-1">
+                  <Skeleton className="h-4 w-16 rounded-md" />
+                  <Skeleton className="h-4 w-12 rounded-md" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -338,7 +354,7 @@ export function DocumentsPage() {
                     { value: "new", label: "+ הוסף ספק" },
                   ]} value={viewEdit.businessId} onChange={(e) => setViewEdit({ ...viewEdit, businessId: e.target.value })} />
                   <Select label="תיקייה" options={[{ value: "", label: "ללא" }, ...FOLDERS.map((f) => ({ value: f.id, label: f.name }))]} value={viewEdit.folder} onChange={(e) => setViewEdit({ ...viewEdit, folder: e.target.value })} />
-                  <Select label="שיוך לפרויקט" options={[{ value: "", label: "ללא" }, ...projects.map((p) => ({ value: p.id, label: p.customer_name }))]} value={viewEdit.projectId} onChange={(e) => setViewEdit({ ...viewEdit, projectId: e.target.value })} />
+                  <Select label="שיוך לפרויקט" options={[{ value: "", label: "ללא" }, ...projects.map((p) => ({ value: p.id, label: p.customer_name || "ללא שם" }))]} value={viewEdit.projectId} onChange={(e) => setViewEdit({ ...viewEdit, projectId: e.target.value })} />
                   <Select label="הוצאה / הכנסה" options={[
                     { value: "expense", label: "הוצאה" },
                     { value: "income", label: "הכנסה" },

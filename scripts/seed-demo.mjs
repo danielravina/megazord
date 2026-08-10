@@ -162,10 +162,23 @@ async function confirmDestructive(target) {
 }
 
 // ── Data generation ─────────────────────────────────────
-const CLIENTS = [
-  "אלעד כהן", "נועה לוי", "דוד מזרחי", "רונית פרץ", "יוסי אברהם", "מיכל ביטון",
-  "אבי גולן", "שירה דהן", "משה וקנין", "תמר בן-דוד", "ערן שגיא", "ליאור אוחנה",
-  "גלית הראל", "איתי ברק", "דנה שפירא", "רונן עזריה",
+const CUSTOMERS = [
+  { name: "אלעד כהן", email: "elad@example.com" },
+  { name: "נועה לוי", email: "noa@example.com" },
+  { name: "דוד מזרחי", email: "david@example.com" },
+  { name: "רונית פרץ", email: "ronit@example.com" },
+  { name: "יוסי אברהם", email: "yossi@example.com" },
+  { name: "מיכל ביטון", email: "michal@example.com" },
+  { name: "אבי גולן", email: "avi@example.com" },
+  { name: "שירה דהן", email: "shira@example.com" },
+  { name: "משה וקנין", email: "moshe@example.com" },
+  { name: "תמר בן-דוד", email: "tamar@example.com" },
+  { name: "ערן שגיא", email: "eran@example.com" },
+  { name: "ליאור אוחנה", email: "lior@example.com" },
+  { name: "גלית הראל", email: "galit@example.com" },
+  { name: "איתי ברק", email: "itay@example.com" },
+  { name: "דנה שפירא", email: "dana@example.com" },
+  { name: "רונן עזריה", email: "ronen@example.com" },
 ];
 const LOCATIONS = ["תל אביב", "ירושלים", "חיפה", "באר שבע", "רמת גן", "הרצליה", "פתח תקווה", "נתניה", "רחובות", "ראשון לציון"];
 const PROJECT_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
@@ -202,7 +215,7 @@ function buildDemoData(targetId) {
       if (date > today) continue;
       incomes.push({
         id: uid(), user_id: targetId,
-        description: `${pick(CLIENTS)} - ${pick(WORK_TYPES)}`,
+        description: `${pick(CUSTOMERS).name} - ${pick(WORK_TYPES)}`,
         amount: round100(rf(3000, 28000)),
         date: iso(date),
         type: pick(["שוטף", "שוטף", "שוטף", "עתידי"]),
@@ -224,7 +237,7 @@ function buildDemoData(targetId) {
     const date = addDays(today, ri(2, 20));
     incomes.push({
       id: uid(), user_id: targetId,
-      description: `${pick(CLIENTS)} - מקדמה על פרויקט`,
+      description: `${pick(CUSTOMERS).name} - מקדמה על פרויקט`,
       amount: round100(rf(5000, 20000)),
       date: iso(date),
       type: "עתידי",
@@ -269,6 +282,11 @@ function buildDemoData(targetId) {
   }
 
   // ── Projects (+ their calendar events) ──
+  const customers = CUSTOMERS.map((c) => ({
+    id: uid(), user_id: targetId,
+    name: c.name, email: c.email,
+    phone: null, company: null, vat_number: null, address: null, notes: null,
+  }));
   const projects = [];
   const projectEvents = [];
   for (let i = 0; i < 12; i++) {
@@ -278,11 +296,11 @@ function buildDemoData(targetId) {
     const quote = round100(rf(15000, 95000));
     const id = uid();
     const color = pick(PROJECT_COLORS);
-    const customer = pick(CLIENTS);
+    const customer = pick(customers);
     const location = rand() < 0.7 ? pick(LOCATIONS) : null;
     projects.push({
       id, user_id: targetId,
-      customer_name: customer,
+      customer_id: customer.id,
       location,
       quote_price: quote,
       expenses: round100(rf(3000, 30000)),
@@ -296,7 +314,7 @@ function buildDemoData(targetId) {
     if (rand() < 0.85) {
       projectEvents.push({
         id: uid(), user_id: targetId,
-        title: `${customer}${location ? ` - ${location}` : ""}`,
+        title: `${customer.name}${location ? ` - ${location}` : ""}`,
         date: iso(startDate),
         end_date: duration > 1 ? iso(addDays(startDate, duration - 1)) : null,
         color,
@@ -330,7 +348,7 @@ function buildDemoData(targetId) {
     const date = addDays(today, ri(-365, 0));
     const docNum = `${date.getFullYear()}-${pad(ri(1, 60))}`;
     documents.push(mkDoc(
-      `חשבונית ${docNum} - ${pick(CLIENTS)}`, "Invoice", "income",
+      `חשבונית ${docNum} - ${pick(CUSTOMERS).name}`, "Invoice", "income",
       round100(rf(2000, 25000)), date, "הכנסות", false, rand() < 0.5,
     ));
   }
@@ -342,7 +360,7 @@ function buildDemoData(targetId) {
   }
   for (let i = 0; i < 4; i++) {
     const date = addDays(today, ri(-120, 0));
-    documents.push(mkDoc(`הצעת מחיר - ${pick(CLIENTS)}`, "Proforma Invoice", "other", round100(rf(5000, 40000)), date, "הצעות", false, false));
+    documents.push(mkDoc(`הצעת מחיר - ${pick(CUSTOMERS).name}`, "Proforma Invoice", "other", round100(rf(5000, 40000)), date, "הצעות", false, false));
   }
   const INVEST = [
     ["מחשב נייד חדש - Apple", 12500],
@@ -353,6 +371,50 @@ function buildDemoData(targetId) {
   for (const [title, amount] of INVEST) {
     const date = addDays(today, ri(-365, 0));
     documents.push(mkDoc(title, "Invoice", "expense", amount, date, "השקעות", true, true));
+  }
+
+  // ── Invoices ──
+  const invoices = [];
+  const invSequences = {};
+  const mkItems = () => {
+    const items = [];
+    for (let i = 0, n = ri(1, 3); i < n; i++) {
+      items.push({
+        id: uid(),
+        description: pick(WORK_TYPES),
+        quantity: ri(1, 4),
+        unit_price: round10(rf(250, 1200)),
+      });
+    }
+    return items;
+  };
+  for (let i = 0; i < 24; i++) {
+    const issueDate = addDays(today, ri(-365, -1));
+    const year = issueDate.getFullYear();
+    invSequences[year] = (invSequences[year] || 0) + 1;
+    const items = mkItems();
+    const subtotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
+    const vatRate = 17;
+    const amount = Math.round(subtotal * (1 + vatRate / 100) * 100) / 100;
+    const customer = pick(customers);
+    const custProjects = projects.filter((p) => p.customer_id === customer.id);
+    const project = custProjects.length && rand() < 0.6 ? pick(custProjects) : null;
+    const status = pick(["draft", "sent", "sent", "paid", "paid"]);
+    invoices.push({
+      id: uid(), user_id: targetId,
+      customer_id: customer.id,
+      project_id: project ? project.id : null,
+      invoice_number: `${year}-${String(invSequences[year]).padStart(4, "0")}`,
+      issue_date: iso(issueDate),
+      due_date: iso(addDays(issueDate, 30)),
+      items,
+      amount,
+      vat_rate: vatRate,
+      status,
+      notes: null,
+      sent_at: status === "draft" ? null : new Date(addDays(issueDate, ri(0, 3))).toISOString(),
+      created_at: new Date(addDays(issueDate, -2)).toISOString(),
+    });
   }
 
   // ── Todos ──
@@ -390,11 +452,12 @@ function buildDemoData(targetId) {
     created_at: new Date(addDays(today, ri(-90, 0))).toISOString(),
   }));
 
-  return { incomes, expenses, savings, projects, documents, todos, events, requests };
+  return { incomes, expenses, savings, customers, projects, documents, invoices, todos, events, requests };
 }
 
 function buildLayout() {
   return [
+    { id: uid(), type: "calendar", dataSource: "calendar:today", span: 1 },
     { id: uid(), type: "hero", dataSource: "income:total", timeRange: "this_month", span: 1 },
     { id: uid(), type: "hero", dataSource: "expenses:total", timeRange: "this_month", span: 1 },
     { id: uid(), type: "hero", dataSource: "profit:net", timeRange: "this_month", span: 1 },
@@ -419,7 +482,7 @@ function buildLayout() {
   console.log(`\nSeeding demo data for ${target.email}...\n`);
 
   // Clear (documents/events before projects because of FKs)
-  const tables = ["documents", "events", "projects", "incomes", "expenses", "savings", "todos", "requests"];
+  const tables = ["documents", "events", "invoices", "projects", "customers", "incomes", "expenses", "savings", "todos", "requests"];
   for (const t of tables) {
     try {
       await clearTable(t, target.id);
@@ -435,7 +498,9 @@ function buildLayout() {
   await insertRows("incomes", demo.incomes);
   await insertRows("expenses", demo.expenses);
   await insertRows("savings", demo.savings);
+  await insertRows("customers", demo.customers);
   await insertRows("projects", demo.projects);
+  await insertRows("invoices", demo.invoices);
   await insertRows("documents", demo.documents);
   await insertRows("todos", demo.todos);
   await insertRows("events", demo.events);
@@ -477,6 +542,7 @@ function buildLayout() {
   console.log(`  expenses:  ${demo.expenses.length}`);
   console.log(`  savings:   ${demo.savings.length}`);
   console.log(`  projects:  ${demo.projects.length}`);
+  console.log(`  invoices:  ${demo.invoices.length}`);
   console.log(`  documents: ${demo.documents.length}`);
   console.log(`  todos:     ${demo.todos.length}`);
   console.log(`  events:    ${demo.events.length}`);

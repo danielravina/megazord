@@ -6,20 +6,23 @@ import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton, SkeletonButton, SkeletonText } from "@/components/ui/skeleton";
 import { formatDate } from "@/components/shared/format-date";
 import { generateId } from "@/components/shared/generate-id";
+import { isValidEmail } from "@/components/shared/validate-email";
 import {
   FolderKanban, Plus, MapPin, Receipt, Clock, Save,
 } from "lucide-react";
-import type { Project, ProjectFormData } from "./project-types";
+import type { Project, ProjectFormData, ProjectRow } from "./project-types";
+import { normalizeProject } from "./project-types";
 
 const emptyForm: ProjectFormData = {
-  customer_name: "", location: "", quote_price: null, expenses: null,
+  customer_id: "", location: "", quote_price: null, expenses: null,
   color: "#3b82f6", start_date: new Date().toISOString().split("T")[0],
   start_time: "", duration: "", closing_price: null, search_words: "",
 };
@@ -30,14 +33,19 @@ export function ProjectsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProjectFormData>({ ...emptyForm });
+  const [newCustOpen, setNewCustOpen] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
 
   useEffect(() => {
     if (!user) return;
     loadProjects();
+    loadCustomers();
   }, [user]);
 
   useEffect(() => {
@@ -50,28 +58,73 @@ export function ProjectsPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("projects")
-      .select("*")
+      .select("*, customers(name)")
       .eq("user_id", user!.id)
       .order("start_date", { ascending: false });
     if (error) { toast("שגיאה בטעינת פרויקטים", "error"); }
-    setProjects(data || []);
+    setProjects(((data || []) as ProjectRow[]).map(normalizeProject));
     setLoading(false);
   }
 
+  async function loadCustomers() {
+    const { data } = await supabase.from("customers").select("id, name").eq("user_id", user!.id).order("name", { ascending: true });
+    setCustomers(data || []);
+  }
+
+  const customerName = (id: string | null) => customers.find((c) => c.id === id)?.name || "";
+
   function openNew() {
     setForm({ ...emptyForm, start_date: new Date().toISOString().split("T")[0] });
+    setNewCustOpen(false);
+    setNewCustName("");
+    setNewCustEmail("");
     setModalOpen(true);
+  }
+
+  async function createQuickCustomer(): Promise<string> {
+    if (!user || !newCustName.trim()) return "";
+    if (newCustEmail.trim() && !isValidEmail(newCustEmail)) {
+      toast("כתובת אימייל לא תקינה", "error");
+      return "";
+    }
+    const id = generateId();
+    const { error } = await supabase.from("customers").insert({
+      id, user_id: user.id, name: newCustName.trim(), email: newCustEmail.trim() || null,
+    });
+    if (error) {
+      toast("שגיאה ביצירת הלקוח", "error");
+      return "";
+    }
+    setCustomers((prev) => [...prev, { id, name: newCustName.trim() }]);
+    setNewCustName("");
+    setNewCustEmail("");
+    setNewCustOpen(false);
+    toast("הלקוח נוצר", "success");
+    return id;
+  }
+
+  async function handleCustomerChange(value: string) {
+    if (value === "new") {
+      setNewCustOpen(true);
+      setForm((f) => ({ ...f, customer_id: "" }));
+      return;
+    }
+    setForm((f) => ({ ...f, customer_id: value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
+    if (!form.customer_id) {
+      toast("יש לבחור לקוח", "error");
+      return;
+    }
     setSaving(true);
 
     const newId = generateId();
     const projectData = {
       user_id: user.id,
-      customer_name: form.customer_name,
+      customer_id: form.customer_id || null,
       location: form.location || null,
       quote_price: form.quote_price,
       expenses: form.expenses ?? 0,
@@ -83,7 +136,8 @@ export function ProjectsPage() {
       search_words: form.search_words || null,
     };
 
-    const newProject: Project = { id: newId, ...projectData, created_at: new Date().toISOString() } as Project;
+    const custName = customerName(form.customer_id);
+    const newProject: Project = { id: newId, ...projectData, customer_name: custName, created_at: new Date().toISOString() } as Project;
     setProjects((prev) => [newProject, ...prev]);
 
     const { error } = await supabase.from("projects").insert({ id: newId, ...projectData });
@@ -105,7 +159,7 @@ export function ProjectsPage() {
         const { error: eventError } = await supabase.from("events").insert({
           id: generateId(),
           user_id: user.id,
-          title: `${form.customer_name}${form.location ? " - " + form.location : ""}`,
+          title: `${custName}${form.location ? " - " + form.location : ""}`,
           date: startStr,
           end_date: days > 1 ? endStr : null,
           color: form.color,
@@ -122,7 +176,8 @@ export function ProjectsPage() {
           date: form.start_date,
           type: "עתידי",
           amount: form.closing_price,
-          description: `הכנסה מפרויקט: ${form.customer_name}`,
+          description: `הכנסה מפרויקט: ${custName}`,
+          project_id: newId,
         });
         if (incomeError) toast("הפרויקט נוצר אך ההכנסה לא נרשמה", "info");
       }
@@ -134,8 +189,31 @@ export function ProjectsPage() {
 
   if (loading && projects.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-6 h-6" />
+            <Skeleton className="w-40 h-8" />
+            <Skeleton className="w-8 h-5 rounded-full" />
+          </div>
+          <SkeletonButton className="w-32" />
+        </div>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-1.5 h-full bg-slate-200" />
+              <div className="mr-2 space-y-2">
+                <SkeletonText className="w-1/2" />
+                <SkeletonText className="w-3/4" />
+                <SkeletonText className="w-2/3" />
+                <div className="flex gap-1.5 pt-2">
+                  <Skeleton className="h-4 w-14 rounded" />
+                  <Skeleton className="h-4 w-14 rounded" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -213,7 +291,28 @@ export function ProjectsPage() {
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="שם לקוח *" value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} required />
+          <div>
+            <Select
+              label="לקוח *"
+              options={[
+                { value: "", label: "בחר לקוח..." },
+                ...customers.map((c) => ({ value: c.id, label: c.name })),
+                { value: "new", label: "+ הוסף לקוח" },
+              ]}
+              value={form.customer_id}
+              onChange={(e) => handleCustomerChange(e.target.value)}
+              required
+            />
+            {newCustOpen && (
+              <div className="mt-2 space-y-2 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <Input label="שם לקוח *" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} />
+                <Input label="אימייל" type="email" value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} />
+                <Button size="sm" type="button" onClick={async () => { const id = await createQuickCustomer(); if (id) setForm((f) => ({ ...f, customer_id: id })); }}>
+                  <Plus size={14} /> צור לקוח
+                </Button>
+              </div>
+            )}
+          </div>
           <Input label="מיקום" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="מחיר הצעה (₪)" type="number" min="0" value={form.quote_price ?? ""} onChange={(e) => { const v = e.target.value; setForm({ ...form, quote_price: v === "" ? null : parseFloat(v) }); }} />

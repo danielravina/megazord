@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/components/layout/auth-provider";
 import type { DashboardRawData } from "@/components/dashboard/dashboard-types";
 import { emptyRawData } from "@/components/dashboard/dashboard-types";
+import type { ProjectRow } from "@/components/projects/project-types";
+import { normalizeProject } from "@/components/projects/project-types";
 
 export function useDashboardData() {
   const { supabase, user } = useAuth();
@@ -50,7 +52,7 @@ export function useDashboardData() {
               .maybeSingle(),
             supabase
               .from("projects")
-              .select("*")
+              .select("*, customers(name)")
               .eq("user_id", uid)
               .order("start_date", { ascending: false }),
             supabase
@@ -82,7 +84,7 @@ export function useDashboardData() {
           expenses: (exp.data || []) as DashboardRawData["expenses"],
           savings: (sav.data || []) as DashboardRawData["savings"],
           taxSettings: (tax.data || null) as DashboardRawData["taxSettings"],
-          projects: (proj.data || []) as DashboardRawData["projects"],
+          projects: ((proj.data || []) as ProjectRow[]).map(normalizeProject) as DashboardRawData["projects"],
           documents: (docs.data || []) as DashboardRawData["documents"],
           todos: (todos.data || []) as DashboardRawData["todos"],
           events: (events.data || []) as DashboardRawData["events"],

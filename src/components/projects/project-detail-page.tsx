@@ -6,11 +6,14 @@ import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/components/shared/format-currency";
+import { generateId } from "@/components/shared/generate-id";
+import { isValidEmail } from "@/components/shared/validate-email";
 import {
   FolderKanban, Trash2, Save, ArrowRight,
   FileText, Plus, ExternalLink,
@@ -45,18 +48,17 @@ export function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [docs, setDocs] = useState<LinkedDoc[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [displayUrls, setDisplayUrls] = useState<Record<string, string>>({});
   const [viewDoc, setViewDoc] = useState<LinkedDoc | null>(null);
   const [form, setForm] = useState<ProjectFormData>({
-    customer_name: "", location: "", quote_price: null, expenses: null,
+    customer_id: "", location: "", quote_price: null, expenses: null,
     color: "#3b82f6", start_date: "", start_time: "", duration: "",
     closing_price: null, search_words: "",
   });
-
-  useEffect(() => {
-    if (!user || !projectId) return;
-    Promise.all([loadProject(), loadDocs()]).finally(() => setLoading(false));
-  }, [user, projectId]);
+  const [newCustOpen, setNewCustOpen] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
 
   // Load signed URLs for document images
   useEffect(() => {
@@ -99,7 +101,7 @@ export function ProjectDetailPage() {
 
     const p = data as Project;
     setForm({
-      customer_name: p.customer_name,
+      customer_id: p.customer_id || "",
       location: p.location || "",
       quote_price: p.quote_price,
       expenses: p.expenses,
@@ -112,17 +114,60 @@ export function ProjectDetailPage() {
     });
   }
 
+  async function loadCustomers() {
+    const { data } = await supabase.from("customers").select("id, name").eq("user_id", user!.id).order("name", { ascending: true });
+    setCustomers(data || []);
+  }
+
+  const customerName = () => customers.find((c) => c.id === form.customer_id)?.name || "";
+
+  async function createQuickCustomer(): Promise<string> {
+    if (!user || !newCustName.trim()) return "";
+    if (newCustEmail.trim() && !isValidEmail(newCustEmail)) {
+      toast("כתובת אימייל לא תקינה", "error");
+      return "";
+    }
+    const id = generateId();
+    const { error } = await supabase.from("customers").insert({
+      id, user_id: user.id, name: newCustName.trim(), email: newCustEmail.trim() || null,
+    });
+    if (error) {
+      toast("שגיאה ביצירת הלקוח", "error");
+      return "";
+    }
+    setCustomers((prev) => [...prev, { id, name: newCustName.trim() }]);
+    setNewCustName("");
+    setNewCustEmail("");
+    setNewCustOpen(false);
+    toast("הלקוח נוצר", "success");
+    return id;
+  }
+
+  async function handleCustomerChange(value: string) {
+    if (value === "new") {
+      setNewCustOpen(true);
+      setForm((f) => ({ ...f, customer_id: "" }));
+      return;
+    }
+    setForm((f) => ({ ...f, customer_id: value }));
+  }
+
   async function loadDocs() {
     const [docsRes, bizRes] = await Promise.all([
       supabase.from("documents").select("*").eq("project_id", projectId).eq("user_id", user!.id).order("date_on_doc", { ascending: false }),
       supabase.from("businesses").select("id, name").eq("user_id", user!.id),
     ]);
     const businesses = bizRes.data || [];
-    const bizMap = new Map(businesses.map((b: any) => [b.id, b.name]));
+    const bizMap = new Map(businesses.map((b) => [b.id, b.name]));
     const docs = (docsRes.data || []) as LinkedDoc[];
     docs.forEach((d) => { d.business_name = d.business_id ? bizMap.get(d.business_id) || null : null; });
     setDocs(docs);
   }
+
+  useEffect(() => {
+    if (!user || !projectId) return;
+    Promise.all([loadProject(), loadDocs(), loadCustomers()]).finally(() => setLoading(false));
+  }, [user, projectId]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -130,7 +175,7 @@ export function ProjectDetailPage() {
     setSaving(true);
 
     const projectData = {
-      customer_name: form.customer_name,
+      customer_id: form.customer_id || null,
       location: form.location || null,
       quote_price: form.quote_price,
       expenses: form.expenses ?? 0,
@@ -162,7 +207,7 @@ export function ProjectDetailPage() {
         await supabase.from("events").insert({
           id: crypto.randomUUID(),
           user_id: user.id,
-          title: `${form.customer_name}${form.location ? " - " + form.location : ""}`,
+          title: `${customerName()}${form.location ? " - " + form.location : ""}`,
           date: startStr,
           end_date: days > 1 ? endStr : null,
           color: form.color,
@@ -176,7 +221,7 @@ export function ProjectDetailPage() {
 
   async function handleDelete() {
     if (!projectId) return;
-    if (!confirm(`האם למחוק את הפרויקט "${form.customer_name}"?`)) return;
+    if (!confirm(`האם למחוק את הפרויקט "${customerName()}"?`)) return;
 
     const { error } = await supabase.from("projects").delete().eq("id", projectId);
     if (error) {
@@ -236,10 +281,46 @@ export function ProjectDetailPage() {
     return null;
   }
 
-  if (loading && !projectId) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Spinner size="lg" />
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <Skeleton className="w-6 h-6" />
+          <Skeleton className="w-6 h-6" />
+          <Skeleton className="w-40 h-8" />
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <Skeleton className="w-full h-10 rounded-lg" />
+          <Skeleton className="w-full h-10 rounded-lg" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Skeleton className="w-full h-10 rounded-lg" />
+            <Skeleton className="w-full h-10 rounded-lg" />
+          </div>
+          <Skeleton className="w-24 h-10 rounded-lg" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Skeleton className="w-full h-10 rounded-lg" />
+            <Skeleton className="w-full h-10 rounded-lg" />
+          </div>
+          <div className="flex gap-2 justify-between pt-4 border-t">
+            <Skeleton className="w-36 h-9 rounded-lg" />
+            <Skeleton className="w-24 h-9 rounded-lg" />
+          </div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <Skeleton className="w-48 h-6" />
+            <Skeleton className="w-24 h-4" />
+          </div>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+              <div className="space-y-2">
+                <SkeletonText className="w-40" />
+                <SkeletonText className="w-24" />
+              </div>
+              <Skeleton className="w-16 h-6 rounded" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -256,7 +337,28 @@ export function ProjectDetailPage() {
 
       <Card className="p-6">
         <form onSubmit={handleSave} className="space-y-4">
-          <Input label="שם לקוח *" value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} required />
+          <div>
+            <Select
+              label="לקוח *"
+              options={[
+                { value: "", label: "בחר לקוח..." },
+                ...customers.map((c) => ({ value: c.id, label: c.name })),
+                { value: "new", label: "+ הוסף לקוח" },
+              ]}
+              value={form.customer_id}
+              onChange={(e) => handleCustomerChange(e.target.value)}
+              required
+            />
+            {newCustOpen && (
+              <div className="mt-2 space-y-2 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <Input label="שם לקוח *" value={newCustName} onChange={(e) => setNewCustName(e.target.value)} />
+                <Input label="אימייל" type="email" value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} />
+                <Button size="sm" type="button" onClick={async () => { const id = await createQuickCustomer(); if (id) setForm((f) => ({ ...f, customer_id: id })); }}>
+                  <Plus size={14} /> צור לקוח
+                </Button>
+              </div>
+            )}
+          </div>
           <Input label="מיקום" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="מחיר הצעה (₪)" type="number" min="0" value={form.quote_price ?? ""} onChange={(e) => { const v = e.target.value; setForm({ ...form, quote_price: v === "" ? null : parseFloat(v) }); }} />

@@ -5,6 +5,8 @@ export interface Income {
   amount: number;
   date: string;
   type: string;
+  project_id?: string | null;
+  vat_rate?: number | null;
   created_at: string;
 }
 
