@@ -3,7 +3,7 @@
 import { Modal } from "@/components/ui/modal";
 import type { DashboardTile, WidgetType, TimeRange } from "@/components/dashboard/dashboard-types";
 import {
-  Hash, Table2, BarChart3, PieChart, Calculator, Clock, CloudSun,
+  Hash, Table2, BarChart3, PieChart, Calculator, Clock, CloudSun, CalendarDays,
   DollarSign, Receipt, TrendingUp, Scale, PiggyBank, Briefcase,
   FileText, CheckSquare, Calendar, Landmark,
 } from "lucide-react";
@@ -36,6 +36,7 @@ const TEMPLATES: TileTemplate[] = [
   { key: "projects:recent", label: "פרויקטים אחרונים", icon: Briefcase, tile: { type: "table", dataSource: "projects:recent", timeRange: "this_month", span: 2 } },
   { key: "todos:open", label: "משימות פתוחות", icon: CheckSquare, tile: { type: "table", dataSource: "todos:open", timeRange: "all_time" as TimeRange, span: 2 } },
   { key: "events:upcoming", label: "אירועים קרובים", icon: Calendar, tile: { type: "table", dataSource: "events:upcoming", timeRange: "all_time" as TimeRange, span: 2 } },
+  { key: "calendar", label: "יומן", icon: CalendarDays, tile: { type: "calendar" as WidgetType, dataSource: "calendar:today", span: 1 } },
   { key: "calculator", label: "מחשבון", icon: Calculator, tile: { type: "calculator" as WidgetType, span: 1 } },
   { key: "clock", label: "שעון", icon: Clock, tile: { type: "clock" as WidgetType, span: 1 } },
   { key: "weather", label: "מזג אוויר", icon: CloudSun, tile: { type: "weather" as WidgetType, span: 1 } },

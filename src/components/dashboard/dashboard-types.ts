@@ -1,9 +1,9 @@
 import type { Income, Expense, TaxSettings, Saving } from "@/components/finance/finance-types";
 import type { Project } from "@/components/projects/project-types";
 
-export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "calculator" | "clock" | "weather";
+export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "calculator" | "clock" | "weather" | "calendar";
 
-export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut"];
+export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut", "calendar"];
 export const LOCKED_1x1: WidgetType[] = ["calculator", "clock", "weather"];
 export const STATIC_WIDGETS: WidgetType[] = ["calculator", "clock", "weather"];
 
@@ -56,7 +56,11 @@ export interface DoughnutData {
   segments: { label: string; value: number; color: string }[];
 }
 
-export type WidgetData = HeroData | TableData | BarData | DoughnutData | null;
+export interface CalendarData {
+  events: CalendarEvent[];
+}
+
+export type WidgetData = HeroData | TableData | BarData | DoughnutData | CalendarData | null;
 
 export interface DocRaw {
   id: string;

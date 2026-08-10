@@ -5,6 +5,12 @@ export function getDefaultLayout(): DashboardTile[] {
   return [
     {
       id: generateId(),
+      type: "calendar",
+      dataSource: "calendar:today",
+      span: 1,
+    },
+    {
+      id: generateId(),
       type: "hero",
       dataSource: "income:total",
       timeRange: "this_month",

@@ -103,7 +103,7 @@ export function DashboardTileComponent({
       className={`relative group bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col transition-shadow h-full ${
         customizing ? "hover:shadow-md" : ""
       }`}
-      style={{ minHeight: tile.type === "calculator" ? 260 : 100 }}
+      style={{ minHeight: tile.type === "calculator" || tile.type === "calendar" ? 260 : 100 }}
       {...(dragHandleProps || {})}
     >
       {(customizing || !isStatic) && (
