@@ -15,6 +15,7 @@ import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/components/shared/format-date";
 import { formatCurrency } from "@/components/shared/format-currency";
+import { DocumentScanner } from "@/components/documents/document-scanner";
 import type { Project, ProjectRow } from "@/components/projects/project-types";
 import { normalizeProject } from "@/components/projects/project-types";
 import {
@@ -244,6 +245,7 @@ export function DocumentsPage() {
           המסמכים שלי
         </h1>
         <div className="flex items-center gap-2">
+          <DocumentScanner onScanned={loadDocs} />
           <div className="flex bg-slate-100 p-1 rounded-lg">
             <button onClick={() => { setCurrentView("list"); setFolderFilter(null); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "list" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>רשימה</button>
             <button onClick={() => setCurrentView("folders")} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "folders" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>תיקיות</button>
@@ -299,7 +301,7 @@ export function DocumentsPage() {
               <EmptyState
                 icon={<FileText size={40} className="text-blue-300" />}
                 title="אין מסמכים עדיין"
-                description="סרוק מסמך מהלוח בקרה כדי להוסיף מסמך חדש"
+                description="סרוק מסמך כדי להוסיף מסמך חדש"
               />
             </Card>
           ) : (

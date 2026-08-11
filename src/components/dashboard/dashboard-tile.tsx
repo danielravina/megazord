@@ -237,6 +237,7 @@ export function DashboardTileComponent({
   const title = tile.title || sourceDef?.label || widgetMeta[tile.type]?.label || "";
   const isStandaloneTile = STANDALONE_SOURCES.some((s) => s.type === tile.type);
   const activeKey = isStandaloneTile ? tile.type : tile.dataSource;
+  const viewTypes = sourceDef?.compatibleTypes ?? DISPLAY_TYPES;
 
   function applyTypeChange(vt: WidgetType) {
     if (vt === tile.type) return;
@@ -311,24 +312,28 @@ export function DashboardTileComponent({
             >
               {(close) => (
                 <div>
-                  <MenuLabel>תצוגה</MenuLabel>
-                  {(sourceDef?.compatibleTypes ?? DISPLAY_TYPES).map((vt) => {
-                    const meta = widgetMeta[vt];
-                    const Icon = meta.icon;
-                    return (
-                      <MenuItem
-                        key={vt}
-                        active={tile.type === vt}
-                        icon={<Icon size={14} />}
-                        onClick={() => {
-                          applyTypeChange(vt);
-                          close();
-                        }}
-                      >
-                        {meta.label}
-                      </MenuItem>
-                    );
-                  })}
+                  {viewTypes.length > 1 && (
+                    <>
+                      <MenuLabel>תצוגה</MenuLabel>
+                      {viewTypes.map((vt) => {
+                        const meta = widgetMeta[vt];
+                        const Icon = meta.icon;
+                        return (
+                          <MenuItem
+                            key={vt}
+                            active={tile.type === vt}
+                            icon={<Icon size={14} />}
+                            onClick={() => {
+                              applyTypeChange(vt);
+                              close();
+                            }}
+                          >
+                            {meta.label}
+                          </MenuItem>
+                        );
+                      })}
+                    </>
+                  )}
 
                   {!isStatic && sourceDef?.needsTimeRange && (
                     <>

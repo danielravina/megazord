@@ -17,9 +17,10 @@ import { todayISO } from "@/components/shared/format-date";
 import { generateId } from "@/components/shared/generate-id";
 import { calculateTaxes } from "./tax-engine";
 import { ExpensePieChart } from "@/components/ui/expense-pie-chart";
+import { MonthlyExport } from "@/components/documents/monthly-export";
 import {
   PieChart, Wallet, Coins, Receipt, Scale, PiggyBank,
-  TrendingUp, TrendingDown, Plus, Save, Check, Clock,
+  TrendingUp, TrendingDown, Plus, Save, Check, Clock, FileText,
 } from "lucide-react";
 import type { Income, Expense, TaxSettings, Saving, TaxCalculation } from "./finance-types";
 
@@ -75,6 +76,8 @@ export function FinancePage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [savings, setSavings] = useState<Saving[]>([]);
   const [taxSettings, setTaxSettings] = useState<TaxSettings | null>(null);
+  const [docs, setDocs] = useState<{ id: string; title: string; date_on_doc: string | null; total_amount: number | null; folder: string | null; doc_type: string; date: string }[]>([]);
+  const [showReport, setShowReport] = useState(false);
 
   // Form states
   const [incDesc, setIncDesc] = useState("");
@@ -125,11 +128,12 @@ export function FinancePage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const [incRes, expRes, savRes, taxRes] = await Promise.all([
+      const [incRes, expRes, savRes, taxRes, docsRes] = await Promise.all([
         supabase.from("incomes").select("*").eq("user_id", uid).order("date", { ascending: false }),
         supabase.from("expenses").select("*").eq("user_id", uid).order("date", { ascending: false }),
         supabase.from("savings").select("*").eq("user_id", uid).order("date", { ascending: false }),
         supabase.from("tax_settings").select("*").eq("user_id", uid).maybeSingle(),
+        supabase.from("documents").select("id, title, date_on_doc, total_amount, folder, doc_type, date").eq("user_id", uid).order("date", { ascending: false }),
       ]);
       if (cancelled) return;
       if (incRes.error) toast("שגיאה בטעינת הכנסות", "error");
@@ -140,6 +144,7 @@ export function FinancePage() {
       setExpenses(expRes.data || []);
       setSavings(savRes.data || []);
       setTaxSettings(taxRes.data || null);
+      setDocs(docsRes.data || []);
       setLoading(false);
     }
     load();
@@ -287,6 +292,10 @@ export function FinancePage() {
           <Wallet size={24} className="text-blue-500" />
           ניהול כספים
         </h1>
+        <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>
+          <FileText size={14} />
+          דוח חודשי
+        </Button>
       </div>
 
       {/* Totals Cards */}
@@ -554,6 +563,19 @@ export function FinancePage() {
           )}
         </div>
       </Card>
+
+      <MonthlyExport
+        open={showReport}
+        onClose={() => setShowReport(false)}
+        docs={docs}
+        businessName={taxSettings?.business_name || ""}
+        vatNumber={taxSettings?.vat_number || ""}
+        businessAddress={taxSettings?.business_address || ""}
+        businessPhone={taxSettings?.business_phone || ""}
+        accountantEmail={taxSettings?.accountant_email || ""}
+        supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL || ""}
+        supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}
+      />
     </div>
   );
 }

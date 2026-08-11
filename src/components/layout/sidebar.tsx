@@ -5,13 +5,14 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Calendar,
   FolderKanban, Wallet, FileText, Users, Receipt,
-  Settings, PanelLeftClose, PanelLeftOpen,
+  Settings, PanelLeftClose, PanelLeftOpen, Building,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "לוח בקרה", icon: LayoutDashboard },
   { href: "/projects/", label: "פרויקטים", icon: FolderKanban },
   { href: "/customers/", label: "לקוחות", icon: Users },
+  { href: "/suppliers/", label: "ספקים", icon: Building },
   { href: "/invoices/", label: "חשבוניות", icon: Receipt },
   { href: "/finance/", label: "ניהול כספים", icon: Wallet },
   { href: "/calendar/", label: "יומן", icon: Calendar },
