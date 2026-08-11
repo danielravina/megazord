@@ -16,7 +16,7 @@ import { generateId } from "@/components/shared/generate-id";
 import { isValidEmail } from "@/components/shared/validate-email";
 import {
   FolderKanban, Trash2, Save, ArrowRight,
-  FileText, Plus, ExternalLink,
+  FileText, Plus, ExternalLink, Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import type { Project, ProjectFormData } from "./project-types";
@@ -380,7 +380,12 @@ export function ProjectDetailPage() {
 
           <div className="flex gap-2 justify-between pt-4 border-t">
             <Button loading={saving} type="submit"><Save size={14} /> שמור שינויים</Button>
-            <Button variant="danger" type="button" onClick={handleDelete}><Trash2 size={14} /> מחק</Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" type="button" onClick={() => router.push(`/invoices/?newInvoice=${projectId}`)}>
+                <Receipt size={14} /> צור חשבונית
+              </Button>
+              <Button variant="danger" type="button" onClick={handleDelete}><Trash2 size={14} /> מחק</Button>
+            </div>
           </div>
         </form>
       </Card>

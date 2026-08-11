@@ -11,6 +11,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const FN = "ocr-document";
+
+function log(level: "info" | "warn" | "error", event: string, fields: Record<string, unknown> = {}) {
+  const entry = { fn: FN, level, event, ...fields };
+  if (level === "error") console.error(entry);
+  else if (level === "warn") console.warn(entry);
+  else console.log(entry);
+}
+
+function truncate(s: string, max = 1000): string {
+  return s.length > max ? `${s.slice(0, max)}…[+${s.length - max} chars]` : s;
+}
+
 function parseJson(content: string): Record<string, unknown> {
   let t = content.trim();
   if (t.startsWith("```json")) t = t.slice(7);
@@ -27,12 +40,36 @@ function parseJson(content: string): Record<string, unknown> {
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const startedAt = Date.now();
+  const fallbackRequestId = crypto.randomUUID();
+
   try {
-    const { imageUrl, imageBase64, mimeType } = await req.json();
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      throw new Error("Invalid JSON body");
+    }
+
+    const { imageUrl, imageBase64, mimeType, requestId: clientRequestId } = body as {
+      imageUrl?: string;
+      imageBase64?: string;
+      mimeType?: string;
+      requestId?: string;
+    };
+    const requestId = clientRequestId || fallbackRequestId;
+
     const resolvedUrl = imageBase64
       ? `data:${mimeType || "image/jpeg"};base64,${imageBase64}`
       : imageUrl;
     if (!resolvedUrl) throw new Error("Missing imageUrl or imageBase64");
+
+    log("info", "scan_started", {
+      request_id: requestId,
+      mode: imageBase64 ? "base64" : "url",
+      mimeType: mimeType || null,
+      payloadSizeKb: imageBase64 ? Math.round(imageBase64.length / 1024) : null,
+    });
 
     const p = `Analyze this document image. Return a JSON object with these fields:
 - title: Short descriptive title in Hebrew
@@ -47,6 +84,8 @@ serve(async (req: Request) => {
 - businessVat: The VAT / עוסק מורשה / ח.פ number. Usually "עוסק מורשה: XXXXXXXXX" or "ח.פ: XXXXXX". Empty if not found.
 - businessAddress: The business address if visible on the document (street, city). Empty if not found.
 - businessPhone: Any phone number belonging to the business (not the customer). Empty if not found.`;
+
+    log("info", "openrouter_request", { request_id: requestId, model: MODEL });
 
     const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -65,13 +104,66 @@ serve(async (req: Request) => {
       }),
     });
 
-    if (!r.ok) throw new Error(`OpenRouter ${r.status}`);
+    const durationMs = Date.now() - startedAt;
+    const resText = await r.text();
 
-    const d = await r.json();
-    const raw = d.choices?.[0]?.message?.content || "";
+    if (!r.ok) {
+      let upstream: string;
+      try {
+        upstream = JSON.stringify(JSON.parse(resText));
+      } catch {
+        upstream = truncate(resText);
+      }
+      log("error", "openrouter_error", {
+        request_id: requestId,
+        status: r.status,
+        durationMs,
+        upstream: truncate(upstream),
+      });
+      throw new Error(`OpenRouter ${r.status}`);
+    }
+
+    let d: Record<string, unknown>;
+    try {
+      d = JSON.parse(resText);
+    } catch {
+      throw new Error("OpenRouter returned non-JSON response");
+    }
+
+    const raw = String((d as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]?.message?.content || "");
+    log("info", "openrouter_response", {
+      request_id: requestId,
+      status: r.status,
+      durationMs,
+      model: d.model || null,
+      promptTokens: (d.usage as { prompt_tokens?: number } | undefined)?.prompt_tokens ?? null,
+      completionTokens: (d.usage as { completion_tokens?: number } | undefined)?.completion_tokens ?? null,
+      totalTokens: (d.usage as { total_tokens?: number } | undefined)?.total_tokens ?? null,
+      rawLength: raw.length,
+    });
+
+    if (!raw) {
+      log("warn", "parse_warning", { request_id: requestId, reason: "empty model content" });
+    }
+
     const parsed = parseJson(raw);
+    if (Object.keys(parsed).length === 0 && raw) {
+      log("warn", "parse_warning", {
+        request_id: requestId,
+        reason: "json parse failed",
+        rawPreview: truncate(raw),
+      });
+    }
 
-    return new Response(JSON.stringify({
+    const degraded: string[] = [];
+    if (!parsed.title) degraded.push("title");
+    if (!parsed.docType) degraded.push("docType");
+    if (parsed.totalAmount == null) degraded.push("totalAmount");
+    if (degraded.length) {
+      log("warn", "parse_degraded", { request_id: requestId, fields: degraded });
+    }
+
+    const payload = {
       title: String(parsed.title || "מסמך ללא שם"),
       tags: Array.isArray(parsed.tags) ? parsed.tags : ["כללי"],
       extractedText: String(parsed.extractedText || raw),
@@ -84,10 +176,29 @@ serve(async (req: Request) => {
       businessVat: String(parsed.businessVat || ""),
       businessAddress: String(parsed.businessAddress || ""),
       businessPhone: String(parsed.businessPhone || ""),
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    };
+
+    log("info", "scan_success", {
+      request_id: requestId,
+      durationMs,
+      docType: payload.docType,
+      totalAmount: payload.totalAmount,
+      hasBusinessName: Boolean(payload.businessName),
+      hasBusinessVat: Boolean(payload.businessVat),
+      extractedTextLength: payload.extractedText.length,
+    });
+
+    return new Response(JSON.stringify(payload), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e: unknown) {
-    return new Response(JSON.stringify({ error: (e as Error).message || "Unknown" }), {
+    const err = e instanceof Error ? e : new Error(String(e));
+    log("error", "scan_error", {
+      request_id: fallbackRequestId,
+      message: err.message || "Unknown",
+      stack: err.stack || null,
+      durationMs: Date.now() - startedAt,
+    });
+    return new Response(JSON.stringify({ error: err.message || "Unknown" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

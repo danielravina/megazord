@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
+import { logEvent } from "@/lib/logger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -19,6 +20,28 @@ interface Business {
   id: string;
   name: string;
   vat_number: string | null;
+}
+
+interface OcrResult {
+  title?: string;
+  tags?: string[];
+  extractedText?: string;
+  docType?: string;
+  dateOnDoc?: string;
+  totalAmount?: number | null;
+  folderSuggestion?: string;
+  isInvestment?: boolean;
+  businessName?: string;
+  businessVat?: string;
+  businessAddress?: string;
+  businessPhone?: string;
+}
+
+interface OcrResponse {
+  ok: boolean;
+  data?: OcrResult;
+  status?: number;
+  bodyText?: string;
 }
 
 const DOC_TYPES = [
@@ -74,6 +97,7 @@ export function DocumentScanner({ onScanned }: Props) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const requestIdRef = useRef<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -105,16 +129,22 @@ export function DocumentScanner({ onScanned }: Props) {
     });
   }
 
-  async function tryOCR(payload: { imageUrl?: string; imageBase64?: string; mimeType?: string }) {
+  async function tryOCR(payload: { imageUrl?: string; imageBase64?: string; mimeType?: string; requestId?: string }): Promise<OcrResponse> {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ocr-document`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}` },
         body: JSON.stringify(payload),
       });
-      if (res.ok) return await res.json();
-    } catch {}
-    return null;
+      const bodyText = await res.text();
+      let data: OcrResult | undefined;
+      try {
+        data = bodyText ? JSON.parse(bodyText) : undefined;
+      } catch {}
+      return { ok: res.ok, data, status: res.status, bodyText };
+    } catch (e) {
+      return { ok: false, status: 0, bodyText: (e as Error)?.message || "network error" };
+    }
   }
 
   async function handleCapture(e: React.ChangeEvent<HTMLInputElement>) {
@@ -122,28 +152,47 @@ export function DocumentScanner({ onScanned }: Props) {
     if (!file || !user) return;
     setProcessing(true);
 
+    const requestId = crypto.randomUUID();
+    requestIdRef.current = requestId;
+
     try {
       const path = `${user.id}/${Date.now()}_${file.name}`;
+      logEvent("info", "scan_upload_start", { requestId, fileName: file.name, fileSizeKb: Math.round(file.size / 1024), fileType: file.type || null, path });
+
       const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
       if (uploadError) {
+        logEvent("error", "scan_upload_error", { requestId, path, message: uploadError.message });
         toast("שגיאה בהעלאת הקובץ", "error");
         setProcessing(false);
         resetInputs();
         return;
       }
-      const { data: signedData } = await supabase.storage.from("documents").createSignedUrl(path, 604800);
+      const { data: signedData, error: signedError } = await supabase.storage.from("documents").createSignedUrl(path, 604800);
+      if (signedError) logEvent("error", "scan_signed_url_error", { requestId, path, message: signedError.message });
       const signedUrl = signedData?.signedUrl || "";
 
       const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-      let ocr;
+      logEvent("info", "scan_ocr_start", { requestId, mode: isPdf ? "base64" : "url", mimeType: file.type || (isPdf ? "application/pdf" : null) });
+      let ocrResult: OcrResponse;
       if (isPdf) {
         const base64 = await fileToBase64(file);
-        ocr = await tryOCR({ imageBase64: base64, mimeType: file.type || "application/pdf" });
+        ocrResult = await tryOCR({ imageBase64: base64, mimeType: file.type || "application/pdf", requestId });
       } else {
-        ocr = await tryOCR({ imageUrl: signedUrl });
+        ocrResult = await tryOCR({ imageUrl: signedUrl, requestId });
       }
-      if (!ocr) {
+
+      let ocr: OcrResult;
+      if (!ocrResult.ok) {
+        logEvent("error", "scan_ocr_error", { requestId, status: ocrResult.status, body: ocrResult.bodyText });
+        toast("סריקת המסמך נכשלה", "error");
         ocr = { title: file.name.replace(/\.[^.]+$/, ""), tags: ["כללי"], extractedText: "", docType: "Other", dateOnDoc: "", totalAmount: null, folderSuggestion: "", isInvestment: false };
+      } else {
+        ocr = ocrResult.data || {};
+        const missing: string[] = [];
+        if (!ocr.title) missing.push("title");
+        if (!ocr.docType) missing.push("docType");
+        if (missing.length) logEvent("warn", "scan_ocr_degraded", { requestId, fields: missing });
+        logEvent("info", "scan_ocr_success", { requestId, docType: ocr.docType, totalAmount: ocr.totalAmount ?? null, hasBusinessName: Boolean(ocr.businessName), hasBusinessVat: Boolean(ocr.businessVat) });
       }
 
       // Immediately save business if VAT detected and not already exists
@@ -179,7 +228,8 @@ export function DocumentScanner({ onScanned }: Props) {
         businessId: bizId, businessVat: bizVat, newBusinessName: "",
       });
       setConfirmOpen(true);
-    } catch {
+    } catch (e) {
+      logEvent("error", "scan_upload_error", { requestId, message: (e as Error)?.message || "unknown" });
       toast("שגיאה בהעלאת הקובץ", "error");
     } finally {
       setProcessing(false);
@@ -194,6 +244,7 @@ export function DocumentScanner({ onScanned }: Props) {
 
   async function saveDocument() {
     if (!user) return;
+    const requestId = requestIdRef.current || "";
     let finalProjectId = tempDoc.projectId;
 
     if (tempDoc.projectId === "new" && tempDoc.newProjectName.trim()) {
@@ -203,11 +254,13 @@ export function DocumentScanner({ onScanned }: Props) {
         id: custId, user_id: user.id, name: tempDoc.newProjectName.trim(),
       });
       if (custError) {
+        logEvent("error", "scan_save_error", { requestId, table: "customers", message: custError.message });
         toast("שגיאה ביצירת הלקוח", "error");
         return;
       }
       const { error: projError } = await supabase.from("projects").insert({ id: newId, user_id: user.id, customer_id: custId });
       if (projError) {
+        logEvent("error", "scan_save_error", { requestId, table: "projects", message: projError.message });
         toast("שגיאה ביצירת הפרויקט", "error");
         return;
       }
@@ -258,27 +311,31 @@ export function DocumentScanner({ onScanned }: Props) {
     });
 
     if (insertError) {
+      logEvent("error", "scan_save_error", { requestId, table: "documents", message: insertError.message });
       toast("שגיאה בשמירת המסמך", "error");
       return;
     }
+    logEvent("info", "scan_saved", { requestId, title: tempDoc.title, docType: tempDoc.docType, totalAmount: tempDoc.totalAmount });
 
     const total = parseFloat(tempDoc.totalAmount) || 0;
     if (total > 0) {
       if (tempDoc.direction === "income") {
-        await supabase.from("incomes").insert({
+        const { error: incomeError } = await supabase.from("incomes").insert({
           id: generateId(), user_id: user.id,
           date: tempDoc.dateOnDoc || new Date().toISOString().split("T")[0],
           amount: total, type: "שוטף",
           description: `הכנסה ממסמך: ${tempDoc.title}`,
         });
+        if (incomeError) logEvent("error", "scan_save_error", { requestId, table: "incomes", message: incomeError.message });
       } else if (tempDoc.direction !== "other" && tempDoc.docType !== "Proforma Invoice") {
-        await supabase.from("expenses").insert({
+        const { error: expenseError } = await supabase.from("expenses").insert({
           id: generateId(), user_id: user.id,
           date: tempDoc.dateOnDoc || new Date().toISOString().split("T")[0],
           amount: total, is_paid: true,
           category: tempDoc.folder || "כללי",
           description: `הוצאה ממסמך: ${tempDoc.title}`,
         });
+        if (expenseError) logEvent("error", "scan_save_error", { requestId, table: "expenses", message: expenseError.message });
       }
       if (finalProjectId) {
         const { data: proj } = await supabase.from("projects").select("expenses").eq("id", finalProjectId).single();

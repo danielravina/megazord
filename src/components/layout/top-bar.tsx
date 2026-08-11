@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { Dropdown, MenuItem } from "@/components/ui/dropdown";
-import { Settings, LogOut } from "lucide-react";
+import { Settings, LogOut, CircleHelp } from "lucide-react";
 
 export function TopBar() {
   const { supabase, user } = useAuth();
@@ -42,6 +42,13 @@ export function TopBar() {
 
       <div className="flex items-center gap-3">
         <GlobalSearch />
+        <Link
+          href="/help/"
+          title="מרכז העזרה"
+          className="w-9 h-9 rounded-full text-slate-500 flex items-center justify-center hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
+        >
+          <CircleHelp size={19} />
+        </Link>
         <Dropdown
           align="left"
           trigger={

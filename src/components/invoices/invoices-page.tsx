@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -37,11 +38,15 @@ interface ProjectOption {
   customer_id: string | null;
   customer_name?: string | null;
   location?: string | null;
+  quote_price: number | null;
+  closing_price: number | null;
 }
 
 export function InvoicesPage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -66,34 +71,53 @@ export function InvoicesPage() {
     loadAll();
   }, [user]);
 
+  useEffect(() => {
+    const projectId = searchParams.get("newInvoice");
+    if (!projectId || loading) return;
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+    openNew({
+      customer_id: project.customer_id || "",
+      project_id: project.id,
+      item_description: project.location ? `פרויקט ${project.location}` : "פרויקט",
+      unit_price: project.closing_price ?? project.quote_price ?? 0,
+    });
+    router.replace("/invoices/", { scroll: false });
+  }, [searchParams, loading, projects]);
+
   async function loadAll() {
     const [invRes, custRes, projRes, taxRes] = await Promise.all([
       supabase.from("invoices").select("*, customers(name)").eq("user_id", user!.id).order("issue_date", { ascending: false }),
       supabase.from("customers").select("*").eq("user_id", user!.id).order("name", { ascending: true }),
-      supabase.from("projects").select("id, customer_id, location, customers(name)").eq("user_id", user!.id).order("start_date", { ascending: false }),
+      supabase.from("projects").select("id, customer_id, location, quote_price, closing_price, customers(name)").eq("user_id", user!.id).order("start_date", { ascending: false }),
       supabase.from("tax_settings").select("*").eq("user_id", user!.id).maybeSingle(),
     ]);
     if (invRes.error) toast("שגיאה בטעינת חשבוניות", "error");
     if (custRes.error) toast("שגיאה בטעינת לקוחות", "error");
     setInvoices((invRes.data || []).map((r) => ({ ...r, customer_name: embeddedName(r.customers) })));
     setCustomers(custRes.data || []);
-    setProjects((projRes.data || []).map((p) => ({ id: p.id, customer_id: p.customer_id, location: p.location, customer_name: embeddedName(p.customers) })));
+    setProjects((projRes.data || []).map((p) => ({ id: p.id, customer_id: p.customer_id, location: p.location, quote_price: p.quote_price, closing_price: p.closing_price, customer_name: embeddedName(p.customers) })));
     setTaxSettings((taxRes.data as TaxSettings) || null);
     setLoading(false);
   }
 
-  function openNew() {
+  function openNew(prefill?: { customer_id?: string; project_id?: string; item_description?: string; unit_price?: number }) {
     setEditingId(null);
     const defaultRate = taxSettings?.vat_rate ?? 18;
+    const item = emptyItem();
+    if (prefill) {
+      item.description = prefill.item_description || "";
+      item.unit_price = prefill.unit_price ?? 0;
+    }
     setForm({
-      customer_id: "",
-      project_id: "",
+      customer_id: prefill?.customer_id || "",
+      project_id: prefill?.project_id || "",
       invoice_number: nextInvoiceNumber(invoices, new Date()),
       issue_date: new Date().toISOString().split("T")[0],
       due_date: "",
       vat_rate: defaultRate,
       is_exempt: defaultRate === 0,
-      items: [emptyItem()],
+      items: [item],
       notes: "",
     });
     setNewCustOpen(false);
@@ -380,7 +404,7 @@ export function InvoicesPage() {
           <h1 className="text-2xl font-bold text-slate-800">חשבוניות</h1>
           <Badge variant="blue">{invoices.length}</Badge>
         </div>
-        <Button onClick={openNew}><Plus size={14} /> חשבונית חדשה</Button>
+        <Button onClick={() => openNew()}><Plus size={14} /> חשבונית חדשה</Button>
       </div>
 
       {invoices.length === 0 ? (
@@ -476,7 +500,7 @@ export function InvoicesPage() {
                 )}
               </div>
               <Select
-                label="פרויקט (לא חובה)"
+                label="פרויקט"
                 options={[
                   { value: "", label: "ללא" },
                   ...projects
