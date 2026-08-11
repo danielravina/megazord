@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { GripHorizontal, MoreVertical, X, LayoutGrid } from "lucide-react";
+import { useState, useRef } from "react";
+import { GripHorizontal, MoreVertical, X, LayoutGrid, ArrowLeftRight } from "lucide-react";
 import type { DashboardTile, WidgetType, WidgetData, TimeRange } from "@/components/dashboard/dashboard-types";
 import {
   STATIC_WIDGETS,
   DISPLAY_TYPES,
+  RESIZABLE_TYPES,
   TIME_RANGE_LABELS,
   DEFAULT_SOURCE_BY_TYPE,
   STANDALONE_SOURCES,
@@ -15,12 +16,18 @@ import { DATA_SOURCES } from "@/components/dashboard/data-sources/sources";
 import { WidgetPicker, WIDGET_ITEMS } from "@/components/dashboard/widget-picker";
 import type { WidgetItem } from "@/components/dashboard/widget-picker";
 import { Dropdown, MenuLabel, MenuItem } from "@/components/ui/dropdown";
+import {
+  computeRowInfo,
+  computeResizeWidth,
+} from "@/components/dashboard/resize-utils";
 
 interface TileProps {
   tile: DashboardTile;
   data: WidgetData;
   loading?: boolean;
   customizing: boolean;
+  onResizePreview: (widths: Record<string, number>) => void;
+  onResizeEnd: (id: string, width: number) => void;
   onRemove: (id: string) => void;
   onChangeType: (id: string, type: WidgetType) => void;
   onChangeSource: (id: string, source: string) => void;
@@ -69,11 +76,152 @@ function TileSkeleton({ type }: { type: string }) {
   );
 }
 
+const MIN_TILE_WIDTH = 288;
+
+interface ResizeState {
+  anchorRight: number;
+  containerLeft: number;
+  containerWidth: number;
+  minWidth: number;
+  frozen: Record<string, number>;
+  startFraction: number;
+}
+
+function ResizeHandle({
+  tile,
+  active,
+  onActiveChange,
+  onResizePreview,
+  onResizeEnd,
+}: {
+  tile: DashboardTile;
+  active: boolean;
+  onActiveChange: (active: boolean) => void;
+  onResizePreview: (widths: Record<string, number>) => void;
+  onResizeEnd: (id: string, width: number) => void;
+}) {
+  const resizeRef = useRef<ResizeState | null>(null);
+  const fractionRef = useRef(0);
+  const previewRef = useRef<Record<string, number> | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  function buildPreview(state: ResizeState, fraction: number): Record<string, number> {
+    return { ...state.frozen, [tile.id]: fraction };
+  }
+
+  function schedulePreview(preview: Record<string, number>) {
+    const fraction = preview[tile.id] ?? 0;
+    if (Math.abs(fraction - fractionRef.current) < 0.002) return;
+    fractionRef.current = fraction;
+    previewRef.current = preview;
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      if (previewRef.current) onResizePreview(previewRef.current);
+    });
+  }
+
+  function startPointer(e: React.PointerEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const container = e.currentTarget.closest("[data-grid-container]") as HTMLElement | null;
+    if (!container) return;
+
+    const tiles = Array.from(container.querySelectorAll<HTMLElement>("[data-tile]")).map((el) => ({
+      id: el.dataset.tile || "",
+      rect: el.getBoundingClientRect(),
+    }));
+
+    const info = computeRowInfo(tiles, tile.id);
+    const targetRect = tiles.find((t) => t.id === tile.id)?.rect;
+    if (!info || !targetRect) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+
+    const frozen: Record<string, number> = {};
+    for (const p of info.preceding) {
+      frozen[p.id] = (p.rect.right - p.rect.left) / containerWidth;
+    }
+
+    const startFraction = (targetRect.right - targetRect.left) / containerWidth;
+    resizeRef.current = {
+      anchorRight: targetRect.right,
+      containerLeft: containerRect.left,
+      containerWidth,
+      minWidth: MIN_TILE_WIDTH,
+      frozen,
+      startFraction,
+    };
+    fractionRef.current = 0;
+
+    // Lock the row immediately so the tile's leading edge is anchored before any movement
+    schedulePreview(buildPreview(resizeRef.current, startFraction));
+
+    onActiveChange(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function movePointer(e: React.PointerEvent<HTMLButtonElement>) {
+    const state = resizeRef.current;
+    if (!state) return;
+    const widthPx = computeResizeWidth(
+      e.clientX,
+      state.anchorRight,
+      state.minWidth,
+      state.containerLeft,
+    );
+    schedulePreview(buildPreview(state, widthPx / state.containerWidth));
+  }
+
+  function endPointer(e: React.PointerEvent<HTMLButtonElement>) {
+    const state = resizeRef.current;
+    if (!state) return;
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    const widthPx = computeResizeWidth(
+      e.clientX,
+      state.anchorRight,
+      state.minWidth,
+      state.containerLeft,
+    );
+    const fraction = widthPx / state.containerWidth;
+    resizeRef.current = null;
+    previewRef.current = null;
+    fractionRef.current = 0;
+    onActiveChange(false);
+    onResizeEnd(tile.id, fraction);
+  }
+
+  return (
+    <button
+      type="button"
+      onPointerDown={startPointer}
+      onPointerMove={movePointer}
+      onPointerUp={endPointer}
+      onPointerCancel={endPointer}
+      className={`absolute bottom-1.5 left-1.5 p-1 rounded-md text-slate-400 cursor-col-resize hover:text-blue-500 hover:bg-blue-50 transition-colors select-none ${
+        active ? "bg-blue-50 text-blue-500" : "opacity-60"
+      }`}
+      style={{ touchAction: "none" }}
+      title="שנה רוחב"
+      aria-label="שנה רוחב"
+    >
+      <ArrowLeftRight size={14} />
+    </button>
+  );
+}
+
 export function DashboardTileComponent({
   tile,
   data,
   loading = false,
   customizing,
+  onResizePreview,
+  onResizeEnd,
   onRemove,
   onChangeType,
   onChangeSource,
@@ -81,8 +229,10 @@ export function DashboardTileComponent({
   dragHandleProps,
 }: TileProps) {
   const [widgetOpen, setWidgetOpen] = useState(false);
+  const [resizing, setResizing] = useState(false);
   const WidgetComponent = widgetRegistry[tile.type];
   const isStatic = STATIC_WIDGETS.includes(tile.type);
+  const isResizable = RESIZABLE_TYPES.includes(tile.type);
   const sourceDef = tile.dataSource ? DATA_SOURCES.find((s) => s.key === tile.dataSource) : undefined;
   const title = tile.title || sourceDef?.label || widgetMeta[tile.type]?.label || "";
   const isStandaloneTile = STANDALONE_SOURCES.some((s) => s.type === tile.type);
@@ -133,7 +283,7 @@ export function DashboardTileComponent({
         data-tile={tile.id}
         className={`relative group bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col transition-shadow h-full ${
           customizing ? "hover:shadow-md" : ""
-        }`}
+        } ${resizing ? "ring-2 ring-blue-300" : ""}`}
         style={{ minHeight: tile.type === "calculator" ? 260 : tile.type === "calendar" ? 200 : 100 }}
         {...(dragHandleProps || {})}
       >
@@ -230,6 +380,16 @@ export function DashboardTileComponent({
           <WidgetComponent data={data} tile={tile} />
         )}
       </div>
+
+      {customizing && isResizable && (
+        <ResizeHandle
+          tile={tile}
+          active={resizing}
+          onActiveChange={setResizing}
+          onResizePreview={onResizePreview}
+          onResizeEnd={onResizeEnd}
+        />
+      )}
       </div>
 
       <WidgetPicker

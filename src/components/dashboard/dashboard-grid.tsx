@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -33,6 +33,7 @@ interface GridProps {
   loading: boolean;
   customizing: boolean;
   onReorder: (tiles: DashboardTileType[]) => void;
+  onWidthChange: (id: string, width: number) => void;
   onRemove: (id: string) => void;
   onChangeType: (id: string, type: WidgetType) => void;
   onChangeSource: (id: string, source: string) => void;
@@ -40,11 +41,21 @@ interface GridProps {
   onShowPicker: () => void;
 }
 
+function tileWrapperStyle(tile: DashboardTileType, draftWidth?: number): React.CSSProperties {
+  const width = draftWidth ?? tile.width;
+  if (width !== undefined) {
+    return { flexGrow: 0, flexShrink: 0, flexBasis: `${width * 100}%` };
+  }
+  return { flexGrow: 1 };
+}
+
 function SortableTile({
   tile,
+  style,
   children,
 }: {
   tile: DashboardTileType;
+  style: React.CSSProperties;
   children: React.ReactNode;
 }) {
   const {
@@ -55,13 +66,14 @@ function SortableTile({
     transition,
   } = useSortable({ id: tile.id });
 
-  const style = {
+  const mergedStyle = {
     transform: CSS.Transform.toString(transform),
     transition,
+    ...style,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={TILE_CLASS} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={mergedStyle} className={TILE_CLASS} {...attributes} {...listeners}>
       {children}
     </div>
   );
@@ -73,6 +85,7 @@ export function DashboardGrid({
   loading,
   customizing,
   onReorder,
+  onWidthChange,
   onRemove,
   onChangeType,
   onChangeSource,
@@ -81,6 +94,22 @@ export function DashboardGrid({
 }: GridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  );
+  const [draftWidths, setDraftWidths] = useState<Record<string, number>>({});
+
+  const handleResizePreview = useCallback((widths: Record<string, number>) => {
+    setDraftWidths(widths);
+  }, []);
+
+  const handleResizeEnd = useCallback(
+    (id: string, width: number) => {
+      setDraftWidths({});
+      const current = tiles.find((t) => t.id === id)?.width;
+      if (current === undefined || Math.abs(width - current) > 0.001) {
+        onWidthChange(id, width);
+      }
+    },
+    [tiles, onWidthChange],
   );
 
   const handleDragEnd = useCallback(
@@ -111,7 +140,7 @@ export function DashboardGrid({
         items={tiles.map((t) => t.id)}
         strategy={rectSortingStrategy}
       >
-        <div className="flex flex-wrap gap-4">
+        <div data-grid-container className="flex flex-wrap gap-4">
           {tiles.map((tile) => {
             const widgetData = tile.dataSource
               ? resolveDataSource(rawData, tile.dataSource, tile.timeRange || "this_month", tile.type)
@@ -123,6 +152,8 @@ export function DashboardGrid({
                 data={widgetData}
                 loading={loading}
                 customizing={customizing}
+                onResizePreview={handleResizePreview}
+                onResizeEnd={handleResizeEnd}
                 onRemove={onRemove}
                 onChangeType={onChangeType}
                 onChangeSource={onChangeSource}
@@ -132,13 +163,21 @@ export function DashboardGrid({
 
             if (customizing) {
               return (
-                <SortableTile key={tile.id} tile={tile}>
+                <SortableTile key={tile.id} tile={tile} style={tileWrapperStyle(tile, draftWidths[tile.id])}>
                   {content}
                 </SortableTile>
               );
             }
 
-            return <div key={tile.id} className={TILE_CLASS}>{content}</div>;
+            return (
+              <div
+                key={tile.id}
+                className={TILE_CLASS}
+                style={tileWrapperStyle(tile, draftWidths[tile.id])}
+              >
+                {content}
+              </div>
+            );
           })}
 
           {customizing && (

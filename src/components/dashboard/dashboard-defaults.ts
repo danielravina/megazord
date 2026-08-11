@@ -43,6 +43,7 @@ export function getDefaultLayout(): DashboardTile[] {
       dataSource: "expenses",
       timeRange: "this_month",
       span: 2,
+      width: 0.5,
     },
     {
       id: generateId(),
@@ -50,6 +51,7 @@ export function getDefaultLayout(): DashboardTile[] {
       dataSource: "savings",
       timeRange: "all_time",
       span: 2,
+      width: 0.5,
     },
     {
       id: generateId(),
@@ -57,6 +59,7 @@ export function getDefaultLayout(): DashboardTile[] {
       dataSource: "todos",
       timeRange: "all_time",
       span: 2,
+      width: 0.5,
     },
     {
       id: generateId(),
@@ -64,6 +67,7 @@ export function getDefaultLayout(): DashboardTile[] {
       dataSource: "documents",
       timeRange: "this_month",
       span: 2,
+      width: 0.5,
     },
   ];
 }

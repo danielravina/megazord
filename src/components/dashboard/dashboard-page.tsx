@@ -35,6 +35,10 @@ export function DashboardPage() {
     updateTile(id, { timeRange });
   };
 
+  const handleWidthChange = (id: string, width: number) => {
+    updateTile(id, { width });
+  };
+
   if (layoutLoading) {
     return (
       <div className="max-w-7xl mx-auto space-y-4">
@@ -104,6 +108,7 @@ export function DashboardPage() {
         loading={dataLoading}
         customizing={customizing}
         onReorder={reorderTiles}
+        onWidthChange={handleWidthChange}
         onRemove={removeTile}
         onChangeType={handleChangeType}
         onChangeSource={handleChangeSource}

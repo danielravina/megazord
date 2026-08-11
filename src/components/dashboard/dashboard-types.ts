@@ -35,6 +35,7 @@ export interface DashboardTile {
   dataSource?: string;
   timeRange?: TimeRange;
   span: 1 | 2 | 3 | 4;
+  width?: number;
   title?: string;
 }
 

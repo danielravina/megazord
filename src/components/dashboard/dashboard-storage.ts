@@ -30,6 +30,9 @@ export function useDashboardLayout() {
         if (data?.layout && Array.isArray(data.layout) && data.layout.length > 0) {
           const migrated = (data.layout as DashboardTile[]).map((t) => ({
             ...t,
+            width:
+              t.width ??
+              (t.span && t.span > 1 ? t.span / 4 : undefined),
             dataSource: t.dataSource ? migrateSourceKey(t.dataSource) : t.dataSource,
           }));
           setLayout(migrated);
