@@ -6,6 +6,7 @@ import { generateId } from "@/components/shared/generate-id";
 import type { DashboardTile } from "@/components/dashboard/dashboard-types";
 import { LOCKED_1x1 } from "@/components/dashboard/dashboard-types";
 import { getDefaultLayout } from "@/components/dashboard/dashboard-defaults";
+import { migrateSourceKey } from "@/components/dashboard/data-sources/sources";
 
 export function useDashboardLayout() {
   const { supabase, user } = useAuth();
@@ -27,7 +28,11 @@ export function useDashboardLayout() {
           .maybeSingle();
 
         if (data?.layout && Array.isArray(data.layout) && data.layout.length > 0) {
-          setLayout(data.layout as DashboardTile[]);
+          const migrated = (data.layout as DashboardTile[]).map((t) => ({
+            ...t,
+            dataSource: t.dataSource ? migrateSourceKey(t.dataSource) : t.dataSource,
+          }));
+          setLayout(migrated);
         }
       } catch {
         /* keep defaults */

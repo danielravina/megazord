@@ -132,8 +132,8 @@ test("add-tile picker opens with list of options", async ({ page }) => {
   await expect(page.locator("h2:has-text('מה תרצה לראות')")).toBeVisible({ timeout: 5000 });
 
   const picker = page.locator(".fixed.inset-0.z-50");
-  await expect(picker.locator("button:has-text('סה״כ הכנסות')")).toBeVisible();
-  await expect(picker.locator("button:has-text('הוצאות לפי קטגוריה')")).toBeVisible();
+  await expect(picker.locator("button:has-text('הכנסות')")).toBeVisible();
+  await expect(picker.locator("button:has-text('הוצאות')")).toBeVisible();
   await expect(picker.locator("button:has-text('משימות פתוחות')")).toBeVisible();
   await expect(picker.locator("button:has-text('מחשבון')")).toBeVisible();
   await expect(picker.locator("button:has-text('שעון')")).toBeVisible();

@@ -10,7 +10,6 @@ import { AddTilePicker } from "@/components/dashboard/add-tile-picker";
 import { DocumentScanner } from "@/components/documents/document-scanner";
 import { MonthlyExport } from "@/components/documents/monthly-export";
 import type {
-  DashboardTile,
   WidgetType,
   TimeRange,
 } from "@/components/dashboard/dashboard-types";
@@ -34,10 +33,6 @@ export function DashboardPage() {
 
   const handleChangeTimeRange = (id: string, timeRange: TimeRange) => {
     updateTile(id, { timeRange });
-  };
-
-  const handleSpanChange = (id: string, span: number) => {
-    updateTile(id, { span: span as DashboardTile["span"] });
   };
 
   if (layoutLoading) {
@@ -109,7 +104,6 @@ export function DashboardPage() {
         loading={dataLoading}
         customizing={customizing}
         onReorder={reorderTiles}
-        onSpanChange={handleSpanChange}
         onRemove={removeTile}
         onChangeType={handleChangeType}
         onChangeSource={handleChangeSource}

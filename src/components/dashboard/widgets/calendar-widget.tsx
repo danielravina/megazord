@@ -84,19 +84,17 @@ export function CalendarWidget({ data }: Props) {
   };
 
   return (
-    <div className="h-full flex flex-col min-h-[210px]">
-      <div className="flex items-start">
-        <div className="flex items-start gap-3">
-          <div className="text-4xl font-bold text-slate-900 leading-none">{now.getDate()}</div>
-          <div className="pt-0.5">
-            <div className="text-sm font-bold text-slate-800">{MONTHS[now.getMonth()]}</div>
-            <div className="text-xs text-slate-400">{WEEKDAYS[now.getDay()]}</div>
-          </div>
+    <div className="h-full flex flex-col min-h-[150px]">
+      <div className="flex items-start gap-3">
+        <div className="text-3xl font-bold text-slate-900 leading-none">{now.getDate()}</div>
+        <div className="pt-0.5">
+          <div className="text-sm font-bold text-slate-800">{MONTHS[now.getMonth()]}</div>
+          <div className="text-xs text-slate-400">{WEEKDAYS[now.getDay()]}</div>
         </div>
       </div>
 
-      <div className="mt-3 space-y-4 flex-1 min-h-0 overflow-y-auto">
-        <div>
+      <div className="mt-3 flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1">
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">היום</div>
           {todayEvents.length === 0 ? (
             <p className="text-xs text-slate-400">אין אירועים היום</p>
@@ -109,7 +107,7 @@ export function CalendarWidget({ data }: Props) {
           )}
         </div>
 
-        <div>
+        <div className="flex-1">
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">קרוב</div>
           {upcoming.length === 0 ? (
             <p className="text-xs text-slate-400">אין אירועים קרובים</p>

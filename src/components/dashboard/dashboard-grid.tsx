@@ -25,15 +25,7 @@ import type {
 import { DashboardTileComponent } from "@/components/dashboard/dashboard-tile";
 import { resolveDataSource } from "@/components/dashboard/data-sources/sources";
 
-function spanClass(span: number) {
-  return span === 4
-    ? "sm:col-span-2 md:col-span-3 lg:col-span-4"
-    : span === 3
-      ? "sm:col-span-2 md:col-span-3 lg:col-span-3"
-      : span === 2
-        ? "sm:col-span-2 md:col-span-2 lg:col-span-2"
-        : "col-span-1";
-}
+const TILE_CLASS = "flex-1 min-w-72";
 
 interface GridProps {
   tiles: DashboardTileType[];
@@ -41,7 +33,6 @@ interface GridProps {
   loading: boolean;
   customizing: boolean;
   onReorder: (tiles: DashboardTileType[]) => void;
-  onSpanChange: (id: string, span: number) => void;
   onRemove: (id: string) => void;
   onChangeType: (id: string, type: WidgetType) => void;
   onChangeSource: (id: string, source: string) => void;
@@ -70,7 +61,7 @@ function SortableTile({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={spanClass(tile.span)} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className={TILE_CLASS} {...attributes} {...listeners}>
       {children}
     </div>
   );
@@ -82,7 +73,6 @@ export function DashboardGrid({
   loading,
   customizing,
   onReorder,
-  onSpanChange,
   onRemove,
   onChangeType,
   onChangeSource,
@@ -121,7 +111,7 @@ export function DashboardGrid({
         items={tiles.map((t) => t.id)}
         strategy={rectSortingStrategy}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-auto">
+        <div className="flex flex-wrap gap-4">
           {tiles.map((tile) => {
             const widgetData = tile.dataSource
               ? resolveDataSource(rawData, tile.dataSource, tile.timeRange || "this_month", tile.type)
@@ -133,7 +123,6 @@ export function DashboardGrid({
                 data={widgetData}
                 loading={loading}
                 customizing={customizing}
-                onSpanChange={onSpanChange}
                 onRemove={onRemove}
                 onChangeType={onChangeType}
                 onChangeSource={onChangeSource}
@@ -149,13 +138,13 @@ export function DashboardGrid({
               );
             }
 
-            return <div key={tile.id} className={spanClass(tile.span)}>{content}</div>;
+            return <div key={tile.id} className={TILE_CLASS}>{content}</div>;
           })}
 
           {customizing && (
             <button
               onClick={onShowPicker}
-              className="col-span-1 min-h-[100px] rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+              className="flex-1 min-w-72 min-h-[100px] rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
             >
               <Plus size={24} className="text-slate-400" />
             </button>

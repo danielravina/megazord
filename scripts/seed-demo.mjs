@@ -458,18 +458,18 @@ function buildDemoData(targetId) {
 function buildLayout() {
   return [
     { id: uid(), type: "calendar", dataSource: "calendar:today", span: 1 },
-    { id: uid(), type: "hero", dataSource: "income:total", timeRange: "this_month", span: 1 },
-    { id: uid(), type: "hero", dataSource: "expenses:total", timeRange: "this_month", span: 1 },
-    { id: uid(), type: "hero", dataSource: "profit:net", timeRange: "this_month", span: 1 },
-    { id: uid(), type: "hero", dataSource: "tax:estimate", timeRange: "this_month", span: 1 },
-    { id: uid(), type: "doughnut", dataSource: "expenses:by_category", timeRange: "this_month", span: 2 },
-    { id: uid(), type: "bar", dataSource: "profit:cashflow", timeRange: "this_year", span: 2 },
-    { id: uid(), type: "timeline", dataSource: "income:by_month", timeRange: "this_year", span: 2 },
-    { id: uid(), type: "doughnut", dataSource: "savings:by_fund", timeRange: "all_time", span: 2 },
-    { id: uid(), type: "table", dataSource: "documents:recent", timeRange: "this_month", span: 2 },
-    { id: uid(), type: "table", dataSource: "todos:open", timeRange: "all_time", span: 2 },
-    { id: uid(), type: "hero", dataSource: "documents:receivables", timeRange: "all_time", span: 1 },
-    { id: uid(), type: "doughnut", dataSource: "requests:by_status", timeRange: "all_time", span: 2 },
+    { id: uid(), type: "hero", dataSource: "income", timeRange: "this_month", span: 1 },
+    { id: uid(), type: "hero", dataSource: "expenses", timeRange: "this_month", span: 1 },
+    { id: uid(), type: "hero", dataSource: "profit", timeRange: "this_month", span: 1 },
+    { id: uid(), type: "hero", dataSource: "tax", timeRange: "this_month", span: 1 },
+    { id: uid(), type: "doughnut", dataSource: "expenses", timeRange: "this_month", span: 2 },
+    { id: uid(), type: "bar", dataSource: "profit", timeRange: "this_year", span: 2 },
+    { id: uid(), type: "timeline", dataSource: "income", timeRange: "this_year", span: 2 },
+    { id: uid(), type: "doughnut", dataSource: "savings", timeRange: "all_time", span: 2 },
+    { id: uid(), type: "table", dataSource: "documents", timeRange: "this_month", span: 2 },
+    { id: uid(), type: "table", dataSource: "todos", timeRange: "all_time", span: 2 },
+    { id: uid(), type: "hero", dataSource: "receivables", timeRange: "all_time", span: 1 },
+    { id: uid(), type: "doughnut", dataSource: "requests", timeRange: "all_time", span: 2 },
   ];
 }
 

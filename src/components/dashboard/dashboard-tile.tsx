@@ -1,14 +1,19 @@
 "use client";
 
-import { GripHorizontal, MoreVertical, X } from "lucide-react";
+import { useState } from "react";
+import { GripHorizontal, MoreVertical, X, LayoutGrid } from "lucide-react";
 import type { DashboardTile, WidgetType, WidgetData, TimeRange } from "@/components/dashboard/dashboard-types";
 import {
-  RESIZABLE_TYPES,
   STATIC_WIDGETS,
+  DISPLAY_TYPES,
   TIME_RANGE_LABELS,
+  DEFAULT_SOURCE_BY_TYPE,
+  STANDALONE_SOURCES,
 } from "@/components/dashboard/dashboard-types";
 import { widgetRegistry, widgetMeta } from "@/components/dashboard/widgets/widget-registry";
 import { DATA_SOURCES } from "@/components/dashboard/data-sources/sources";
+import { WidgetPicker, WIDGET_ITEMS } from "@/components/dashboard/widget-picker";
+import type { WidgetItem } from "@/components/dashboard/widget-picker";
 import { Dropdown, MenuLabel, MenuItem } from "@/components/ui/dropdown";
 
 interface TileProps {
@@ -16,7 +21,6 @@ interface TileProps {
   data: WidgetData;
   loading?: boolean;
   customizing: boolean;
-  onSpanChange: (id: string, span: number) => void;
   onRemove: (id: string) => void;
   onChangeType: (id: string, type: WidgetType) => void;
   onChangeSource: (id: string, source: string) => void;
@@ -27,13 +31,6 @@ interface TileProps {
 const TIME_RANGES: TimeRange[] = [
   "this_month", "last_month", "this_quarter", "this_year", "last_30_days", "all_time",
 ];
-
-const SPAN_LABELS: Record<number, string> = {
-  1: "¼ (1/4)",
-  2: "½ (2/4)",
-  3: "¾ (3/4)",
-  4: "מלא (4/4)",
-};
 
 function TileSkeleton({ type }: { type: string }) {
   if (type === "hero") {
@@ -77,17 +74,50 @@ export function DashboardTileComponent({
   data,
   loading = false,
   customizing,
-  onSpanChange,
   onRemove,
   onChangeType,
+  onChangeSource,
   onChangeTimeRange,
   dragHandleProps,
 }: TileProps) {
+  const [widgetOpen, setWidgetOpen] = useState(false);
   const WidgetComponent = widgetRegistry[tile.type];
   const isStatic = STATIC_WIDGETS.includes(tile.type);
-  const isResizable = RESIZABLE_TYPES.includes(tile.type);
   const sourceDef = tile.dataSource ? DATA_SOURCES.find((s) => s.key === tile.dataSource) : undefined;
-  const title = tile.title || sourceDef?.label || "";
+  const title = tile.title || sourceDef?.label || widgetMeta[tile.type]?.label || "";
+  const isStandaloneTile = STANDALONE_SOURCES.some((s) => s.type === tile.type);
+  const activeKey = isStandaloneTile ? tile.type : tile.dataSource;
+
+  function applyTypeChange(vt: WidgetType) {
+    if (vt === tile.type) return;
+    if (!DISPLAY_TYPES.includes(tile.type) && DEFAULT_SOURCE_BY_TYPE[vt]) {
+      onChangeSource(tile.id, DEFAULT_SOURCE_BY_TYPE[vt]);
+    }
+    onChangeType(tile.id, vt);
+  }
+
+  function applySourceChange(sourceKey: string) {
+    if (sourceKey === tile.dataSource) return;
+    onChangeSource(tile.id, sourceKey);
+    if (!DISPLAY_TYPES.includes(tile.type)) {
+      const item = WIDGET_ITEMS.find((i) => i.key === sourceKey);
+      onChangeType(tile.id, item?.defaultType || "hero");
+    }
+  }
+
+  function applyStandaloneChange(standalone: WidgetItem) {
+    if (!standalone.type || standalone.type === tile.type) return;
+    onChangeSource(tile.id, standalone.dataSource || "");
+    onChangeType(tile.id, standalone.type);
+  }
+
+  function handleWidgetSelect(item: WidgetItem) {
+    if (item.standalone) {
+      applyStandaloneChange(item);
+    } else {
+      applySourceChange(item.key);
+    }
+  }
 
   if (!WidgetComponent) {
     return (
@@ -98,14 +128,15 @@ export function DashboardTileComponent({
   }
 
   return (
-    <div
-      data-tile={tile.id}
-      className={`relative group bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col transition-shadow h-full ${
-        customizing ? "hover:shadow-md" : ""
-      }`}
-      style={{ minHeight: tile.type === "calculator" || tile.type === "calendar" ? 260 : 100 }}
-      {...(dragHandleProps || {})}
-    >
+    <>
+      <div
+        data-tile={tile.id}
+        className={`relative group bg-white rounded-xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col transition-shadow h-full ${
+          customizing ? "hover:shadow-md" : ""
+        }`}
+        style={{ minHeight: tile.type === "calculator" ? 260 : tile.type === "calendar" ? 200 : 100 }}
+        {...(dragHandleProps || {})}
+      >
       {(customizing || !isStatic) && (
         <div className="flex items-center gap-2 mb-2">
           {customizing && (
@@ -128,46 +159,24 @@ export function DashboardTileComponent({
             >
               {(close) => (
                 <div>
-                  {!isStatic && sourceDef && sourceDef.compatibleTypes.length > 1 && (
-                    <>
-                      <MenuLabel>תצוגה</MenuLabel>
-                      {sourceDef.compatibleTypes.map((vt) => {
-                        const meta = widgetMeta[vt];
-                        const Icon = meta.icon;
-                        return (
-                          <MenuItem
-                            key={vt}
-                            active={tile.type === vt}
-                            icon={<Icon size={14} />}
-                            onClick={() => {
-                              onChangeType(tile.id, vt);
-                              close();
-                            }}
-                          >
-                            {meta.label}
-                          </MenuItem>
-                        );
-                      })}
-                    </>
-                  )}
-
-                  {isResizable && (
-                    <>
-                      <MenuLabel>רוחב</MenuLabel>
-                      {([1, 2, 3, 4] as const).map((n) => (
-                        <MenuItem
-                          key={n}
-                          active={tile.span === n}
-                          onClick={() => {
-                            onSpanChange(tile.id, n);
-                            close();
-                          }}
-                        >
-                          {SPAN_LABELS[n]}
-                        </MenuItem>
-                      ))}
-                    </>
-                  )}
+                  <MenuLabel>תצוגה</MenuLabel>
+                  {DISPLAY_TYPES.map((vt) => {
+                    const meta = widgetMeta[vt];
+                    const Icon = meta.icon;
+                    return (
+                      <MenuItem
+                        key={vt}
+                        active={tile.type === vt}
+                        icon={<Icon size={14} />}
+                        onClick={() => {
+                          applyTypeChange(vt);
+                          close();
+                        }}
+                      >
+                        {meta.label}
+                      </MenuItem>
+                    );
+                  })}
 
                   {!isStatic && sourceDef?.needsTimeRange && (
                     <>
@@ -188,6 +197,15 @@ export function DashboardTileComponent({
                   )}
 
                   <div className="my-1 border-t border-slate-100" />
+                  <MenuItem
+                    icon={<LayoutGrid size={14} />}
+                    onClick={() => {
+                      setWidgetOpen(true);
+                      close();
+                    }}
+                  >
+                    שנה וידג׳ט
+                  </MenuItem>
                   <MenuItem
                     onClick={() => {
                       onRemove(tile.id);
@@ -212,6 +230,14 @@ export function DashboardTileComponent({
           <WidgetComponent data={data} tile={tile} />
         )}
       </div>
-    </div>
+      </div>
+
+      <WidgetPicker
+        open={widgetOpen}
+        onClose={() => setWidgetOpen(false)}
+        activeKey={activeKey}
+        onSelect={handleWidgetSelect}
+      />
+    </>
   );
 }

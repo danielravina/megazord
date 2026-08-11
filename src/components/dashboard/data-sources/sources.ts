@@ -9,6 +9,7 @@ import type {
   DoughnutData,
   TimeRange,
 } from "@/components/dashboard/dashboard-types";
+import { DISPLAY_TYPES } from "@/components/dashboard/dashboard-types";
 import { calculateTaxes, totalVat } from "@/components/finance/tax-engine";
 
 const CHART_COLORS = [
@@ -19,6 +20,9 @@ const CHART_COLORS = [
 const fmtNIS = (n: number) => `₪ ${n.toLocaleString()}`;
 
 const fmtDate = (d?: string | null) => d?.split("-").reverse().join("/") || "-";
+
+const STATUS_MAP: Record<string, string> = { new: "חדש", in_progress: "בביצוע", done: "הושלם" };
+const PRIORITY_MAP: Record<string, string> = { high: "דחוף", medium: "בינוני", low: "נמוך" };
 
 export function filterByTimeRange<T>(
   items: T[],
@@ -87,82 +91,484 @@ function doughnut(
   return { labels, segments };
 }
 
-// ── Data Source Definitions ──────────────────────────
+// ── Generic helpers ──────────────────────────────
 
-export const DATA_SOURCES: DataSourceDef[] = [
-  { key: "income:total", label: "סה״כ הכנסות", compatibleTypes: ["hero"], needsTimeRange: true },
-  { key: "income:recent", label: "הכנסות אחרונות", compatibleTypes: ["table", "hero"], needsTimeRange: true },
-  { key: "income:by_month", label: "הכנסות חודשיות", compatibleTypes: ["bar", "timeline"], needsTimeRange: true },
-  { key: "expenses:total", label: "סה״כ הוצאות", compatibleTypes: ["hero"], needsTimeRange: true },
-  { key: "expenses:recent", label: "הוצאות אחרונות", compatibleTypes: ["table", "hero"], needsTimeRange: true },
-  { key: "expenses:by_category", label: "הוצאות לפי קטגוריה", compatibleTypes: ["doughnut", "bar", "table"], needsTimeRange: true },
-  { key: "expenses:by_month", label: "הוצאות חודשיות", compatibleTypes: ["bar", "timeline"], needsTimeRange: true },
-  { key: "profit:net", label: "רווח נטו", compatibleTypes: ["hero"], needsTimeRange: true },
-  { key: "profit:cashflow", label: "הכנסות מול הוצאות", compatibleTypes: ["bar", "timeline"], needsTimeRange: true },
-  { key: "tax:estimate", label: "חבות מס משוערת", compatibleTypes: ["hero"], needsTimeRange: true },
-  { key: "tax:breakdown", label: "פירוט מס", compatibleTypes: ["doughnut", "bar", "table"], needsTimeRange: true },
-  { key: "tax:upcoming", label: "תשלומים קרובים", compatibleTypes: ["table"], needsTimeRange: false },
-  { key: "savings:total", label: "סה״כ חסכונות", compatibleTypes: ["hero"], needsTimeRange: false },
-  { key: "savings:recent", label: "הפקדות אחרונות", compatibleTypes: ["table", "hero"], needsTimeRange: true },
-  { key: "savings:by_fund", label: "חסכונות לפי סוג", compatibleTypes: ["doughnut", "bar", "table"], needsTimeRange: false },
-  { key: "savings:pension", label: "פנסיה", compatibleTypes: ["hero"], needsTimeRange: false },
-  { key: "savings:hishtalmut", label: "קרן השתלמות", compatibleTypes: ["hero"], needsTimeRange: false },
-  { key: "savings:gemel", label: "קופת גמל", compatibleTypes: ["hero"], needsTimeRange: false },
-  { key: "investments:total", label: "השקעות בציוד", compatibleTypes: ["hero"], needsTimeRange: false },
-  { key: "investments:recent", label: "השקעות אחרונות", compatibleTypes: ["table", "hero"], needsTimeRange: true },
-  { key: "projects:active", label: "פרויקטים פעילים", compatibleTypes: ["table", "hero"], needsTimeRange: false },
-  { key: "projects:pipeline", label: "צבר פרויקטים", compatibleTypes: ["hero"], needsTimeRange: false },
-  { key: "projects:recent", label: "פרויקטים אחרונים", compatibleTypes: ["table", "hero"], needsTimeRange: true },
-  { key: "documents:recent", label: "מסמכים אחרונים", compatibleTypes: ["table", "hero"], needsTimeRange: true },
-  { key: "documents:receivables", label: "חובות לקוחות", compatibleTypes: ["hero"], needsTimeRange: false },
-  { key: "todos:open", label: "משימות פתוחות", compatibleTypes: ["table", "hero"], needsTimeRange: false },
-  { key: "events:upcoming", label: "אירועים קרובים", compatibleTypes: ["table", "hero"], needsTimeRange: false },
-  { key: "calendar:today", label: "יומן", compatibleTypes: ["calendar"], needsTimeRange: false },
-  { key: "requests:open", label: "בקשות פתוחות", compatibleTypes: ["table", "hero"], needsTimeRange: false },
-  { key: "requests:by_status", label: "בקשות לפי סטטוס", compatibleTypes: ["doughnut", "bar", "table"], needsTimeRange: false },
-];
+function monthBreakdown(
+  items: { date?: string | null; amount?: number }[],
+): { labels: string[]; values: number[] } {
+  const byMonth = new Map<string, number>();
+  for (const i of items) {
+    const m = (i.date || "").slice(0, 7);
+    if (!m) continue;
+    byMonth.set(m, (byMonth.get(m) || 0) + Number(i.amount || 0));
+  }
+  const sorted = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return {
+    labels: sorted.map(([m]) => m.split("-").reverse().join("/")),
+    values: sorted.map(([, v]) => v),
+  };
+}
 
-// ── Transform Functions ──────────────────────────────
+function breakdown<T>(
+  items: T[],
+  keyFn: (item: T) => string,
+  valueFn: (item: T) => number = (i) => Number((i as { amount?: number }).amount),
+): { labels: string[]; values: number[] } {
+  const by = new Map<string, number>();
+  for (const i of items) {
+    const k = keyFn(i);
+    by.set(k, (by.get(k) || 0) + valueFn(i));
+  }
+  const sorted = [...by.entries()].sort(([, a], [, b]) => b - a);
+  return { labels: sorted.map(([k]) => k), values: sorted.map(([, v]) => v) };
+}
 
-function categoryBreakdown(
+type Col = { key: string; label: string; align?: "right" | "left" | "center" };
+type Row = Record<string, string | number>;
+
+function recordsView<T>(
+  view: WidgetType,
+  items: T[],
+  columns: Col[],
+  mapper: (item: T) => Row,
+  heroValue: number,
+  heroLabel: string,
+  heroSublabel?: string,
+): WidgetData {
+  if (view === "hero") return hero(heroValue, heroLabel, heroSublabel);
+  if (view === "table") return table(columns, items.slice(0, 10).map(mapper));
+  return null;
+}
+
+function monthSeriesView(
+  view: WidgetType,
   labels: string[],
   values: number[],
-  view: WidgetType,
   label: string,
-  tableKey: string,
-  tableColLabel: string,
+  color: string,
 ): WidgetData {
+  if (view === "bar" || view === "timeline") return bar(labels, [{ label, data: values, color }]);
+  return null;
+}
+
+// ── Family resolvers ─────────────────────────────
+
+function incomeView(raw: DashboardRawData, range: TimeRange, view: WidgetType, label: string): WidgetData {
+  const items = filterByTimeRange(raw.incomes, range);
+  const total = items.reduce((s, i) => s + Number(i.amount), 0);
+  const t = recordsView(
+    view, items,
+    [
+      { key: "description", label: "תיאור" },
+      { key: "amount", label: "סכום", align: "left" as const },
+      { key: "date", label: "תאריך", align: "left" as const },
+    ],
+    (i) => ({ description: i.description, amount: fmtNIS(Number(i.amount)), date: fmtDate(i.date) }),
+    total, label, `${items.length} רשומות`,
+  );
+  if (t) return t;
+  const { labels, values } = monthBreakdown(items);
+  const s = monthSeriesView(view, labels, values, "הכנסות", CHART_COLORS[2]);
+  if (s) return s;
   if (view === "doughnut") {
-    return doughnut(
-      labels,
-      values.map((v, i) => ({ label: labels[i], value: v, color: CHART_COLORS[i % CHART_COLORS.length] })),
+    const d = breakdown(items, (i) => i.type || "אחר");
+    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+function expenseView(raw: DashboardRawData, range: TimeRange, view: WidgetType, label: string): WidgetData {
+  const items = filterByTimeRange(raw.expenses, range);
+  const total = items.reduce((s, e) => s + Number(e.amount), 0);
+  const t = recordsView(
+    view, items,
+    [
+      { key: "description", label: "תיאור" },
+      { key: "category", label: "קטגוריה" },
+      { key: "amount", label: "סכום", align: "left" as const },
+      { key: "date", label: "תאריך", align: "left" as const },
+    ],
+    (e) => ({ description: e.description, category: e.category, amount: fmtNIS(Number(e.amount)), date: fmtDate(e.date) }),
+    total, label, `${items.length} רשומות`,
+  );
+  if (t) return t;
+  const { labels, values } = monthBreakdown(items);
+  const s = monthSeriesView(view, labels, values, "הוצאות", CHART_COLORS[1]);
+  if (s) return s;
+  if (view === "doughnut") {
+    const d = breakdown(items, (e) => e.category || "אחר");
+    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+function profitView(raw: DashboardRawData, range: TimeRange, view: WidgetType, label: string): WidgetData {
+  const incItems = filterByTimeRange(raw.incomes, range);
+  const expItems = filterByTimeRange(raw.expenses, range);
+  const totalInc = incItems.reduce((s, i) => s + Number(i.amount), 0);
+  const totalExp = expItems.reduce((s, e) => s + Number(e.amount), 0);
+  const tax = calculateTaxes(incItems, expItems, raw.savings, raw.taxSettings);
+  const net = totalInc - totalExp - tax.totalTax;
+
+  if (view === "hero") return hero(net, label);
+  if (view === "table") {
+    return table(
+      [
+        { key: "row", label: "" },
+        { key: "amount", label: "סכום", align: "left" as const },
+      ],
+      [
+        { row: "הכנסות", amount: fmtNIS(totalInc) },
+        { row: "הוצאות", amount: fmtNIS(totalExp) },
+        { row: "מס", amount: fmtNIS(tax.totalTax) },
+        { row: "רווח נטו", amount: fmtNIS(net) },
+      ],
     );
   }
-  if (view === "bar") {
-    return bar(labels, [{ label, data: values, color: CHART_COLORS[1] }]);
+
+  const byMonth = new Map<string, { inc: number; exp: number }>();
+  for (const i of incItems) {
+    const m = i.date.slice(0, 7);
+    const cur = byMonth.get(m) || { inc: 0, exp: 0 };
+    cur.inc += Number(i.amount);
+    byMonth.set(m, cur);
+  }
+  for (const e of expItems) {
+    const m = e.date.slice(0, 7);
+    const cur = byMonth.get(m) || { inc: 0, exp: 0 };
+    cur.exp += Number(e.amount);
+    byMonth.set(m, cur);
+  }
+  const sorted = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+  if (view === "bar" || view === "timeline") {
+    return bar(
+      sorted.map(([m]) => m.split("-").reverse().join("/")),
+      [
+        { label: "הכנסות", data: sorted.map(([, v]) => v.inc), color: CHART_COLORS[2] },
+        { label: "הוצאות", data: sorted.map(([, v]) => v.exp), color: CHART_COLORS[1] },
+      ],
+    );
+  }
+  if (view === "doughnut") {
+    return doughnut(["הכנסות", "הוצאות"], [
+      { label: "הכנסות", value: totalInc, color: CHART_COLORS[2] },
+      { label: "הוצאות", value: totalExp, color: CHART_COLORS[1] },
+    ]);
+  }
+  return null;
+}
+
+function taxView(raw: DashboardRawData, range: TimeRange, view: WidgetType, label: string): WidgetData {
+  const incItems = filterByTimeRange(raw.incomes, range);
+  const expItems = filterByTimeRange(raw.expenses, range);
+  const tax = calculateTaxes(incItems, expItems, raw.savings, raw.taxSettings);
+  const segments = [
+    { label: 'מע"מ', value: tax.vat, color: CHART_COLORS[0] },
+    { label: "מס הכנסה", value: tax.incomeTax, color: CHART_COLORS[3] },
+    { label: "ביטוח לאומי", value: tax.bituahLeumi, color: CHART_COLORS[4] },
+  ].filter((s) => s.value > 0);
+
+  if (view === "hero") return hero(tax.totalTax, label, "מע״מ + מקדמות + ביטוח לאומי");
+  if (view === "doughnut") return doughnut(segments.map((s) => s.label), segments);
+  if (view === "bar" || view === "timeline") {
+    return bar(segments.map((s) => s.label), [{ label: "מס", data: segments.map((s) => s.value), color: CHART_COLORS[3] }]);
   }
   if (view === "table") {
     return table(
       [
-        { key: tableKey, label: tableColLabel },
+        { key: "label", label: "סוג מס" },
         { key: "amount", label: "סכום", align: "left" as const },
       ],
-      values.map((v, i) => ({ [tableKey]: labels[i], amount: fmtNIS(v) })),
+      segments.map((s) => ({ label: s.label, amount: fmtNIS(s.value) })),
     );
   }
   return null;
 }
 
-function monthSeries(
-  labels: string[],
-  values: number[],
-  view: WidgetType,
-  seriesLabel: string,
-  color: string,
-): WidgetData {
-  if (view !== "bar" && view !== "timeline") return null;
-  return bar(labels, [{ label: seriesLabel, data: values, color }]);
+function taxUpcomingView(raw: DashboardRawData, view: WidgetType): WidgetData {
+  const s = raw.taxSettings;
+  const vatRate = s?.vat_rate ?? 17;
+  const incTaxRate = s?.income_tax_advance ?? 0;
+  const blRate = s?.bituah_leumi ?? 5;
+  const totalIncome = raw.incomes.reduce((sum, i) => sum + Number(i.amount), 0);
+  const estVat = Math.round(totalVat(raw.incomes, vatRate));
+  const grossWithoutVat = totalIncome - estVat;
+  const estIncTax = Math.round(grossWithoutVat * (incTaxRate / 100));
+  const estBL = Math.round(grossWithoutVat * (blRate / 100));
+  const vatFreq = s?.vat_frequency || "bimonthly";
+
+  function getNextBillingDay(day: number): string {
+    const today = new Date();
+    const target = new Date(today.getFullYear(), today.getMonth(), 1);
+    const maxDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const safeDay = Math.min(day, maxDay);
+    const date = new Date(target.getFullYear(), target.getMonth(), safeDay);
+    if (today.getDate() >= safeDay) date.setMonth(date.getMonth() + 1);
+    return date.toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
+  }
+
+  const entries: { label: string; amount: number; date: string }[] = [];
+  if (estVat > 0) {
+    entries.push({
+      label: vatFreq === "bimonthly" ? 'מע"מ (דו-חודשי)' : 'מע"מ',
+      amount: estVat * (vatFreq === "bimonthly" ? 2 : 1),
+      date: getNextBillingDay(s?.vat_billing_day ?? 15),
+    });
+  }
+  if (estIncTax > 0) {
+    entries.push({
+      label: "מקדמות מס הכנסה",
+      amount: Math.round(estIncTax * (vatFreq === "bimonthly" ? 2 : 1)),
+      date: getNextBillingDay(s?.income_tax_billing_day ?? 15),
+    });
+  }
+  if (estBL > 0) {
+    entries.push({
+      label: "ביטוח לאומי",
+      amount: estBL,
+      date: getNextBillingDay(s?.bituah_leumi_billing_day ?? 15),
+    });
+  }
+
+  if (view === "table") {
+    return table(
+      [
+        { key: "label", label: "תשלום" },
+        { key: "amount", label: "סכום", align: "left" as const },
+        { key: "date", label: "חיוב", align: "left" as const },
+      ],
+      entries.map((e) => ({ label: e.label, amount: fmtNIS(e.amount), date: e.date })),
+    );
+  }
+  if (view === "hero") return hero(entries.reduce((sum, e) => sum + e.amount, 0), "תשלומים קרובים", `${entries.length} תשלומים`);
+  if (view === "bar" || view === "timeline") {
+    return bar(entries.map((e) => e.label), [{ label: "תשלומים", data: entries.map((e) => e.amount), color: CHART_COLORS[4] }]);
+  }
+  if (view === "doughnut") {
+    return doughnut(entries.map((e) => e.label), entries.map((e, i) => ({ label: e.label, value: e.amount, color: CHART_COLORS[i % CHART_COLORS.length] })));
+  }
+  return null;
 }
+
+function savingsView(
+  raw: DashboardRawData,
+  range: TimeRange,
+  view: WidgetType,
+  fundFilter: string | null,
+  label: string,
+): WidgetData {
+  let all = raw.savings;
+  if (fundFilter) all = all.filter((sv) => sv.fund_type === fundFilter);
+  const items = filterByTimeRange(all, range);
+  const total = items.reduce((s, sv) => s + Number(sv.amount), 0);
+
+  const t = recordsView(
+    view, items,
+    [
+      { key: "fund_type", label: "סוג" },
+      { key: "amount", label: "סכום", align: "left" as const },
+      { key: "date", label: "תאריך", align: "left" as const },
+    ],
+    (sv) => ({ fund_type: sv.fund_type, amount: fmtNIS(Number(sv.amount)), date: fmtDate(sv.date) }),
+    total, label, `${items.length} הפקדות`,
+  );
+  if (t) return t;
+  const { labels, values } = monthBreakdown(items);
+  const s = monthSeriesView(view, labels, values, label, CHART_COLORS[5]);
+  if (s) return s;
+  if (view === "doughnut") {
+    const d = breakdown(items, (sv) => sv.fund_type || "אחר");
+    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+function documentsView(
+  raw: DashboardRawData,
+  range: TimeRange,
+  view: WidgetType,
+  opts: { investment?: boolean; unpaidIncome?: boolean },
+  label: string,
+): WidgetData {
+  let docs = raw.documents;
+  if (opts.investment) docs = docs.filter((d) => d.is_investment);
+  if (opts.unpaidIncome) docs = docs.filter((d) => !d.is_paid && d.direction === "income");
+  const items = filterByTimeRange(docs, range);
+  const total = items.reduce((s, d) => s + Number(d.total_amount || 0), 0);
+
+  const t = recordsView(
+    view, items,
+    [
+      { key: "title", label: "מסמך" },
+      { key: "amount", label: "סכום", align: "left" as const },
+      { key: "date", label: "תאריך", align: "left" as const },
+    ],
+    (d) => ({ title: d.title, amount: d.total_amount ? fmtNIS(d.total_amount) : "-", date: fmtDate(d.date_on_doc) }),
+    total, label, `${items.length} מסמכים`,
+  );
+  if (t) return t;
+  const { labels, values } = monthBreakdown(items.map((d) => ({ date: d.date_on_doc || d.date, amount: d.total_amount || 0 })));
+  const s = monthSeriesView(view, labels, values, label, CHART_COLORS[6]);
+  if (s) return s;
+  if (view === "doughnut") {
+    const d = breakdown(items, (doc) => doc.doc_type || "אחר");
+    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+function projectsView(raw: DashboardRawData, range: TimeRange, view: WidgetType, label: string): WidgetData {
+  const items = filterByTimeRange(raw.projects, range, "start_date");
+  const total = items.reduce((sum, p) => sum + Number(p.quote_price || 0), 0);
+
+  const t = recordsView(
+    view, items,
+    [
+      { key: "customer_name", label: "לקוח" },
+      { key: "quote_price", label: "הצעת מחיר", align: "left" as const },
+      { key: "start_date", label: "תאריך", align: "left" as const },
+    ],
+    (p) => ({ customer_name: p.customer_name || "-", quote_price: p.quote_price ? fmtNIS(p.quote_price) : "-", start_date: fmtDate(p.start_date) }),
+    total, label, `${items.length} פרויקטים`,
+  );
+  if (t) return t;
+  const { labels, values } = monthBreakdown(items.map((p) => ({ date: p.start_date || p.created_at, amount: p.quote_price || 0 })));
+  const s = monthSeriesView(view, labels, values, label, CHART_COLORS[6]);
+  if (s) return s;
+  if (view === "doughnut") {
+    const d = breakdown(items, (p) => p.customer_name || "אחר");
+    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+function todosView(raw: DashboardRawData, view: WidgetType): WidgetData {
+  const open = raw.todos.filter((t) => !t.completed);
+  if (view === "hero") return hero(open.length, "משימות פתוחות");
+  if (view === "table") {
+    return table(
+      [{ key: "text", label: "משימה" }, { key: "status", label: "" }],
+      open.slice(0, 10).map((t) => ({ text: t.text, status: "פתוח" })),
+    );
+  }
+  const d = monthBreakdown(raw.todos.map((t) => ({ date: (t.created_at || "").slice(0, 10), amount: 1 })));
+  const s = monthSeriesView(view, d.labels, d.values, "משימות", CHART_COLORS[6]);
+  if (s) return s;
+  if (view === "doughnut") {
+    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+function eventsView(raw: DashboardRawData, view: WidgetType): WidgetData {
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = raw.events
+    .filter((e) => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 10);
+  if (view === "hero") return hero(upcoming.length, "אירועים קרובים");
+  if (view === "table") {
+    return table(
+      [
+        { key: "title", label: "אירוע" },
+        { key: "date", label: "תאריך", align: "left" as const },
+      ],
+      upcoming.map((e) => ({ title: e.title, date: fmtDate(e.date) })),
+    );
+  }
+  const d = monthBreakdown(raw.events.map((e) => ({ date: e.date, amount: 1 })));
+  const s = monthSeriesView(view, d.labels, d.values, "אירועים", CHART_COLORS[6]);
+  if (s) return s;
+  if (view === "doughnut") {
+    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+function requestsOpenView(raw: DashboardRawData, view: WidgetType): WidgetData {
+  const open = raw.requests.filter((r) => r.status !== "done");
+  if (view === "hero") return hero(open.length, "בקשות פתוחות");
+  if (view === "table") {
+    return table(
+      [
+        { key: "title", label: "בקשה" },
+        { key: "priority", label: "עדיפות" },
+        { key: "status", label: "סטטוס" },
+      ],
+      open.slice(0, 10).map((r) => ({
+        title: r.title,
+        priority: PRIORITY_MAP[r.priority] || r.priority,
+        status: STATUS_MAP[r.status] || r.status,
+      })),
+    );
+  }
+  const d = monthBreakdown(raw.requests.map((r) => ({ date: (r.created_at || "").slice(0, 10), amount: 1 })));
+  const s = monthSeriesView(view, d.labels, d.values, "בקשות", CHART_COLORS[6]);
+  if (s) return s;
+  if (view === "doughnut") {
+    const byStatus = breakdown(raw.requests, (r) => STATUS_MAP[r.status] || r.status, () => 1);
+    return doughnut(byStatus.labels, byStatus.values.map((v, idx) => ({ label: byStatus.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
+  }
+  return null;
+}
+
+// ── Data Source Definitions ──────────────────────────
+
+export const DATA_SOURCES: DataSourceDef[] = [
+  { key: "income", label: "הכנסות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
+  { key: "expenses", label: "הוצאות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
+  { key: "profit", label: "רווח נטו", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
+  { key: "tax", label: "חבות מס", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
+  { key: "tax:upcoming", label: "תשלומים קרובים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "savings", label: "חסכונות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "savings:pension", label: "פנסיה", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "savings:hishtalmut", label: "קרן השתלמות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "savings:gemel", label: "קופת גמל", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "investments", label: "השקעות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "projects", label: "פרויקטים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
+  { key: "documents", label: "מסמכים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
+  { key: "receivables", label: "חובות לקוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "todos", label: "משימות פתוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "events", label: "אירועים קרובים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "requests", label: "בקשות פתוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+];
+
+// Map old granular keys to the consolidated ones so saved layouts keep working
+const SOURCE_KEY_MIGRATIONS: Record<string, string> = {
+  "income:total": "income",
+  "income:recent": "income",
+  "income:by_month": "income",
+  "expenses:total": "expenses",
+  "expenses:recent": "expenses",
+  "expenses:by_month": "expenses",
+  "expenses:by_category": "expenses",
+  "profit:net": "profit",
+  "profit:cashflow": "profit",
+  "tax:estimate": "tax",
+  "tax:breakdown": "tax",
+  "savings:total": "savings",
+  "savings:recent": "savings",
+  "savings:by_fund": "savings",
+  "investments:total": "investments",
+  "investments:recent": "investments",
+  "projects:active": "projects",
+  "projects:pipeline": "projects",
+  "projects:recent": "projects",
+  "documents:recent": "documents",
+  "documents:receivables": "receivables",
+  "todos:open": "todos",
+  "events:upcoming": "events",
+  "requests:open": "requests",
+  "requests:by_status": "requests",
+};
+
+export function migrateSourceKey(key?: string): string | undefined {
+  if (!key) return key;
+  return SOURCE_KEY_MIGRATIONS[key] || key;
+}
+
+// ── Resolver ──────────────────────────────────────
 
 export function resolveDataSource(
   raw: DashboardRawData,
@@ -170,514 +576,70 @@ export function resolveDataSource(
   timeRange: TimeRange,
   view: WidgetType,
 ): WidgetData {
+  sourceKey = SOURCE_KEY_MIGRATIONS[sourceKey] || sourceKey;
+  const needsRange = DATA_SOURCES.some((s) => s.key === sourceKey && s.needsTimeRange);
+  const range: TimeRange = needsRange ? timeRange : "all_time";
+  const label = DATA_SOURCES.find((s) => s.key === sourceKey)?.label || "הנתונים";
+
   switch (sourceKey) {
     // ── Income ──────────────
-    case "income:total": {
-      const items = filterByTimeRange(raw.incomes, timeRange);
-      if (view !== "hero") return null;
-      return hero(
-        items.reduce((s, i) => s + Number(i.amount), 0),
-        "סה״כ הכנסות",
-        `${items.length} רשומות`,
-      );
-    }
-
-    case "income:recent": {
-      const items = filterByTimeRange(raw.incomes, timeRange).slice(0, 10);
-      if (view === "hero") {
-        return hero(items.reduce((s, i) => s + Number(i.amount), 0), "הכנסות אחרונות", `${items.length} רשומות`);
-      }
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "description", label: "תיאור" },
-          { key: "amount", label: "סכום", align: "left" as const },
-          { key: "date", label: "תאריך", align: "left" as const },
-        ],
-        items.map((i) => ({
-          description: i.description,
-          amount: fmtNIS(Number(i.amount)),
-          date: fmtDate(i.date),
-        })),
-      );
-    }
-
-    case "income:by_month": {
-      const items = filterByTimeRange(raw.incomes, timeRange);
-      const byMonth = new Map<string, number>();
-      for (const i of items) {
-        const m = i.date.slice(0, 7);
-        byMonth.set(m, (byMonth.get(m) || 0) + Number(i.amount));
-      }
-      const sorted = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
-      return monthSeries(
-        sorted.map(([m]) => m.split("-").reverse().join("/")),
-        sorted.map(([, v]) => v),
-        view,
-        "הכנסות",
-        CHART_COLORS[2],
-      );
-    }
+    case "income":
+      return incomeView(raw, range, view, label);
 
     // ── Expenses ────────────
-    case "expenses:total": {
-      const items = filterByTimeRange(raw.expenses, timeRange);
-      if (view !== "hero") return null;
-      return hero(
-        items.reduce((s, e) => s + Number(e.amount), 0),
-        "סה״כ הוצאות",
-        `${items.length} רשומות`,
-      );
-    }
-
-    case "expenses:recent": {
-      const items = filterByTimeRange(raw.expenses, timeRange).slice(0, 10);
-      if (view === "hero") {
-        return hero(items.reduce((s, e) => s + Number(e.amount), 0), "הוצאות אחרונות", `${items.length} רשומות`);
-      }
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "description", label: "תיאור" },
-          { key: "category", label: "קטגוריה" },
-          { key: "amount", label: "סכום", align: "left" as const },
-          { key: "date", label: "תאריך", align: "left" as const },
-        ],
-        items.map((e) => ({
-          description: e.description,
-          category: e.category,
-          amount: fmtNIS(Number(e.amount)),
-          date: fmtDate(e.date),
-        })),
-      );
-    }
-
-    case "expenses:by_category": {
-      const items = filterByTimeRange(raw.expenses, timeRange);
-      const byCat = new Map<string, number>();
-      for (const e of items) {
-        const cat = e.category || "אחר";
-        byCat.set(cat, (byCat.get(cat) || 0) + Number(e.amount));
-      }
-      const sorted = [...byCat.entries()].sort(([, a], [, b]) => b - a);
-      return categoryBreakdown(
-        sorted.map(([c]) => c),
-        sorted.map(([, v]) => v),
-        view,
-        "הוצאות",
-        "category",
-        "קטגוריה",
-      );
-    }
-
-    case "expenses:by_month": {
-      const items = filterByTimeRange(raw.expenses, timeRange);
-      const byMonth = new Map<string, number>();
-      for (const e of items) {
-        const m = e.date.slice(0, 7);
-        byMonth.set(m, (byMonth.get(m) || 0) + Number(e.amount));
-      }
-      const sorted = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
-      return monthSeries(
-        sorted.map(([m]) => m.split("-").reverse().join("/")),
-        sorted.map(([, v]) => v),
-        view,
-        "הוצאות",
-        CHART_COLORS[1],
-      );
-    }
+    case "expenses":
+      return expenseView(raw, range, view, label);
 
     // ── Profit ──────────────
-    case "profit:net": {
-      const incItems = filterByTimeRange(raw.incomes, timeRange);
-      const expItems = filterByTimeRange(raw.expenses, timeRange);
-      const totalInc = incItems.reduce((s, i) => s + Number(i.amount), 0);
-      const totalExp = expItems.reduce((s, e) => s + Number(e.amount), 0);
-      const tax = calculateTaxes(incItems, expItems, raw.savings, raw.taxSettings);
-      if (view !== "hero") return null;
-      return hero(totalInc - totalExp - tax.totalTax, "רווח נטו");
-    }
-
-    case "profit:cashflow": {
-      const items = filterByTimeRange(raw.incomes, timeRange);
-      const expItems = filterByTimeRange(raw.expenses, timeRange);
-      const byMonth = new Map<string, { inc: number; exp: number }>();
-      for (const i of items) {
-        const m = i.date.slice(0, 7);
-        const cur = byMonth.get(m) || { inc: 0, exp: 0 };
-        cur.inc += Number(i.amount);
-        byMonth.set(m, cur);
-      }
-      for (const e of expItems) {
-        const m = e.date.slice(0, 7);
-        const cur = byMonth.get(m) || { inc: 0, exp: 0 };
-        cur.exp += Number(e.amount);
-        byMonth.set(m, cur);
-      }
-      const sorted = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
-      if (view !== "bar" && view !== "timeline") return null;
-      return bar(
-        sorted.map(([m]) => m.split("-").reverse().join("/")),
-        [
-          { label: "הכנסות", data: sorted.map(([, v]) => v.inc), color: CHART_COLORS[2] },
-          { label: "הוצאות", data: sorted.map(([, v]) => v.exp), color: CHART_COLORS[1] },
-        ],
-      );
-    }
+    case "profit":
+      return profitView(raw, range, view, label);
 
     // ── Tax ─────────────────
-    case "tax:estimate": {
-      const incItems = filterByTimeRange(raw.incomes, timeRange);
-      const expItems = filterByTimeRange(raw.expenses, timeRange);
-      const tax = calculateTaxes(incItems, expItems, raw.savings, raw.taxSettings);
-      if (view !== "hero") return null;
-      return hero(tax.totalTax, "חבות מס משוערת", "מע״מ + מקדמות + ביטוח לאומי");
-    }
+    case "tax":
+      return taxView(raw, range, view, label);
 
-    case "tax:breakdown": {
-      const incItems = filterByTimeRange(raw.incomes, timeRange);
-      const expItems = filterByTimeRange(raw.expenses, timeRange);
-      const tax = calculateTaxes(incItems, expItems, raw.savings, raw.taxSettings);
-      const segments = [
-        { label: 'מע"מ', value: tax.vat, color: CHART_COLORS[0] },
-        { label: "מס הכנסה", value: tax.incomeTax, color: CHART_COLORS[3] },
-        { label: "ביטוח לאומי", value: tax.bituahLeumi, color: CHART_COLORS[4] },
-      ].filter((s) => s.value > 0);
-      if (view === "doughnut") return doughnut(segments.map((s) => s.label), segments);
-      if (view === "bar") return bar(segments.map((s) => s.label), [{ label: "מס", data: segments.map((s) => s.value), color: CHART_COLORS[3] }]);
-      if (view === "table") {
-        return table(
-          [
-            { key: "label", label: "סוג מס" },
-            { key: "amount", label: "סכום", align: "left" as const },
-          ],
-          segments.map((s) => ({ label: s.label, amount: fmtNIS(s.value) })),
-        );
-      }
-      return null;
-    }
-
-    case "tax:upcoming": {
-      if (view !== "table") return null;
-      const s = raw.taxSettings;
-      const vatRate = s?.vat_rate ?? 17;
-      const incTaxRate = s?.income_tax_advance ?? 0;
-      const blRate = s?.bituah_leumi ?? 5;
-      const totalIncome = raw.incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-      const estVat = Math.round(totalVat(raw.incomes, vatRate));
-      const grossWithoutVat = totalIncome - estVat;
-      const estIncTax = Math.round(grossWithoutVat * (incTaxRate / 100));
-      const estBL = Math.round(grossWithoutVat * (blRate / 100));
-      const vatFreq = s?.vat_frequency || "bimonthly";
-
-      function getNextBillingDay(day: number): string {
-        const today = new Date();
-        const target = new Date(today.getFullYear(), today.getMonth(), 1);
-        const maxDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-        const safeDay = Math.min(day, maxDay);
-        const date = new Date(target.getFullYear(), target.getMonth(), safeDay);
-        if (today.getDate() >= safeDay) date.setMonth(date.getMonth() + 1);
-        return date.toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
-      }
-
-      const rows: Record<string, string | number>[] = [];
-      if (estVat > 0) {
-        rows.push({
-          label: vatFreq === "bimonthly" ? 'מע"מ (דו-חודשי)' : 'מע"מ',
-          amount: fmtNIS(estVat * (vatFreq === "bimonthly" ? 2 : 1)),
-          date: getNextBillingDay(s?.vat_billing_day ?? 15),
-        });
-      }
-      if (estIncTax > 0) {
-        rows.push({
-          label: "מקדמות מס הכנסה",
-          amount: fmtNIS(Math.round(estIncTax * (vatFreq === "bimonthly" ? 2 : 1))),
-          date: getNextBillingDay(s?.income_tax_billing_day ?? 15),
-        });
-      }
-      if (estBL > 0) {
-        rows.push({
-          label: "ביטוח לאומי",
-          amount: fmtNIS(estBL),
-          date: getNextBillingDay(s?.bituah_leumi_billing_day ?? 15),
-        });
-      }
-
-      return table(
-        [
-          { key: "label", label: "תשלום" },
-          { key: "amount", label: "סכום", align: "left" as const },
-          { key: "date", label: "חיוב", align: "left" as const },
-        ],
-        rows,
-      );
-    }
+    case "tax:upcoming":
+      return taxUpcomingView(raw, view);
 
     // ── Savings ─────────────
-    case "savings:total": {
-      const total = raw.savings.reduce((s, sv) => s + Number(sv.amount), 0);
-      if (view !== "hero") return null;
-      return hero(total, "סה״כ חסכונות", `${raw.savings.length} הפקדות`);
-    }
+    case "savings":
+      return savingsView(raw, range, view, null, label);
 
-    case "savings:recent": {
-      const items = filterByTimeRange(raw.savings, timeRange).slice(0, 10);
-      if (view === "hero") {
-        return hero(items.reduce((s, sv) => s + Number(sv.amount), 0), "הפקדות אחרונות", `${items.length} הפקדות`);
-      }
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "fund_type", label: "סוג" },
-          { key: "amount", label: "סכום", align: "left" as const },
-          { key: "date", label: "תאריך", align: "left" as const },
-        ],
-        items.map((s) => ({
-          fund_type: s.fund_type,
-          amount: fmtNIS(Number(s.amount)),
-          date: fmtDate(s.date),
-        })),
-      );
-    }
-
-    case "savings:by_fund": {
-      const byFund = new Map<string, number>();
-      for (const s of raw.savings) {
-        const f = s.fund_type || "אחר";
-        byFund.set(f, (byFund.get(f) || 0) + Number(s.amount));
-      }
-      const sorted = [...byFund.entries()].sort(([, a], [, b]) => b - a);
-      return categoryBreakdown(
-        sorted.map(([f]) => f),
-        sorted.map(([, v]) => v),
-        view,
-        "חסכונות",
-        "fund_type",
-        "סוג קופה",
-      );
-    }
-
-    case "savings:pension": {
-      const total = raw.savings
-        .filter((s) => s.fund_type === "פנסיה")
-        .reduce((sum, s) => sum + Number(s.amount), 0);
-      if (view !== "hero") return null;
-      return hero(total, "פנסיה");
-    }
-
-    case "savings:hishtalmut": {
-      const total = raw.savings
-        .filter((s) => s.fund_type === "קרן השתלמות")
-        .reduce((sum, s) => sum + Number(s.amount), 0);
-      if (view !== "hero") return null;
-      return hero(total, "קרן השתלמות");
-    }
-
-    case "savings:gemel": {
-      const total = raw.savings
-        .filter((s) => s.fund_type === "קופת גמל")
-        .reduce((sum, s) => sum + Number(s.amount), 0);
-      if (view !== "hero") return null;
-      return hero(total, "קופת גמל");
-    }
+    case "savings:pension":
+      return savingsView(raw, range, view, "פנסיה", label);
+    case "savings:hishtalmut":
+      return savingsView(raw, range, view, "קרן השתלמות", label);
+    case "savings:gemel":
+      return savingsView(raw, range, view, "קופת גמל", label);
 
     // ── Investments ─────────
-    case "investments:total": {
-      const total = raw.documents
-        .filter((d) => d.is_investment)
-        .reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
-      if (view !== "hero") return null;
-      return hero(total, "השקעות בציוד");
-    }
-
-    case "investments:recent": {
-      const items = filterByTimeRange(
-        raw.documents.filter((d) => d.is_investment),
-        timeRange,
-      ).slice(0, 10);
-      if (view === "hero") {
-        return hero(items.reduce((s, d) => s + Number(d.total_amount || 0), 0), "השקעות אחרונות", `${items.length} רכישות`);
-      }
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "title", label: "תיאור" },
-          { key: "amount", label: "סכום", align: "left" as const },
-          { key: "date", label: "תאריך", align: "left" as const },
-        ],
-        items.map((d) => ({
-          title: d.title,
-          amount: d.total_amount ? fmtNIS(d.total_amount) : "-",
-          date: fmtDate(d.date_on_doc),
-        })),
-      );
-    }
+    case "investments":
+      return documentsView(raw, range, view, { investment: true }, label);
 
     // ── Projects ────────────
-    case "projects:active": {
-      if (view === "hero") return hero(raw.projects.length, "פרויקטים פעילים");
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "customer_name", label: "לקוח" },
-          { key: "quote_price", label: "הצעת מחיר", align: "left" as const },
-          { key: "start_date", label: "תאריך", align: "left" as const },
-        ],
-        raw.projects.slice(0, 10).map((p) => ({
-          customer_name: p.customer_name || "-",
-          quote_price: p.quote_price ? fmtNIS(p.quote_price) : "-",
-          start_date: fmtDate(p.start_date),
-        })),
-      );
-    }
-
-    case "projects:pipeline": {
-      const total = raw.projects.reduce((sum, p) => sum + Number(p.quote_price || 0), 0);
-      if (view !== "hero") return null;
-      return hero(total, "צבר פרויקטים", `${raw.projects.length} פרויקטים`);
-    }
-
-    case "projects:recent": {
-      const items = filterByTimeRange(raw.projects, timeRange, "start_date").slice(0, 10);
-      if (view === "hero") {
-        return hero(items.reduce((s, p) => s + Number(p.quote_price || 0), 0), "פרויקטים אחרונים", `${items.length} פרויקטים`);
-      }
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "customer_name", label: "לקוח" },
-          { key: "quote_price", label: "הצעת מחיר", align: "left" as const },
-          { key: "start_date", label: "תאריך", align: "left" as const },
-        ],
-        items.map((p) => ({
-          customer_name: p.customer_name || "-",
-          quote_price: p.quote_price ? fmtNIS(p.quote_price) : "-",
-          start_date: fmtDate(p.start_date),
-        })),
-      );
-    }
+    case "projects":
+      return projectsView(raw, range, view, label);
 
     // ── Documents ───────────
-    case "documents:recent": {
-      const items = filterByTimeRange(raw.documents, timeRange).slice(0, 10);
-      if (view === "hero") {
-        return hero(items.reduce((s, d) => s + Number(d.total_amount || 0), 0), "מסמכים אחרונים", `${items.length} מסמכים`);
-      }
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "title", label: "מסמך" },
-          { key: "type", label: "סוג" },
-          { key: "amount", label: "סכום", align: "left" as const },
-          { key: "date", label: "תאריך", align: "left" as const },
-        ],
-        items.map((d) => ({
-          title: d.title,
-          type: d.doc_type,
-          amount: d.total_amount ? fmtNIS(d.total_amount) : "-",
-          date: fmtDate(d.date_on_doc),
-        })),
-      );
-    }
-
-    case "documents:receivables": {
-      const total = raw.documents
-        .filter((d) => !d.is_paid && d.direction === "income")
-        .reduce((sum, d) => sum + Number(d.total_amount || 0), 0);
-      if (view !== "hero") return null;
-      return hero(total, "חובות לקוחות");
-    }
+    case "documents":
+      return documentsView(raw, range, view, {}, label);
+    case "receivables":
+      return documentsView(raw, range, view, { unpaidIncome: true }, label);
 
     // ── Todos ───────────────
-    case "todos:open": {
-      const open = raw.todos.filter((t) => !t.completed);
-      if (view === "hero") return hero(open.length, "משימות פתוחות");
-      if (view !== "table") return null;
-      return table(
-        [{ key: "text", label: "משימה" }, { key: "status", label: "" }],
-        open.slice(0, 10).map((t) => ({
-          text: t.text,
-          status: "פתוח",
-        })),
-      );
-    }
+    case "todos":
+      return todosView(raw, view);
 
     // ── Events ──────────────
-    case "calendar:today": {
-      return { events: raw.events };
-    }
-
-    case "events:upcoming": {
-      const today = new Date().toISOString().slice(0, 10);
-      const upcoming = raw.events
-        .filter((e) => e.date >= today)
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .slice(0, 10);
-      if (view === "hero") return hero(upcoming.length, "אירועים קרובים");
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "title", label: "אירוע" },
-          { key: "date", label: "תאריך", align: "left" as const },
-        ],
-        upcoming.map((e) => ({
-          title: e.title,
-          date: fmtDate(e.date),
-        })),
-      );
-    }
+    case "events":
+      return eventsView(raw, view);
 
     // ── Requests ────────────
-    case "requests:open": {
-      const open = raw.requests.filter((r) => r.status !== "done");
-      if (view === "hero") return hero(open.length, "בקשות פתוחות");
-      if (view !== "table") return null;
-      return table(
-        [
-          { key: "title", label: "בקשה" },
-          { key: "priority", label: "עדיפות" },
-          { key: "status", label: "סטטוס" },
-        ],
-        open.slice(0, 10).map((r) => {
-          const priorityMap: Record<string, string> = { high: "דחוף", medium: "בינוני", low: "נמוך" };
-          const statusMap: Record<string, string> = { new: "חדש", in_progress: "בביצוע", done: "הושלם" };
-          return {
-            title: r.title,
-            priority: priorityMap[r.priority] || r.priority,
-            status: statusMap[r.status] || r.status,
-          };
-        }),
-      );
-    }
+    case "requests":
+      return requestsOpenView(raw, view);
 
-    case "requests:by_status": {
-      const byStatus = new Map<string, number>();
-      for (const r of raw.requests) {
-        byStatus.set(r.status, (byStatus.get(r.status) || 0) + 1);
-      }
-      const statusMap: Record<string, string> = { new: "חדש", in_progress: "בביצוע", done: "הושלם" };
-      const sorted = [...byStatus.entries()];
-      const labels = sorted.map(([s]) => statusMap[s] || s);
-      if (view === "doughnut") {
-        return doughnut(
-          labels,
-          sorted.map(([s, v], i) => ({ label: statusMap[s] || s, value: v, color: CHART_COLORS[i % CHART_COLORS.length] })),
-        );
-      }
-      if (view === "bar") {
-        return bar(labels, [{ label: "בקשות", data: sorted.map(([, v]) => v), color: CHART_COLORS[6] }]);
-      }
-      if (view === "table") {
-        return table(
-          [
-            { key: "status", label: "סטטוס" },
-            { key: "count", label: "כמות", align: "left" as const },
-          ],
-          sorted.map(([s, v]) => ({ status: statusMap[s] || s, count: v })),
-        );
-      }
-      return null;
-    }
+    case "calendar:today":
+      return { events: raw.events };
 
     default:
       return null;

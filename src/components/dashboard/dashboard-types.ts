@@ -6,6 +6,28 @@ export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "c
 export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut", "calendar"];
 export const LOCKED_1x1: WidgetType[] = ["calculator", "clock", "weather"];
 export const STATIC_WIDGETS: WidgetType[] = ["calculator", "clock", "weather"];
+export const DISPLAY_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut"];
+
+export const DEFAULT_SOURCE_BY_TYPE: Partial<Record<WidgetType, string>> = {
+  hero: "income",
+  table: "income",
+  bar: "income",
+  timeline: "income",
+  doughnut: "expenses",
+};
+
+export interface StandaloneSourceDef {
+  key: string;
+  label: string;
+  type: WidgetType;
+}
+
+export const STANDALONE_SOURCES: StandaloneSourceDef[] = [
+  { key: "calendar", label: "יומן", type: "calendar" },
+  { key: "calculator", label: "מחשבון", type: "calculator" },
+  { key: "clock", label: "שעון", type: "clock" },
+  { key: "weather", label: "מזג אוויר", type: "weather" },
+];
 
 export interface DashboardTile {
   id: string;
