@@ -249,9 +249,11 @@ export function DashboardTileComponent({
   function applySourceChange(sourceKey: string) {
     if (sourceKey === tile.dataSource) return;
     onChangeSource(tile.id, sourceKey);
-    if (!DISPLAY_TYPES.includes(tile.type)) {
+    const def = DATA_SOURCES.find((s) => s.key === sourceKey);
+    const compatible = def?.compatibleTypes ?? DISPLAY_TYPES;
+    if (!compatible.includes(tile.type)) {
       const item = WIDGET_ITEMS.find((i) => i.key === sourceKey);
-      onChangeType(tile.id, item?.defaultType || "hero");
+      onChangeType(tile.id, item?.defaultType || compatible[0] || "hero");
     }
   }
 
@@ -310,7 +312,7 @@ export function DashboardTileComponent({
               {(close) => (
                 <div>
                   <MenuLabel>תצוגה</MenuLabel>
-                  {DISPLAY_TYPES.map((vt) => {
+                  {(sourceDef?.compatibleTypes ?? DISPLAY_TYPES).map((vt) => {
                     const meta = widgetMeta[vt];
                     const Icon = meta.icon;
                     return (

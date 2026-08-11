@@ -38,7 +38,6 @@ const WIDGET_ICONS: Record<string, LucideIcon> = {
   documents: FileText,
   receivables: HandCoins,
   todos: CheckSquare,
-  events: Calendar,
 };
 
 const DEFAULT_TYPE: Partial<Record<string, WidgetType>> = {
@@ -56,7 +55,6 @@ const DEFAULT_TYPE: Partial<Record<string, WidgetType>> = {
   documents: "table",
   receivables: "hero",
   todos: "table",
-  events: "table",
 };
 
 const DEFAULT_TIME_RANGE: Partial<Record<string, TimeRange>> = {

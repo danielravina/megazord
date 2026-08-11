@@ -137,17 +137,6 @@ function recordsView<T>(
   return null;
 }
 
-function monthSeriesView(
-  view: WidgetType,
-  labels: string[],
-  values: number[],
-  label: string,
-  color: string,
-): WidgetData {
-  if (view === "bar" || view === "timeline") return bar(labels, [{ label, data: values, color }]);
-  return null;
-}
-
 function barSeriesView(
   view: WidgetType,
   monthLabels: string[],
@@ -474,65 +463,36 @@ function projectsView(raw: DashboardRawData, range: TimeRange, view: WidgetType,
 
 function todosView(raw: DashboardRawData, view: WidgetType): WidgetData {
   const open = raw.todos.filter((t) => !t.completed);
-  if (view === "hero") return hero(open.length, "משימות פתוחות");
   if (view === "table") {
     return table(
       [{ key: "text", label: "משימה" }, { key: "status", label: "" }],
       open.slice(0, 10).map((t) => ({ text: t.text, status: "פתוח" })),
     );
   }
-  const d = monthBreakdown(raw.todos.map((t) => ({ date: (t.created_at || "").slice(0, 10), amount: 1 })));
-  const s = monthSeriesView(view, d.labels, d.values, "משימות", CHART_COLORS[6]);
-  if (s) return s;
-  if (view === "doughnut") {
-    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
-  }
-  return null;
-}
-
-function eventsView(raw: DashboardRawData, view: WidgetType): WidgetData {
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = raw.events
-    .filter((e) => e.date >= today)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 10);
-  if (view === "hero") return hero(upcoming.length, "אירועים קרובים");
-  if (view === "table") {
-    return table(
-      [
-        { key: "title", label: "אירוע" },
-        { key: "date", label: "תאריך", align: "left" as const },
-      ],
-      upcoming.map((e) => ({ title: e.title, date: fmtDate(e.date) })),
-    );
-  }
-  const d = monthBreakdown(raw.events.map((e) => ({ date: e.date, amount: 1 })));
-  const s = monthSeriesView(view, d.labels, d.values, "אירועים", CHART_COLORS[6]);
-  if (s) return s;
-  if (view === "doughnut") {
-    return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
-  }
   return null;
 }
 
 // ── Data Source Definitions ──────────────────────────
 
+const NO_TIMELINE: WidgetType[] = ["hero", "table", "bar", "doughnut"];
+const NO_DOUGHNUT: WidgetType[] = ["hero", "table", "bar", "timeline"];
+const TABLE_ONLY: WidgetType[] = ["table"];
+
 export const DATA_SOURCES: DataSourceDef[] = [
   { key: "income", label: "הכנסות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
   { key: "expenses", label: "הוצאות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
   { key: "profit", label: "רווח נטו", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
-  { key: "tax", label: "חבות מס", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
-  { key: "tax:upcoming", label: "תשלומים קרובים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "tax", label: "חבות מס", compatibleTypes: NO_TIMELINE, needsTimeRange: true },
+  { key: "tax:upcoming", label: "תשלומים קרובים", compatibleTypes: NO_TIMELINE, needsTimeRange: false },
   { key: "savings", label: "חסכונות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
-  { key: "savings:pension", label: "פנסיה", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
-  { key: "savings:hishtalmut", label: "קרן השתלמות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
-  { key: "savings:gemel", label: "קופת גמל", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "savings:pension", label: "פנסיה", compatibleTypes: NO_DOUGHNUT, needsTimeRange: false },
+  { key: "savings:hishtalmut", label: "קרן השתלמות", compatibleTypes: NO_DOUGHNUT, needsTimeRange: false },
+  { key: "savings:gemel", label: "קופת גמל", compatibleTypes: NO_DOUGHNUT, needsTimeRange: false },
   { key: "investments", label: "השקעות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
   { key: "projects", label: "פרויקטים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
   { key: "documents", label: "מסמכים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
   { key: "receivables", label: "חובות לקוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
-  { key: "todos", label: "משימות פתוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
-  { key: "events", label: "אירועים קרובים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
+  { key: "todos", label: "משימות פתוחות", compatibleTypes: TABLE_ONLY, needsTimeRange: false },
 ];
 
 // Map old granular keys to the consolidated ones so saved layouts keep working
@@ -559,7 +519,6 @@ const SOURCE_KEY_MIGRATIONS: Record<string, string> = {
   "documents:recent": "documents",
   "documents:receivables": "receivables",
   "todos:open": "todos",
-  "events:upcoming": "events",
 };
 
 export function migrateSourceKey(key?: string): string | undefined {
@@ -576,9 +535,10 @@ export function resolveDataSource(
   view: WidgetType,
 ): WidgetData {
   sourceKey = SOURCE_KEY_MIGRATIONS[sourceKey] || sourceKey;
-  const needsRange = DATA_SOURCES.some((s) => s.key === sourceKey && s.needsTimeRange);
-  const range: TimeRange = needsRange ? timeRange : "all_time";
-  const label = DATA_SOURCES.find((s) => s.key === sourceKey)?.label || "הנתונים";
+  const def = DATA_SOURCES.find((s) => s.key === sourceKey);
+  if (def && !def.compatibleTypes.includes(view)) return null;
+  const range: TimeRange = def?.needsTimeRange ? timeRange : "all_time";
+  const label = def?.label || "הנתונים";
 
   switch (sourceKey) {
     // ── Income ──────────────
@@ -628,10 +588,6 @@ export function resolveDataSource(
     // ── Todos ───────────────
     case "todos":
       return todosView(raw, view);
-
-    // ── Events ──────────────
-    case "events":
-      return eventsView(raw, view);
 
     case "calendar:today":
       return { events: raw.events };
