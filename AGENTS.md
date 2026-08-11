@@ -35,7 +35,6 @@ src/app/
 ├── (dashboard)/page.tsx       ← Dashboard
 ├── (dashboard)/todos/page.tsx
 ├── (dashboard)/calendar/page.tsx
-├── (dashboard)/kanban/page.tsx
 ├── (dashboard)/projects/page.tsx
 ├── (dashboard)/projects/detail/page.tsx  ← ?project=xxx
 ├── (dashboard)/finance/page.tsx
@@ -62,7 +61,6 @@ src/components/
 ├── todos/           TodoList, TodoItem
 ├── calendar/        CalendarPage
 ├── calculator/      CalculatorPage, vat-calc, tax-calc, pricing-calc, calculator-utils
-├── kanban/          KanbanPage
 ├── projects/        ProjectsPage, ProjectDetailPage, project-types
 ├── finance/         FinancePage, tax-engine, finance-types
 ├── documents/       DocumentsPage, monthly-export

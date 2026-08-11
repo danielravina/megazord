@@ -28,7 +28,7 @@ export function useDashboardData() {
       const uid = user.id;
 
       try {
-        const [inc, exp, sav, tax, proj, docs, todos, events, reqs] =
+        const [inc, exp, sav, tax, proj, docs, todos, events] =
           await Promise.all([
             supabase
               .from("incomes")
@@ -70,11 +70,6 @@ export function useDashboardData() {
               .select("*")
               .eq("user_id", uid)
               .order("date", { ascending: false }),
-            supabase
-              .from("requests")
-              .select("*")
-              .eq("user_id", uid)
-              .order("created_at", { ascending: false }),
           ]);
 
         lastFetch.current = Date.now();
@@ -88,7 +83,6 @@ export function useDashboardData() {
           documents: (docs.data || []) as DashboardRawData["documents"],
           todos: (todos.data || []) as DashboardRawData["todos"],
           events: (events.data || []) as DashboardRawData["events"],
-          requests: (reqs.data || []) as DashboardRawData["requests"],
         });
       } catch {
         /* silent — stale data stays */

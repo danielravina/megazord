@@ -123,18 +123,6 @@ export interface Todo {
   created_at: string;
 }
 
-export interface KanbanRequest {
-  id: string;
-  user_id: string;
-  title: string;
-  details: string | null;
-  priority: string;
-  status: string;
-  files: string[];
-  comments: Record<string, unknown>[];
-  created_at: string;
-}
-
 export interface DashboardRawData {
   incomes: Income[];
   expenses: Expense[];
@@ -144,7 +132,6 @@ export interface DashboardRawData {
   documents: DocRaw[];
   todos: Todo[];
   events: CalendarEvent[];
-  requests: KanbanRequest[];
 }
 
 export function emptyRawData(): DashboardRawData {
@@ -157,6 +144,5 @@ export function emptyRawData(): DashboardRawData {
     documents: [],
     todos: [],
     events: [],
-    requests: [],
   };
 }

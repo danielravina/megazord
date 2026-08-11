@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
   Search, Users, FolderKanban, Receipt, FileText, Wallet,
-  ClipboardList, Layers, CalendarDays, Building,
+  ClipboardList, CalendarDays, Building,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -31,7 +31,6 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   "הכנסות": Wallet,
   "הוצאות": Wallet,
   "משימות": ClipboardList,
-  "בקשות": Layers,
   "אירועים": CalendarDays,
   "ספקים": Building,
 };

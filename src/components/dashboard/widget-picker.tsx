@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   DollarSign, Receipt, TrendingUp, Scale, Calendar, PiggyBank, Landmark,
-  Briefcase, FileText, HandCoins, CheckSquare, Inbox,
+  Briefcase, FileText, HandCoins, CheckSquare,
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { DATA_SOURCES } from "@/components/dashboard/data-sources/sources";
@@ -39,7 +39,6 @@ const WIDGET_ICONS: Record<string, LucideIcon> = {
   receivables: HandCoins,
   todos: CheckSquare,
   events: Calendar,
-  requests: Inbox,
 };
 
 const DEFAULT_TYPE: Partial<Record<string, WidgetType>> = {
@@ -58,7 +57,6 @@ const DEFAULT_TYPE: Partial<Record<string, WidgetType>> = {
   receivables: "hero",
   todos: "table",
   events: "table",
-  requests: "table",
 };
 
 const DEFAULT_TIME_RANGE: Partial<Record<string, TimeRange>> = {

@@ -150,7 +150,7 @@ async function confirmDestructive(target) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const answer = await rl.question(
     `This will DELETE all existing rows for ${target.email} (${target.id}) in:\n` +
-      `  incomes, expenses, savings, projects, documents, todos, events, requests\n` +
+      `  incomes, expenses, savings, projects, documents, todos, events\n` +
       `and then insert the demo dataset${seedLayout ? " + a rich dashboard layout" : ""}.\n` +
       `Continue? [y/N] `,
   );
@@ -190,11 +190,6 @@ const TODO_TEXTS = [
   "לענות למייל של רו\"ח", "לחדש ביטוח עסקי", "להזמין ציוד משרדי",
   "לסכם חודש עם הלקוחות", "להעלות דוחות חודשיים", "לעדכן לוח שנה",
   "לבדוק יתרת קופת גמל", "להכין רשימת חובות לקוחות",
-];
-const REQ_TITLES = [
-  "בקשת הצעת מחיר - אתר חדש", "עדכון לפרויקט שירות לקוחות", "שאלה לגבי חשבונית",
-  "בקשת תמיכה בתוכנה", "הוספת משתמש למערכת", "בקשה להארכת פרויקט",
-  "עדכון פרטי לקוח", "בקשה לדוח חודשי", "פגישת ייעוץ ראשונית", "בקשה לשינוי ספק",
 ];
 const EVENT_TITLES = [
   "פגישת לקוח", "תחזוקה שבועית", "הפקדת פיקדון", "בדיקת חשבונות", "סדנת הכשרה",
@@ -440,19 +435,7 @@ function buildDemoData(targetId) {
     });
   }
 
-  // ── Requests (kanban) ──
-  const requests = REQ_TITLES.map((title) => ({
-    id: uid(), user_id: targetId,
-    title,
-    details: "פירוט מלא של הבקשה כולל צירופים ואבני דרך רלוונטיות.",
-    priority: pick(["high", "medium", "low"]),
-    status: pick(["new", "new", "in_progress", "in_progress", "done"]),
-    files: [],
-    comments: [],
-    created_at: new Date(addDays(today, ri(-90, 0))).toISOString(),
-  }));
-
-  return { incomes, expenses, savings, customers, projects, documents, invoices, todos, events, requests };
+  return { incomes, expenses, savings, customers, projects, documents, invoices, todos, events };
 }
 
 function buildLayout() {
@@ -469,7 +452,6 @@ function buildLayout() {
     { id: uid(), type: "table", dataSource: "documents", timeRange: "this_month", span: 2 },
     { id: uid(), type: "table", dataSource: "todos", timeRange: "all_time", span: 2 },
     { id: uid(), type: "hero", dataSource: "receivables", timeRange: "all_time", span: 1 },
-    { id: uid(), type: "doughnut", dataSource: "requests", timeRange: "all_time", span: 2 },
   ];
 }
 
@@ -482,7 +464,7 @@ function buildLayout() {
   console.log(`\nSeeding demo data for ${target.email}...\n`);
 
   // Clear (documents/events before projects because of FKs)
-  const tables = ["documents", "events", "invoices", "projects", "customers", "incomes", "expenses", "savings", "todos", "requests"];
+  const tables = ["documents", "events", "invoices", "projects", "customers", "incomes", "expenses", "savings", "todos"];
   for (const t of tables) {
     try {
       await clearTable(t, target.id);
@@ -504,7 +486,6 @@ function buildLayout() {
   await insertRows("documents", demo.documents);
   await insertRows("todos", demo.todos);
   await insertRows("events", demo.events);
-  await insertRows("requests", demo.requests);
 
   // Tax settings (so tax widgets + preferences have values)
   const { error: taxErr } = await supabase.from("tax_settings").upsert({
@@ -546,7 +527,6 @@ function buildLayout() {
   console.log(`  documents: ${demo.documents.length}`);
   console.log(`  todos:     ${demo.todos.length}`);
   console.log(`  events:    ${demo.events.length}`);
-  console.log(`  requests:  ${demo.requests.length}`);
   console.log("\nOpen the app and reload the dashboard to see the rich demo data.");
 })().catch((e) => {
   console.error("\nSeed failed:", e.message);

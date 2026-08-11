@@ -21,9 +21,6 @@ const fmtNIS = (n: number) => `₪ ${n.toLocaleString()}`;
 
 const fmtDate = (d?: string | null) => d?.split("-").reverse().join("/") || "-";
 
-const STATUS_MAP: Record<string, string> = { new: "חדש", in_progress: "בביצוע", done: "הושלם" };
-const PRIORITY_MAP: Record<string, string> = { high: "דחוף", medium: "בינוני", low: "נמוך" };
-
 export function filterByTimeRange<T>(
   items: T[],
   range: TimeRange,
@@ -151,6 +148,38 @@ function monthSeriesView(
   return null;
 }
 
+function barSeriesView(
+  view: WidgetType,
+  monthLabels: string[],
+  monthValues: number[],
+  fallbackLabels: string[],
+  fallbackValues: number[],
+  label: string,
+  color: string,
+): WidgetData {
+  if (view !== "bar" && view !== "timeline") return null;
+
+  if (view === "timeline") {
+    const labels = monthLabels.length > 1 ? monthLabels : fallbackLabels;
+    const values = monthLabels.length > 1 ? monthValues : fallbackValues;
+    if (labels.length === 0) return null;
+    return bar(labels, [{ label, data: values, color }]);
+  }
+
+  if (fallbackLabels.length === 0) return null;
+  if (fallbackLabels.length === 1) {
+    return bar(fallbackLabels, [{ label, data: fallbackValues, color }]);
+  }
+  return bar(
+    fallbackLabels,
+    fallbackLabels.map((l, idx) => ({
+      label: l,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+      data: fallbackLabels.map((_, j) => (j === idx ? fallbackValues[idx] : 0)),
+    })),
+  );
+}
+
 // ── Family resolvers ─────────────────────────────
 
 function incomeView(raw: DashboardRawData, range: TimeRange, view: WidgetType, label: string): WidgetData {
@@ -168,10 +197,10 @@ function incomeView(raw: DashboardRawData, range: TimeRange, view: WidgetType, l
   );
   if (t) return t;
   const { labels, values } = monthBreakdown(items);
-  const s = monthSeriesView(view, labels, values, "הכנסות", CHART_COLORS[2]);
+  const d = breakdown(items, (i) => i.type || "אחר");
+  const s = barSeriesView(view, labels, values, d.labels, d.values, "הכנסות", CHART_COLORS[2]);
   if (s) return s;
   if (view === "doughnut") {
-    const d = breakdown(items, (i) => i.type || "אחר");
     return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
   }
   return null;
@@ -193,10 +222,10 @@ function expenseView(raw: DashboardRawData, range: TimeRange, view: WidgetType, 
   );
   if (t) return t;
   const { labels, values } = monthBreakdown(items);
-  const s = monthSeriesView(view, labels, values, "הוצאות", CHART_COLORS[1]);
+  const d = breakdown(items, (e) => e.category || "אחר");
+  const s = barSeriesView(view, labels, values, d.labels, d.values, "הוצאות", CHART_COLORS[1]);
   if (s) return s;
   if (view === "doughnut") {
-    const d = breakdown(items, (e) => e.category || "אחר");
     return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
   }
   return null;
@@ -375,10 +404,10 @@ function savingsView(
   );
   if (t) return t;
   const { labels, values } = monthBreakdown(items);
-  const s = monthSeriesView(view, labels, values, label, CHART_COLORS[5]);
+  const d = breakdown(items, (sv) => sv.fund_type || "אחר");
+  const s = barSeriesView(view, labels, values, d.labels, d.values, label, CHART_COLORS[5]);
   if (s) return s;
   if (view === "doughnut") {
-    const d = breakdown(items, (sv) => sv.fund_type || "אחר");
     return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
   }
   return null;
@@ -409,10 +438,10 @@ function documentsView(
   );
   if (t) return t;
   const { labels, values } = monthBreakdown(items.map((d) => ({ date: d.date_on_doc || d.date, amount: d.total_amount || 0 })));
-  const s = monthSeriesView(view, labels, values, label, CHART_COLORS[6]);
+  const d = breakdown(items, (doc) => doc.doc_type || "אחר", (doc) => Number(doc.total_amount || 0));
+  const s = barSeriesView(view, labels, values, d.labels, d.values, label, CHART_COLORS[6]);
   if (s) return s;
   if (view === "doughnut") {
-    const d = breakdown(items, (doc) => doc.doc_type || "אחר");
     return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
   }
   return null;
@@ -434,10 +463,10 @@ function projectsView(raw: DashboardRawData, range: TimeRange, view: WidgetType,
   );
   if (t) return t;
   const { labels, values } = monthBreakdown(items.map((p) => ({ date: p.start_date || p.created_at, amount: p.quote_price || 0 })));
-  const s = monthSeriesView(view, labels, values, label, CHART_COLORS[6]);
+  const d = breakdown(items, (p) => p.customer_name || "אחר", (p) => Number(p.quote_price || 0));
+  const s = barSeriesView(view, labels, values, d.labels, d.values, label, CHART_COLORS[6]);
   if (s) return s;
   if (view === "doughnut") {
-    const d = breakdown(items, (p) => p.customer_name || "אחר");
     return doughnut(d.labels, d.values.map((v, idx) => ({ label: d.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
   }
   return null;
@@ -486,33 +515,6 @@ function eventsView(raw: DashboardRawData, view: WidgetType): WidgetData {
   return null;
 }
 
-function requestsOpenView(raw: DashboardRawData, view: WidgetType): WidgetData {
-  const open = raw.requests.filter((r) => r.status !== "done");
-  if (view === "hero") return hero(open.length, "בקשות פתוחות");
-  if (view === "table") {
-    return table(
-      [
-        { key: "title", label: "בקשה" },
-        { key: "priority", label: "עדיפות" },
-        { key: "status", label: "סטטוס" },
-      ],
-      open.slice(0, 10).map((r) => ({
-        title: r.title,
-        priority: PRIORITY_MAP[r.priority] || r.priority,
-        status: STATUS_MAP[r.status] || r.status,
-      })),
-    );
-  }
-  const d = monthBreakdown(raw.requests.map((r) => ({ date: (r.created_at || "").slice(0, 10), amount: 1 })));
-  const s = monthSeriesView(view, d.labels, d.values, "בקשות", CHART_COLORS[6]);
-  if (s) return s;
-  if (view === "doughnut") {
-    const byStatus = breakdown(raw.requests, (r) => STATUS_MAP[r.status] || r.status, () => 1);
-    return doughnut(byStatus.labels, byStatus.values.map((v, idx) => ({ label: byStatus.labels[idx], value: v, color: CHART_COLORS[idx % CHART_COLORS.length] })));
-  }
-  return null;
-}
-
 // ── Data Source Definitions ──────────────────────────
 
 export const DATA_SOURCES: DataSourceDef[] = [
@@ -531,7 +533,6 @@ export const DATA_SOURCES: DataSourceDef[] = [
   { key: "receivables", label: "חובות לקוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
   { key: "todos", label: "משימות פתוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
   { key: "events", label: "אירועים קרובים", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
-  { key: "requests", label: "בקשות פתוחות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
 ];
 
 // Map old granular keys to the consolidated ones so saved layouts keep working
@@ -559,8 +560,6 @@ const SOURCE_KEY_MIGRATIONS: Record<string, string> = {
   "documents:receivables": "receivables",
   "todos:open": "todos",
   "events:upcoming": "events",
-  "requests:open": "requests",
-  "requests:by_status": "requests",
 };
 
 export function migrateSourceKey(key?: string): string | undefined {
@@ -633,10 +632,6 @@ export function resolveDataSource(
     // ── Events ──────────────
     case "events":
       return eventsView(raw, view);
-
-    // ── Requests ────────────
-    case "requests":
-      return requestsOpenView(raw, view);
 
     case "calendar:today":
       return { events: raw.events };

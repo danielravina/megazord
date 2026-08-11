@@ -33,25 +33,6 @@ create policy "Users can manage their own events"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Kanban Requests
-create table requests (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null,
-  details text,
-  priority text not null default 'medium' check (priority in ('high', 'medium', 'low')),
-  status text not null default 'new' check (status in ('new', 'in_progress', 'done')),
-  files jsonb default '[]'::jsonb,
-  comments jsonb default '[]'::jsonb,
-  created_at timestamptz not null default now()
-);
-
-alter table requests enable row level security;
-create policy "Users can manage their own requests"
-  on requests for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
 -- Projects
 create table projects (
   id uuid primary key default uuid_generate_v4(),
@@ -192,12 +173,3 @@ create policy "Users can upload documents"
 create policy "Users can read their documents"
   on storage.objects for select
   using (bucket_id = 'documents');
-
--- Storage bucket for kanban attachments
-insert into storage.buckets (id, name, public) values ('attachments', 'attachments', true);
-create policy "Users can upload attachments"
-  on storage.objects for insert
-  with check (bucket_id = 'attachments' and auth.role() = 'authenticated');
-create policy "Users can read attachments"
-  on storage.objects for select
-  using (bucket_id = 'attachments');

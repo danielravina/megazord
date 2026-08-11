@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Calendar,
-  Layers, FolderKanban, Wallet, FileText, Users, Receipt,
+  FolderKanban, Wallet, FileText, Users, Receipt,
   Settings, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 
@@ -16,7 +16,6 @@ const navItems = [
   { href: "/finance/", label: "ניהול כספים", icon: Wallet },
   { href: "/calendar/", label: "יומן", icon: Calendar },
   { href: "/todos/", label: "פתקים", icon: ClipboardList },
-  { href: "/kanban/", label: "מעקב בקשות", icon: Layers },
   { href: "/documents/", label: "מסמכים", icon: FileText },
   { href: "/preferences/", label: "העדפות", icon: Settings },
 ];
