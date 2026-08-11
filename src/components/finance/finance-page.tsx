@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,9 @@ function getNextBillingDay(day: number): string {
 export function FinancePage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const transactionParam = searchParams.get("transaction");
   const [tab, setTab] = useState<string>("dashboard");
   const [loading, setLoading] = useState(true);
   const [incomes, setIncomes] = useState<Income[]>([]);
@@ -86,6 +90,34 @@ export function FinancePage() {
   const [savAmount, setSavAmount] = useState("");
   const [savDate, setSavDate] = useState(todayISO());
   const [taxSaving, setTaxSaving] = useState(false);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  // Switch to the requested tab directly when navigating with ?tab=<id> (e.g. from global search)
+  useEffect(() => {
+    if (!tabParam || !TAB_DEFS.some((t) => t.id === tabParam)) return;
+    const t = setTimeout(() => setTab(tabParam), 0);
+    return () => clearTimeout(t);
+  }, [tabParam]);
+
+  // Scroll to + highlight the transaction when navigating with ?transaction=<id> (e.g. from global search)
+  useEffect(() => {
+    if (!transactionParam) return;
+    const start = setTimeout(() => setHighlightId(transactionParam), 0);
+    const clear = setTimeout(() => setHighlightId(null), 3000);
+    return () => { clearTimeout(start); clearTimeout(clear); };
+  }, [transactionParam]);
+
+  useEffect(() => {
+    if (loading || !transactionParam) return;
+    const inc = incomes.find((i) => i.id === transactionParam);
+    const exp = expenses.find((e) => e.id === transactionParam);
+    const rowId = inc ? `income-${transactionParam}` : exp ? `expense-${transactionParam}` : null;
+    if (!rowId) return;
+    const scroll = setTimeout(() => {
+      document.getElementById(rowId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+    return () => clearTimeout(scroll);
+  }, [loading, incomes, expenses, transactionParam]);
 
   useEffect(() => {
     if (!user) return;
@@ -391,7 +423,7 @@ export function FinancePage() {
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       {incomes.map((inc) => (
-                        <tr key={inc.id} className="hover:bg-slate-50">
+                        <tr key={inc.id} id={`income-${inc.id}`} className={`hover:bg-slate-50 ${highlightId === inc.id ? "bg-blue-50" : ""}`}>
                           <td className="px-4 py-3 text-sm text-slate-500">{formatDate(inc.date)}</td>
                           <td className="px-4 py-3 text-sm font-medium">{inc.description}</td>
                           <td className="px-4 py-3">
@@ -440,7 +472,7 @@ export function FinancePage() {
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       {expenses.map((exp) => (
-                        <tr key={exp.id} className="hover:bg-slate-50">
+                        <tr key={exp.id} id={`expense-${exp.id}`} className={`hover:bg-slate-50 ${highlightId === exp.id ? "bg-blue-50" : ""}`}>
                           <td className="px-4 py-3 text-sm text-slate-500">{formatDate(exp.date)}</td>
                           <td className="px-4 py-3 text-sm font-medium">{exp.description}</td>
                           <td className="px-4 py-3 text-sm text-slate-500">{exp.category}</td>

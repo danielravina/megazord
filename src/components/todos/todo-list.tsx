@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import { TodoItem } from "./todo-item";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -13,9 +14,12 @@ import type { Todo } from "./todo-types";
 export function TodoList() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const todoParam = searchParams.get("todo");
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -39,6 +43,18 @@ export function TodoList() {
     load();
     return () => { cancelled = true; };
   }, [user, supabase, toast]);
+
+  // Highlight and scroll to the todo directly when navigating with ?todo=<id> (e.g. from global search)
+  useEffect(() => {
+    if (!todoParam || loading || todos.length === 0) return;
+    if (!todos.some((t) => t.id === todoParam)) return;
+    const start = setTimeout(() => setHighlightId(todoParam), 0);
+    const clear = setTimeout(() => setHighlightId(null), 3000);
+    const scroll = setTimeout(() => {
+      document.getElementById(`todo-${todoParam}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    return () => { clearTimeout(start); clearTimeout(clear); clearTimeout(scroll); };
+  }, [todoParam, loading, todos]);
 
   async function addTodo(e: React.FormEvent) {
     e.preventDefault();
@@ -170,6 +186,7 @@ export function TodoList() {
               todo={todo}
               onToggle={toggleTodo}
               onDelete={deleteTodo}
+              highlight={highlightId === todo.id}
             />
           ))}
         </ul>

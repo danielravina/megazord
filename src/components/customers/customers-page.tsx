@@ -24,6 +24,7 @@ export function CustomersPage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const customerParam = searchParams.get("customer");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -39,6 +40,13 @@ export function CustomersPage() {
   useEffect(() => {
     if (searchParams.get("new") === "1") openNew();
   }, [searchParams]);
+
+  // Open the customer's edit view directly when navigating with ?customer=<id> (e.g. from global search)
+  useEffect(() => {
+    if (!customerParam || customers.length === 0) return;
+    const customer = customers.find((c) => c.id === customerParam);
+    if (customer) openEdit(customer);
+  }, [customerParam, customers]);
 
   async function loadCustomers() {
     setLoading(true);

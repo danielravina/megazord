@@ -47,6 +47,7 @@ export function InvoicesPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const invoiceParam = searchParams.get("invoice");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -84,6 +85,15 @@ export function InvoicesPage() {
     });
     router.replace("/invoices/", { scroll: false });
   }, [searchParams, loading, projects]);
+
+  // Open the preview directly when navigating with ?invoice=<id> (e.g. from global search)
+  useEffect(() => {
+    if (!invoiceParam || loading || invoices.length === 0) return;
+    const inv = invoices.find((i) => i.id === invoiceParam);
+    if (!inv) return;
+    const t = setTimeout(() => setPreview(inv), 0);
+    return () => clearTimeout(t);
+  }, [invoiceParam, loading, invoices]);
 
   async function loadAll() {
     const [invRes, custRes, projRes, taxRes] = await Promise.all([

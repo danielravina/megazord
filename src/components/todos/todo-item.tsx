@@ -7,14 +7,16 @@ interface TodoItemProps {
   todo: Todo;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  highlight?: boolean;
 }
 
-export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
+export function TodoItem({ todo, onToggle, onDelete, highlight }: TodoItemProps) {
   return (
     <li
+      id={`todo-${todo.id}`}
       className={`task-enter group flex items-center justify-between p-3.5 bg-white border rounded-xl shadow-sm hover:shadow-md transition-all hover:border-blue-100 ${
         todo.completed ? "bg-gray-50/50 border-gray-100" : "border-gray-100"
-      }`}
+      } ${highlight ? "ring-2 ring-blue-400 border-blue-400 bg-blue-50/50" : ""}`}
     >
       <div className="flex items-center gap-4 flex-1 overflow-hidden">
         <input

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,10 @@ const DOC_TYPES = [
 export function DocumentsPage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const documentParam = searchParams.get("document");
+  const supplierParam = searchParams.get("supplier");
   const [docs, setDocs] = useState<Document[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [businesses, setBusinesses] = useState<{ id: string; name: string; vat_number: string | null }[]>([]);
@@ -104,6 +109,14 @@ export function DocumentsPage() {
     if (!user) return;
     Promise.all([loadDocs(), loadProjects(), loadBusinesses()]).finally(() => setLoading(false));
   }, [user]);
+
+  // Open the detail view directly when navigating with ?document=<id> (e.g. from global search)
+  useEffect(() => {
+    if (!documentParam || docs.length === 0) return;
+    if (!docs.some((d) => d.id === documentParam)) return;
+    const t = setTimeout(() => setViewId(documentParam), 0);
+    return () => clearTimeout(t);
+  }, [docs, documentParam]);
 
   // Load signed URLs when viewing a document
   useEffect(() => {
@@ -185,6 +198,7 @@ export function DocumentsPage() {
   }
 
   const filteredDocs = docs.filter((d) => {
+    if (supplierParam && d.business_id !== supplierParam) return false;
     if (folderFilter && d.folder !== folderFilter) return false;
     const q = search.toLowerCase();
     if (!q) return true;
@@ -269,6 +283,11 @@ export function DocumentsPage() {
         </div>
       ) : (
         <>
+          {supplierParam && (
+            <button onClick={() => router.push("/documents/")} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
+              <X size={12} /> מסמכי {businesses.find((b) => b.id === supplierParam)?.name || "הספק"} — חזרה לכל המסמכים
+            </button>
+          )}
           {folderFilter && (
             <button onClick={() => setFolderFilter(null)} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
               <X size={12} /> חזרה לכל המסמכים
