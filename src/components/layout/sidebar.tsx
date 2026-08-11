@@ -5,9 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ClipboardList, Calendar,
   Layers, FolderKanban, Wallet, FileText, Users, Receipt,
-  Settings, LogOut,
+  Settings, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
-import { useAuth } from "./auth-provider";
 
 const navItems = [
   { href: "/", label: "לוח בקרה", icon: LayoutDashboard },
@@ -22,16 +21,15 @@ const navItems = [
   { href: "/preferences/", label: "העדפות", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: () => void }) {
   const pathname = usePathname();
-  const { supabase } = useAuth();
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
 
   return (
-    <aside className="group fixed right-0 top-0 bottom-0 z-40 w-14 hover:w-48 bg-white border-l border-slate-200 flex flex-col transition-[width] duration-150 overflow-hidden">
+    <aside
+      className={`fixed right-0 top-14 bottom-0 z-40 bg-white border-l border-slate-200 flex flex-col transition-[width] duration-150 overflow-hidden ${
+        pinned ? "w-48" : "w-14 group hover:w-48"
+      }`}
+    >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-1">
         {navItems.map((item) => {
           const isActive =
@@ -50,7 +48,9 @@ export function Sidebar() {
               }`}
             >
               <Icon size={18} className="shrink-0" />
-              <span className="hidden group-hover:inline leading-[18px]">{item.label}</span>
+              <span className={`leading-[18px] ${pinned ? "inline" : "hidden group-hover:inline"}`}>
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -58,11 +58,15 @@ export function Sidebar() {
 
       <div className="py-4 border-t border-slate-100">
         <button
-          onClick={handleSignOut}
-          className="flex items-center gap-2 px-[19px] w-full py-2 text-sm text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors whitespace-nowrap"
+          onClick={onTogglePin}
+          title={pinned ? "כווץ את התפריט" : "הצמד תפריט פתוח"}
+          className="flex items-center justify-start px-[19px] w-full py-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
         >
-          <LogOut size={16} className="shrink-0" />
-          <span className="hidden group-hover:inline leading-[16px]">התנתק</span>
+          {pinned ? (
+            <PanelLeftClose size={16} />
+          ) : (
+            <PanelLeftOpen size={16} />
+          )}
         </button>
       </div>
     </aside>

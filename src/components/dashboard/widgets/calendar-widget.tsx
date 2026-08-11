@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
 import type { CalendarData, CalendarEvent } from "@/components/dashboard/dashboard-types";
 
 interface Props {
@@ -35,7 +34,7 @@ const UPCOMING_LIMIT = 5;
 function EventRow({ event, label }: { event: CalendarEvent; label?: string }) {
   return (
     <Link
-      href="/calendar/"
+      href={`/calendar/?event=${event.id}`}
       className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
     >
       <span
@@ -86,7 +85,7 @@ export function CalendarWidget({ data }: Props) {
 
   return (
     <div className="h-full flex flex-col min-h-[210px]">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start">
         <div className="flex items-start gap-3">
           <div className="text-4xl font-bold text-slate-900 leading-none">{now.getDate()}</div>
           <div className="pt-0.5">
@@ -94,13 +93,6 @@ export function CalendarWidget({ data }: Props) {
             <div className="text-xs text-slate-400">{WEEKDAYS[now.getDay()]}</div>
           </div>
         </div>
-        <Link
-          href="/calendar/"
-          className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 shrink-0"
-        >
-          <CalendarDays size={13} />
-          הצג הכל
-        </Link>
       </div>
 
       <div className="mt-3 space-y-4 flex-1 min-h-0 overflow-y-auto">

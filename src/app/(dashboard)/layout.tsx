@@ -1,5 +1,5 @@
 import { AuthGuard } from "@/components/layout/auth-guard";
-import { Sidebar } from "@/components/layout/sidebar";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { ToastProvider } from "@/components/ui/toast";
 
 export default function DashboardLayout({
@@ -10,10 +10,7 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <ToastProvider>
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="mr-14 flex-1 p-4 lg:p-6 overflow-y-auto">{children}</main>
-        </div>
+        <DashboardShell>{children}</DashboardShell>
       </ToastProvider>
     </AuthGuard>
   );

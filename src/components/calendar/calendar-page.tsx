@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,8 @@ function spanningPillClasses(isStart: boolean, isEnd: boolean): string {
 export function CalendarPage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const eventParam = searchParams.get("event");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -95,6 +98,21 @@ export function CalendarPage() {
     load();
     return () => { cancelled = true; };
   }, [user, supabase, toast]);
+
+  // Open an event directly when navigating with ?event=<id> (e.g. from the dashboard widget)
+  useEffect(() => {
+    if (!events.length || !eventParam) return;
+    const ev = events.find((e) => e.id === eventParam);
+    if (!ev) return;
+    const t = setTimeout(() => {
+      setEventDate(ev.date);
+      setEventEndDate(ev.end_date);
+      setEditingEvent(ev);
+      setEventTitle(ev.title);
+      setModalOpen(true);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [events, eventParam]);
 
   function openAddModal(dateStr: string) {
     setEventDate(dateStr);
