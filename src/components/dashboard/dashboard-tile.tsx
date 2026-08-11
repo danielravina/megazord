@@ -294,7 +294,7 @@ export function DashboardTileComponent({
           )}
           {!isStatic && <h3 className="text-xs font-bold text-slate-500 truncate">{title}</h3>}
           <div className="flex-1" />
-          {customizing && (
+          {!isStatic && (
             <Dropdown
               align="left"
               trigger={
