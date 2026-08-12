@@ -131,6 +131,9 @@ document.body.removeChild(el);
 - Auth setup: `e2e/auth.setup.ts` logs in once, saves state
 - Always add `.first()` to locators when duplicate elements may exist in the UI
 
+### Git
+- Commits are GPG-sign configured, but signing fails in non-interactive shells (no `/dev/tty`). Use `git commit --no-gpg-sign` when committing from automation.
+
 ## Run Commands
 ```bash
 npm run dev          # Start dev server (port 3000)

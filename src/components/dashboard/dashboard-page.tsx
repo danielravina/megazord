@@ -125,7 +125,10 @@ export function DashboardPage() {
       <MonthlyExport
         open={showReport}
         onClose={() => setShowReport(false)}
-        docs={rawData.documents}
+        incomes={rawData.incomes}
+        expenses={rawData.expenses}
+        savings={rawData.savings}
+        taxSettings={rawData.taxSettings}
         businessName={rawData.taxSettings?.business_name || ""}
         vatNumber={rawData.taxSettings?.vat_number || ""}
         businessAddress={rawData.taxSettings?.business_address || ""}

@@ -76,7 +76,6 @@ export function FinancePage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [savings, setSavings] = useState<Saving[]>([]);
   const [taxSettings, setTaxSettings] = useState<TaxSettings | null>(null);
-  const [docs, setDocs] = useState<{ id: string; title: string; date_on_doc: string | null; total_amount: number | null; folder: string | null; doc_type: string; date: string }[]>([]);
   const [showReport, setShowReport] = useState(false);
 
   // Form states
@@ -128,12 +127,11 @@ export function FinancePage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const [incRes, expRes, savRes, taxRes, docsRes] = await Promise.all([
+      const [incRes, expRes, savRes, taxRes] = await Promise.all([
         supabase.from("incomes").select("*").eq("user_id", uid).order("date", { ascending: false }),
         supabase.from("expenses").select("*").eq("user_id", uid).order("date", { ascending: false }),
         supabase.from("savings").select("*").eq("user_id", uid).order("date", { ascending: false }),
         supabase.from("tax_settings").select("*").eq("user_id", uid).maybeSingle(),
-        supabase.from("documents").select("id, title, date_on_doc, total_amount, folder, doc_type, date").eq("user_id", uid).order("date", { ascending: false }),
       ]);
       if (cancelled) return;
       if (incRes.error) toast("שגיאה בטעינת הכנסות", "error");
@@ -144,7 +142,6 @@ export function FinancePage() {
       setExpenses(expRes.data || []);
       setSavings(savRes.data || []);
       setTaxSettings(taxRes.data || null);
-      setDocs(docsRes.data || []);
       setLoading(false);
     }
     load();
@@ -567,7 +564,10 @@ export function FinancePage() {
       <MonthlyExport
         open={showReport}
         onClose={() => setShowReport(false)}
-        docs={docs}
+        incomes={incomes}
+        expenses={expenses}
+        savings={savings}
+        taxSettings={taxSettings}
         businessName={taxSettings?.business_name || ""}
         vatNumber={taxSettings?.vat_number || ""}
         businessAddress={taxSettings?.business_address || ""}
