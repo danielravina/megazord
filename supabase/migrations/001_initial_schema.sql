@@ -166,7 +166,9 @@ create policy "Users can manage their own calc history"
   with check (auth.uid() = user_id);
 
 -- Storage bucket for documents
-insert into storage.buckets (id, name, public) values ('documents', 'documents', true);
+insert into storage.buckets (id, name, public) values ('documents', 'documents', true) on conflict (id) do nothing;
+drop policy if exists "Users can upload documents" on storage.objects;
+drop policy if exists "Users can read their documents" on storage.objects;
 create policy "Users can upload documents"
   on storage.objects for insert
   with check (bucket_id = 'documents' and auth.role() = 'authenticated');

@@ -6,6 +6,9 @@ import type { DashboardRawData } from "@/components/dashboard/dashboard-types";
 import { emptyRawData } from "@/components/dashboard/dashboard-types";
 import type { ProjectRow } from "@/components/projects/project-types";
 import { normalizeProject } from "@/components/projects/project-types";
+import { buildLedger } from "@/components/finance/ledger";
+import type { ScanEvidence } from "@/components/finance/ledger";
+import type { Invoice } from "@/components/documents/invoice-types";
 
 export function useDashboardData() {
   const { supabase, user } = useAuth();
@@ -28,18 +31,12 @@ export function useDashboardData() {
       const uid = user.id;
 
       try {
-        const [inc, exp, sav, tax, proj, docs, todos, events] =
+        const [inv, sav, tax, proj, docs, todos, events] =
           await Promise.all([
             supabase
-              .from("incomes")
+              .from("invoices")
               .select("*")
-              .eq("user_id", uid)
-              .order("date", { ascending: false }),
-            supabase
-              .from("expenses")
-              .select("*")
-              .eq("user_id", uid)
-              .order("date", { ascending: false }),
+              .eq("user_id", uid),
             supabase
               .from("savings")
               .select("*")
@@ -74,9 +71,16 @@ export function useDashboardData() {
 
         lastFetch.current = Date.now();
 
+        const vatStatus = (tax.data as DashboardRawData["taxSettings"])?.vat_status ?? "morashi";
+        const { incomes: derivedIn, expenses: derivedEx } = buildLedger(
+          (inv.data || []) as unknown as Invoice[],
+          (docs.data || []) as unknown as ScanEvidence[],
+          vatStatus,
+        );
+
         setRawData({
-          incomes: (inc.data || []) as DashboardRawData["incomes"],
-          expenses: (exp.data || []) as DashboardRawData["expenses"],
+          incomes: derivedIn,
+          expenses: derivedEx,
           savings: (sav.data || []) as DashboardRawData["savings"],
           taxSettings: (tax.data || null) as DashboardRawData["taxSettings"],
           projects: ((proj.data || []) as ProjectRow[]).map(normalizeProject) as DashboardRawData["projects"],

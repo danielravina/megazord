@@ -177,19 +177,6 @@ export function ProjectsPage() {
         });
         if (eventError) toast("הפרויקט נוצר אך אירוע היומן לא נשמר", "info");
       }
-      // Sync to finance incomes
-      if (form.closing_price && form.start_date) {
-        const { error: incomeError } = await supabase.from("incomes").insert({
-          id: generateId(),
-          user_id: user.id,
-          date: form.start_date,
-          type: "עתידי",
-          amount: form.closing_price,
-          description: `הכנסה מפרויקט: ${custName}`,
-          project_id: newId,
-        });
-        if (incomeError) toast("הפרויקט נוצר אך ההכנסה לא נרשמה", "info");
-      }
     }
 
     setSaving(false);

@@ -21,6 +21,13 @@ import {
 import Link from "next/link";
 import type { Project, ProjectFormData } from "./project-types";
 
+// מצב התשלום של מסמך סרוק נגזר מסוגו (evidence-based)
+function scanState(docType: string): "paid" | "future" | "none" {
+  if (["tax_invoice", "receipt", "tax_invoice_receipt", "credit_invoice"].includes(docType)) return "paid";
+  if (docType === "transaction_account") return "future";
+  return "none";
+}
+
 interface LinkedDoc {
   id: string;
   title: string;
@@ -32,7 +39,7 @@ interface LinkedDoc {
   tags: string[];
   extracted_text: string | null;
   is_investment: boolean;
-  is_paid: boolean;
+  direction: string;
   business_id: string | null;
   business_name: string | null;
   date: string;
@@ -235,30 +242,15 @@ export function ProjectDetailPage() {
 
   async function markAsPaid(doc: LinkedDoc) {
     if (!user) return;
-    // Create expense entry
-    const { error: expError } = await supabase.from("expenses").insert({
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      date: doc.date_on_doc || new Date().toISOString().split("T")[0],
-      amount: doc.total_amount || 0,
-      is_paid: true,
-      category: doc.folder || "כללי",
-      description: `הוצאה ממסמך: ${doc.title}`,
-    });
-    if (expError) {
-      toast("שגיאה ביצירת ההוצאה", "error");
+    // סימון כשולם = שינוי סוג המסמך לסוג ששולם (קבלה/חשבונית מס).
+    // ההוצאה נרשמת בספרים מעצם הסוג החדש (evidence-based ledger).
+    const paidType = doc.direction === "income" ? "tax_invoice_receipt" : "receipt";
+    const { error } = await supabase.from("documents").update({ doc_type: paidType }).eq("id", doc.id);
+    if (error) {
+      toast("שגיאה בעדכון", "error");
       return;
     }
-    // Update project expenses
-    if (projectId) {
-      const { data: proj } = await supabase.from("projects").select("expenses").eq("id", projectId).single();
-      if (proj) {
-        await supabase.from("projects").update({ expenses: (proj.expenses || 0) + (doc.total_amount || 0) }).eq("id", projectId);
-      }
-    }
-    // Mark doc as paid
-    await supabase.from("documents").update({ is_paid: true }).eq("id", doc.id);
-    setDocs((prev) => prev.map((d) => d.id === doc.id ? { ...d, is_paid: true } : d));
+    setDocs((prev) => prev.map((d) => d.id === doc.id ? { ...d, doc_type: paidType } : d));
     toast("המסמך סומן כשולם", "success");
   }
 
@@ -381,7 +373,7 @@ export function ProjectDetailPage() {
           <div className="flex gap-2 justify-between pt-4 border-t">
             <Button loading={saving} type="submit"><Save size={14} /> שמור שינויים</Button>
             <div className="flex gap-2">
-              <Button variant="secondary" type="button" onClick={() => router.push(`/invoices/?newInvoice=${projectId}`)}>
+              <Button variant="secondary" type="button" onClick={() => router.push(`/documents/?newDocument=${projectId}`)}>
                 <Receipt size={14} /> צור חשבונית
               </Button>
               <Button variant="danger" type="button" onClick={handleDelete}><Trash2 size={14} /> מחק</Button>
@@ -399,7 +391,7 @@ export function ProjectDetailPage() {
             <Badge variant="blue">{docs.length}</Badge>
           </h2>
           <Link
-            href={`/documents/`}
+            href={`/scans/`}
             className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
           >
             <Plus size={14} />
@@ -413,11 +405,11 @@ export function ProjectDetailPage() {
           </p>
         ) : (
           <>
-            {docs.some(d => !d.is_paid) && (
+            {docs.some(d => scanState(d.doc_type) === "future") && (
               <div className="mb-4">
                 <h3 className="text-xs font-semibold text-amber-600 mb-2">ממתין לתשלום</h3>
                 <div className="space-y-2">
-                  {docs.filter(d => !d.is_paid).map((doc) => (
+                  {docs.filter(d => scanState(d.doc_type) === "future").map((doc) => (
                     <div key={doc.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
                       <div className="min-w-0 cursor-pointer" onClick={() => setViewDoc(doc)}>
                         <p className="text-sm font-medium truncate">{doc.title}</p>
@@ -439,13 +431,13 @@ export function ProjectDetailPage() {
               </div>
             )}
 
-            {docs.some(d => d.is_paid) && (
-              <div>
-                {docs.some(d => !d.is_paid) && (
+            {docs.some(d => scanState(d.doc_type) === "paid") && (
+              <div className="mb-4">
+                {docs.some(d => scanState(d.doc_type) === "future") && (
                   <h3 className="text-xs font-semibold text-slate-500 mb-2">שולם</h3>
                 )}
                 <div className="space-y-2">
-                  {docs.filter(d => d.is_paid).map((doc) => (
+                  {docs.filter(d => scanState(d.doc_type) === "paid").map((doc) => (
                     <div
                       key={doc.id}
                       className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
@@ -463,7 +455,7 @@ export function ProjectDetailPage() {
                           <p className="text-sm font-medium truncate">{doc.title}</p>
                           <p className="text-xs text-slate-400">
                             {doc.date_on_doc?.split("-").reverse().join("/") || "-"}
-                            {doc.doc_type !== "Other" && <span className="mx-1">•</span>}
+                            <span className="mx-1">•</span>
                             {doc.doc_type}
                             {doc.business_name && <span className="mx-1">•</span>}
                             {doc.business_name}
@@ -483,6 +475,45 @@ export function ProjectDetailPage() {
                           הסר
                         </button>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {docs.some(d => scanState(d.doc_type) === "none") && (
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold text-slate-500 mb-2">לא פיננסי (הצעה / משלוח)</h3>
+                <div className="space-y-2">
+                  {docs.filter(d => scanState(d.doc_type) === "none").map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                      onClick={() => setViewDoc(doc)}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-12 bg-slate-200 rounded-lg shrink-0 flex items-center justify-center overflow-hidden">
+                          {doc.image_url ? (
+                            <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <FileText size={16} className="text-slate-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{doc.title}</p>
+                          <p className="text-xs text-slate-400">
+                            {doc.date_on_doc?.split("-").reverse().join("/") || "-"}
+                            <span className="mx-1">•</span>
+                            {doc.doc_type}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); unlinkDoc(doc.id); }}
+                        className="text-xs text-slate-400 hover:text-red-500 shrink-0"
+                      >
+                        הסר
+                      </button>
                     </div>
                   ))}
                 </div>

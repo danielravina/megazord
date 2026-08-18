@@ -1,17 +1,12 @@
 import type { Invoice } from "./invoice-types";
 import type { Customer } from "@/components/customers/customer-types";
 import type { TaxSettings } from "@/components/finance/finance-types";
+import { DOC_TYPE_META } from "./invoice-types";
 import { escapeHtml } from "@/components/shared/escape-html";
 import { formatCurrency } from "@/components/shared/format-currency";
-import { computeTotals, lineTotal } from "./invoice-utils";
+import { lineVatBreakdown } from "./invoice-utils";
 
 const fmtDate = (d?: string | null) => (d ? d.split("-").reverse().join("/") : "-");
-
-const DOC_TITLE: Record<string, string> = {
-  tax_invoice: "חשבונית מס",
-  receipt: "קבלה",
-  tax_invoice_receipt: "חשבונית מס/קבלה",
-};
 
 const EXEMPT_CLAUSE = 'עוסק פטור — חשבונית זו אינה כוללת מע"מ';
 
@@ -20,55 +15,61 @@ export function buildInvoiceHtml(
   invoice: Invoice,
   customer: Customer | null,
   settings: TaxSettings | null,
+  maxWidth = "700px",
 ): string {
   const items = invoice.items || [];
-  const totals = computeTotals(items, invoice.vat_rate);
   const isExempt = invoice.vat_rate === 0;
-  const isReceipt = invoice.document_type === "receipt";
-  const title = DOC_TITLE[invoice.document_type] || DOC_TITLE.tax_invoice;
+  const meta = DOC_TYPE_META[invoice.document_type];
+  const title = meta?.label || DOC_TYPE_META.tax_invoice.label;
+  const isCredit = invoice.document_type === "credit_invoice";
+  const isInformational = invoice.document_type === "quotation" || invoice.document_type === "delivery_note";
+  const isSingleTotal = invoice.document_type === "receipt";
+  const vatBreakdown = meta?.vatMode === "breakdown";
 
   const rows = items
-    .map(
-      (it) => `
+    .map((it) => {
+      const bd = lineVatBreakdown(it, invoice.vat_rate, false);
+      const vatCell = vatBreakdown && !isExempt
+        ? `<td style="padding:8px;text-align:left;font-size:12px;">${formatCurrency(isCredit ? -bd.vat : bd.vat)}</td>`
+        : "";
+      const grossCell = vatBreakdown && !isExempt
+        ? formatCurrency(isCredit ? -bd.gross : bd.gross)
+        : formatCurrency(isCredit ? -bd.net : bd.net);
+      return `
         <tr style="border-bottom:1px solid #f1f5f9;">
           <td style="padding:8px;text-align:right;font-size:12px;">${escapeHtml(it.description)}</td>
           <td style="padding:8px;text-align:center;font-size:12px;">${it.quantity}</td>
           <td style="padding:8px;text-align:left;font-size:12px;">${formatCurrency(it.unit_price)}</td>
-          <td style="padding:8px;text-align:left;font-size:12px;font-weight:600;">${formatCurrency(lineTotal(it))}</td>
-        </tr>`,
-    )
+          ${vatCell}
+          <td style="padding:8px;text-align:left;font-size:12px;font-weight:600;">${grossCell}</td>
+        </tr>`;
+    })
     .join("");
 
-  // A pure receipt shows a single total (no separate VAT breakdown).
-  const totalBlock = isReceipt
-    ? `
+  let totalBlock: string;
+  if (isInformational) {
+    // Quotation / delivery note: no "payable now" — informational total only.
+    const gross = items.reduce((s, it) => s + lineVatBreakdown(it, invoice.vat_rate, false).gross, 0);
+    totalBlock = `
       <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
-        <span>סה"כ לתשלום</span>
-        <span>${formatCurrency(totals.total)}</span>
-      </div>
-      ${isExempt ? `<p style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.5;">${EXEMPT_CLAUSE}</p>` : ""}
-    `
-    : `
-      <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
-        <span>סכום ללא מע"מ</span>
-        <span>${formatCurrency(totals.subtotal)}</span>
-      </div>
-      ${
-        isExempt
-          ? `<p style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.5;">${EXEMPT_CLAUSE}</p>`
-          : `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
-               <span>מע"מ (${invoice.vat_rate}%)</span>
-               <span>${formatCurrency(totals.vat)}</span>
-             </div>`
-      }
-      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
-        <span>סה"כ לתשלום</span>
-        <span>${formatCurrency(totals.total)}</span>
+        <span>${invoice.document_type === "quotation" ? "סה\"כ להצעה" : "סה\"כ פריטים"}</span>
+        <span>${formatCurrency(isCredit ? -gross : gross)}</span>
       </div>
     `;
+  } else {
+    // Every other type: single total. For tax documents the VAT already appears per item.
+    const gross = items.reduce((s, it) => s + lineVatBreakdown(it, invoice.vat_rate, false).gross, 0);
+    totalBlock = `
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
+        <span>${isCredit ? "סה\"כ זיכוי" : invoice.document_type === "quotation" ? "סה\"כ להצעה" : "סה\"כ לתשלום"}</span>
+        <span>${formatCurrency(isCredit ? -gross : gross)}</span>
+      </div>
+      ${isExempt && vatBreakdown ? `<p style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.5;">${EXEMPT_CLAUSE}</p>` : ""}
+    `;
+  }
 
   return `
-  <div dir="rtl" style="font-family:Arial,'Heebo',sans-serif;color:#1e293b;padding:24px;background:#fff;max-width:700px;overflow:hidden;">
+  <div dir="rtl" style="font-family:Arial,'Heebo',sans-serif;color:#1e293b;padding:24px;background:#fff;max-width:${maxWidth};overflow:hidden;">
     <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1e293b;padding-bottom:12px;">
       <div>
         <h1 style="font-size:22px;margin:0;font-weight:700;">${escapeHtml(settings?.business_name || "עצמאי")}</h1>
@@ -84,8 +85,14 @@ export function buildInvoiceHtml(
       </div>
     </div>
 
+    ${
+      invoice.document_type === "transaction_account"
+        ? `<p style="font-size:12px;color:#64748b;margin:10px 0 0;line-height:1.6;">זוהי דרישת תשלום עבור העסקה שבוצעה. אין חובת דיווח לרשויות המס בגין מסמך זה — עם קבלת התשלום תונפק חשבונית המס הסופית.</p>`
+        : ""
+    }
+
     <div style="margin-top:16px;padding:12px;background:#f8fafc;border-radius:8px;">
-      <p style="font-size:11px;font-weight:700;color:#64748b;margin:0 0 4px;">הוגש ל:</p>
+      <p style="font-size:11px;font-weight:700;color:#64748b;margin:0 0 4px;">${invoice.document_type === "quotation" ? "ההצעה מיועדת ל:" : "הוגש ל:"}</p>
       <p style="font-size:14px;font-weight:600;margin:0;">${customer ? escapeHtml(customer.name) : "-"}</p>
       ${customer?.company ? `<p style="font-size:12px;margin:2px 0;">${escapeHtml(customer.company)}</p>` : ""}
       ${customer?.vat_number ? `<p style="font-size:12px;margin:2px 0;">ע.מ: ${escapeHtml(customer.vat_number)}</p>` : ""}
@@ -98,11 +105,12 @@ export function buildInvoiceHtml(
           <th style="padding:8px;text-align:right;">תיאור</th>
           <th style="padding:8px;text-align:center;">כמות</th>
           <th style="padding:8px;text-align:left;">מחיר ליחידה</th>
+          ${vatBreakdown && !isExempt ? `<th style="padding:8px;text-align:left;">מע"מ</th>` : ""}
           <th style="padding:8px;text-align:left;">סה"כ</th>
         </tr>
       </thead>
       <tbody>
-        ${items.length ? rows : '<tr><td colspan="4" style="padding:8px;text-align:center;color:#94a3b8;font-size:12px;">אין פריטים</td></tr>'}
+        ${items.length ? rows : `<tr><td colspan="${vatBreakdown && !isExempt ? 5 : 4}" style="padding:8px;text-align:center;color:#94a3b8;font-size:12px;">אין פריטים</td></tr>`}
       </tbody>
     </table>
 

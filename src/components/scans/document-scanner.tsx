@@ -44,11 +44,20 @@ interface OcrResponse {
   bodyText?: string;
 }
 
+// סוג מסמך שהתקבל (סריקה). סוג המסמך קובע את מצב התשלום:
+//  - tax_invoice / receipt / tax_invoice_receipt → שולם (הוצאה/הכנסה)
+//  - credit_invoice → זיכוי (שלילי)
+//  - transaction_account → תשלום עתידי (עדיין לא הוצאה)
+//  - quotation / delivery_note / other → לא פיננסי
 const DOC_TYPES = [
-  { value: "Invoice", label: "חשבונית מס" },
-  { value: "Delivery Note", label: "תעודת משלוח" },
-  { value: "Proforma Invoice", label: "חשבונית פרופורמה" },
-  { value: "Other", label: "אחר" },
+  { value: "tax_invoice", label: "חשבונית מס" },
+  { value: "transaction_account", label: "חשבונית עסקה (תשלום עתידי)" },
+  { value: "tax_invoice_receipt", label: "חשבונית מס/קבלה" },
+  { value: "credit_invoice", label: "חשבונית מס זיכוי" },
+  { value: "receipt", label: "קבלה" },
+  { value: "quotation", label: "הצעת מחיר" },
+  { value: "delivery_note", label: "תעודת משלוח" },
+  { value: "other", label: "אחר" },
 ];
 
 const FOLDERS = [
@@ -87,7 +96,7 @@ interface TempDoc {
 }
 
 const EMPTY_TEMP: TempDoc = {
-  imageUrl: "", previewUrl: "", title: "", tags: [], extractedText: "", docType: "Other",
+  imageUrl: "", previewUrl: "", title: "", tags: [], extractedText: "", docType: "other",
   dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false,
   direction: "expense", projectId: "", newProjectName: "",
   businessId: "", businessVat: "", newBusinessName: "",
@@ -186,7 +195,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       if (!ocrResult.ok) {
         logEvent("error", "scan_ocr_error", { requestId, status: ocrResult.status, body: ocrResult.bodyText });
         toast("סריקת המסמך נכשלה", "error");
-        ocr = { title: file.name.replace(/\.[^.]+$/, ""), tags: ["כללי"], extractedText: "", docType: "Other", dateOnDoc: "", totalAmount: null, folderSuggestion: "", isInvestment: false };
+        ocr = { title: file.name.replace(/\.[^.]+$/, ""), tags: ["כללי"], extractedText: "", docType: "other", dateOnDoc: "", totalAmount: null, folderSuggestion: "", isInvestment: false };
       } else {
         ocr = ocrResult.data || {};
         const missing: string[] = [];
@@ -222,7 +231,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
 
       setTempDoc({
         imageUrl: path, previewUrl: signedUrl, title: ocr.title || file.name, tags: ocr.tags || ["כללי"],
-        extractedText: ocr.extractedText || "", docType: ocr.docType || "Other",
+        extractedText: ocr.extractedText || "", docType: ocr.docType || "other",
         dateOnDoc: ocr.dateOnDoc || "", totalAmount: ocr.totalAmount?.toString() || "",
         folder: ocr.folderSuggestion || "", isInvestment: ocr.isInvestment || false,
         direction: "expense", projectId: "", newProjectName: "",
@@ -307,7 +316,6 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       folder: tempDoc.folder || null,
       is_investment: tempDoc.isInvestment,
       direction: tempDoc.direction,
-      is_paid: tempDoc.docType !== "Delivery Note",
       business_id: finalBusinessId || null,
     });
 
@@ -317,34 +325,6 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       return;
     }
     logEvent("info", "scan_saved", { requestId, title: tempDoc.title, docType: tempDoc.docType, totalAmount: tempDoc.totalAmount });
-
-    const total = parseFloat(tempDoc.totalAmount) || 0;
-    if (total > 0) {
-      if (tempDoc.direction === "income") {
-        const { error: incomeError } = await supabase.from("incomes").insert({
-          id: generateId(), user_id: user.id,
-          date: tempDoc.dateOnDoc || new Date().toISOString().split("T")[0],
-          amount: total, type: "שוטף",
-          description: `הכנסה ממסמך: ${tempDoc.title}`,
-        });
-        if (incomeError) logEvent("error", "scan_save_error", { requestId, table: "incomes", message: incomeError.message });
-      } else if (tempDoc.direction !== "other" && tempDoc.docType !== "Proforma Invoice") {
-        const { error: expenseError } = await supabase.from("expenses").insert({
-          id: generateId(), user_id: user.id,
-          date: tempDoc.dateOnDoc || new Date().toISOString().split("T")[0],
-          amount: total, is_paid: true,
-          category: tempDoc.folder || "כללי",
-          description: `הוצאה ממסמך: ${tempDoc.title}`,
-        });
-        if (expenseError) logEvent("error", "scan_save_error", { requestId, table: "expenses", message: expenseError.message });
-      }
-      if (finalProjectId) {
-        const { data: proj } = await supabase.from("projects").select("expenses").eq("id", finalProjectId).single();
-        if (proj) {
-          await supabase.from("projects").update({ expenses: (proj.expenses || 0) + total }).eq("id", finalProjectId);
-        }
-      }
-    }
 
     toast("המסמך נשמר", "success");
     setConfirmOpen(false);

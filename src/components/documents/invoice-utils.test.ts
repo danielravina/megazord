@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { nextInvoiceNumber, computeTotals, computeTotalsInclusive, lineTotal } from "./invoice-utils";
+import {
+  nextInvoiceNumber, nextQuotationNumber, nextDeliveryNoteNumber, computeTotals, computeTotalsInclusive, lineTotal, lineVatBreakdown, booksIncome, incomeSign,
+} from "./invoice-utils";
 
 describe("nextInvoiceNumber", () => {
   it("returns YYYY-0001 for an empty list", () => {
@@ -20,6 +22,59 @@ describe("nextInvoiceNumber", () => {
   it("ignores malformed numbers", () => {
     const existing = [{ invoice_number: "2026-abc" }, { invoice_number: "something" }];
     assert.equal(nextInvoiceNumber(existing, new Date("2026-08-10")), "2026-0001");
+  });
+});
+
+describe("nextQuotationNumber (shared numeric sequence)", () => {
+  it("returns YYYY-0001 for an empty list", () => {
+    assert.equal(nextQuotationNumber([], new Date("2026-08-10")), "2026-0001");
+  });
+
+  it("increments the highest sequence for the current year", () => {
+    const existing = [{ invoice_number: "2026-0003" }, { invoice_number: "2026-0001" }];
+    assert.equal(nextQuotationNumber(existing, new Date("2026-08-10")), "2026-0004");
+  });
+
+  it("ignores other years and non-numeric suffixes", () => {
+    const existing = [{ invoice_number: "2025-0010" }, { invoice_number: "2026-0002" }];
+    assert.equal(nextQuotationNumber(existing, new Date("2026-08-10")), "2026-0003");
+  });
+});
+
+describe("nextDeliveryNoteNumber (shared numeric sequence)", () => {
+  it("returns YYYY-0001 for an empty list", () => {
+    assert.equal(nextDeliveryNoteNumber([], new Date("2026-08-10")), "2026-0001");
+  });
+
+  it("increments the highest sequence for the current year", () => {
+    const existing = [{ invoice_number: "2026-0002" }, { invoice_number: "2026-0001" }];
+    assert.equal(nextDeliveryNoteNumber(existing, new Date("2026-08-10")), "2026-0003");
+  });
+});
+
+describe("booksIncome / incomeSign", () => {
+  it("morashi: tax_invoice / combined / credit book income, receipt does not", () => {
+    assert.equal(booksIncome("tax_invoice", "morashi"), true);
+    assert.equal(booksIncome("tax_invoice_receipt", "morashi"), true);
+    assert.equal(booksIncome("credit_invoice", "morashi"), true);
+    assert.equal(booksIncome("receipt", "morashi"), false);
+    assert.equal(booksIncome("transaction_account", "morashi"), false);
+    assert.equal(booksIncome("quotation", "morashi"), false);
+    assert.equal(booksIncome("delivery_note", "morashi"), false);
+  });
+
+  it("patoor: only receipt books income", () => {
+    assert.equal(booksIncome("receipt", "patoor"), true);
+    assert.equal(booksIncome("tax_invoice", "patoor"), false);
+    assert.equal(booksIncome("tax_invoice_receipt", "patoor"), false);
+    assert.equal(booksIncome("credit_invoice", "patoor"), false);
+    assert.equal(booksIncome("transaction_account", "patoor"), false);
+  });
+
+  it("credit invoices are negative", () => {
+    assert.equal(incomeSign("credit_invoice"), -1);
+    assert.equal(incomeSign("tax_invoice"), 1);
+    assert.equal(incomeSign("receipt"), 1);
   });
 });
 
@@ -93,5 +148,28 @@ describe("computeTotalsInclusive", () => {
     assert.equal(t.subtotal, 0);
     assert.equal(t.vat, 0);
     assert.equal(t.total, 0);
+  });
+});
+
+describe("lineVatBreakdown", () => {
+  it("splits a net price into per-line net / vat / gross", () => {
+    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 2, unit_price: 100 }, 18, false);
+    assert.equal(bd.net, 200);
+    assert.equal(bd.vat, 36);
+    assert.equal(bd.gross, 236);
+  });
+
+  it("backs VAT out of a gross (inclusive) price", () => {
+    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 1, unit_price: 118 }, 18, true);
+    assert.equal(bd.net, 100);
+    assert.equal(bd.vat, 18);
+    assert.equal(bd.gross, 118);
+  });
+
+  it("handles exempt / zero rate", () => {
+    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 3, unit_price: 50 }, 0, false);
+    assert.equal(bd.net, 150);
+    assert.equal(bd.vat, 0);
+    assert.equal(bd.gross, 150);
   });
 });

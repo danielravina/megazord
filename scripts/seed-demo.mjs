@@ -75,7 +75,6 @@ const pad = (n) => String(n).padStart(2, "0");
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const addMonths = (d, n) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
-const daysInMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
 const uid = () => crypto.randomUUID();
 
 function mulberry32(a) {
@@ -150,7 +149,7 @@ async function confirmDestructive(target) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const answer = await rl.question(
     `This will DELETE all existing rows for ${target.email} (${target.id}) in:\n` +
-      `  incomes, expenses, savings, projects, documents, todos, events\n` +
+      `  savings, projects, documents, invoices, todos, events\n` +
       `and then insert the demo dataset${seedLayout ? " + a rich dashboard layout" : ""}.\n` +
       `Continue? [y/N] `,
   );
@@ -162,6 +161,10 @@ async function confirmDestructive(target) {
 }
 
 // ── Data generation ─────────────────────────────────────
+// סוגי מסמכים (evidence-based): המצב הפיננסי נגזר מהסוג.
+// הכנסה נרשמת במסמך שהכסף התקבל בו — חשבונית מס / חשבונית מס+קבלה / זיכוי (מורשה).
+const INV_TYPES_BOOK = ["tax_invoice", "tax_invoice_receipt"];
+const INV_TYPES_NOBOOK = ["transaction_account", "quotation", "delivery_note"];
 const CUSTOMERS = [
   { name: "אלעד כהן", email: "elad@example.com" },
   { name: "נועה לוי", email: "noa@example.com" },
@@ -183,7 +186,6 @@ const CUSTOMERS = [
 const LOCATIONS = ["תל אביב", "ירושלים", "חיפה", "באר שבע", "רמת גן", "הרצליה", "פתח תקווה", "נתניה", "רחובות", "ראשון לציון"];
 const PROJECT_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 const WORK_TYPES = ["עיצוב אתר", "בניית מערכת", "ייעוץ עסקי", "פיתוח מוצר", "שירות תחזוקה"];
-const RECURRING = ["מנוי חודשי - שירות ניהול", "תחזוקה חודשית - אתר", "מנוי תוכנה חודשי"];
 const TODO_TEXTS = [
   "להכין הצעת מחיר ללקוח חדש", "לעדכן חשבונית מס אחרונה", "לטלפן לספק על הזמנה",
   "לסיים מצגת לפרויקט הבא", "לשלם מקדמות מס", "לארגן את התיקיות במסמכים",
@@ -200,68 +202,7 @@ function buildDemoData(targetId) {
   const nowDate = new Date();
   const today = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
 
-  // ── Incomes ──
-  const incomes = [];
-  for (let m = -12; m <= 0; m++) {
-    const monthStart = addMonths(new Date(nowDate.getFullYear(), nowDate.getMonth(), 1), m);
-    const dim = daysInMonth(monthStart);
-    for (let i = 0, n = ri(2, 4); i < n; i++) {
-      const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), ri(1, dim));
-      if (date > today) continue;
-      incomes.push({
-        id: uid(), user_id: targetId,
-        description: `${pick(CUSTOMERS).name} - ${pick(WORK_TYPES)}`,
-        amount: round100(rf(3000, 28000)),
-        date: iso(date),
-        type: pick(["שוטף", "שוטף", "שוטף", "עתידי"]),
-      });
-    }
-    for (let i = 0, n = ri(1, 2); i < n; i++) {
-      const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), ri(1, dim));
-      if (date > today) continue;
-      incomes.push({
-        id: uid(), user_id: targetId,
-        description: pick(RECURRING),
-        amount: round10(rf(1500, 6000)),
-        date: iso(date),
-        type: "שוטף",
-      });
-    }
-  }
-  for (let i = 0; i < 3; i++) {
-    const date = addDays(today, ri(2, 20));
-    incomes.push({
-      id: uid(), user_id: targetId,
-      description: `${pick(CUSTOMERS).name} - מקדמה על פרויקט`,
-      amount: round100(rf(5000, 20000)),
-      date: iso(date),
-      type: "עתידי",
-    });
-  }
-
-  // ── Expenses ──
-  const expenses = [];
-  for (let m = -12; m <= 0; m++) {
-    const monthStart = addMonths(new Date(nowDate.getFullYear(), nowDate.getMonth(), 1), m);
-    const dim = daysInMonth(monthStart);
-    const push = (description, amount, category, day) => {
-      const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day ?? ri(1, dim));
-      if (date > today) return;
-      expenses.push({
-        id: uid(), user_id: targetId,
-        description, amount, date: iso(date), category,
-        is_paid: rand() < 0.92,
-      });
-    };
-    push("שכירות משרד", 4200, "שכירות", ri(1, 5));
-    push("שיווק דיגיטלי", round10(rf(800, 2500)), "שיווק");
-    if (rand() < 0.7) push("פרסום ברשתות", round10(rf(500, 1800)), "שיווק");
-    push("חשמל ומשרד", round10(rf(300, 1100)), "חשבונות");
-    if (rand() < 0.7) push("אינטרנט וסלולר", round10(rf(250, 700)), "חשבונות");
-    if (rand() < 0.8) push("רכש ציוד", round100(rf(400, 9000)), "רכש");
-    if (rand() < 0.7) push("הוצאות פרויקט", round100(rf(600, 6000)), "פרויקט");
-    push("הפרשות סוציאליות", round100(rf(1500, 2800)), "הפרשות", ri(20, 28));
-  }
+  // הכנסות והוצאות נגזרות מסמכים (invoices + documents scans) — אין רשומות פיננסיות נפרדות.
 
   // ── Savings ──
   const savings = [];
@@ -319,9 +260,9 @@ function buildDemoData(targetId) {
     }
   }
 
-  // ── Documents ──
+  // ── Documents (סריקות) ──
   const documents = [];
-  const mkDoc = (title, docType, direction, totalAmount, date, folder, isInvestment, isPaid, projectId = null) => ({
+  const mkDoc = (title, docType, direction, totalAmount, date, folder, isInvestment, projectId = null) => ({
     id: uid(), user_id: targetId,
     title,
     image_url: null,
@@ -334,28 +275,32 @@ function buildDemoData(targetId) {
     folder: folder || null,
     is_investment: isInvestment,
     direction,
-    is_paid: isPaid,
     business_id: null,
     date: `${iso(date)}T12:00:00.000Z`,
   });
 
-  for (let i = 0; i < 30; i++) {
-    const date = addDays(today, ri(-365, 0));
-    const docNum = `${date.getFullYear()}-${pad(ri(1, 60))}`;
-    documents.push(mkDoc(
-      `חשבונית ${docNum} - ${pick(CUSTOMERS).name}`, "Invoice", "income",
-      round100(rf(2000, 25000)), date, "הכנסות", false, rand() < 0.5,
-    ));
-  }
+  // קבלות/חשבוניות מס נכנסות (הוצאות ששולמו) — רושמות הוצאות בספרים
   const expCats = ["שיווק", "שכירות", "חשבונות", "פרויקט", "רכש"];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 26; i++) {
     const date = addDays(today, ri(-365, 0));
     const cat = pick(expCats);
-    documents.push(mkDoc(`חשבונית רכישה - ${cat}`, pick(["Invoice", "Delivery Note"]), "expense", round100(rf(400, 9000)), date, cat, false, true));
+    const docType = pick(["receipt", "receipt", "tax_invoice", "tax_invoice_receipt"]);
+    documents.push(mkDoc(`קבלה/חשבונית רכישה - ${cat}`, docType, "expense", round100(rf(400, 9000)), date, cat, false));
   }
+  // חשבוניות עסקה נכנסות (תשלום עתידי) — טרם נרשמו כהוצאה
+  for (let i = 0; i < 5; i++) {
+    const date = addDays(today, ri(-120, 0));
+    documents.push(mkDoc(`חשבונית עסקה מספק - ${pick(expCats)}`, "transaction_account", "expense", round100(rf(800, 7000)), date, pick(expCats), false));
+  }
+  // הכנסות מסריקות (למשל קבלות שהתקבלו)
+  for (let i = 0; i < 6; i++) {
+    const date = addDays(today, ri(-365, 0));
+    documents.push(mkDoc(`קבלה שהתקבלה - ${pick(CUSTOMERS).name}`, "tax_invoice_receipt", "income", round100(rf(2000, 20000)), date, "הכנסות", false));
+  }
+  // הצעות מחיר (לא פיננסיות)
   for (let i = 0; i < 4; i++) {
     const date = addDays(today, ri(-120, 0));
-    documents.push(mkDoc(`הצעת מחיר - ${pick(CUSTOMERS).name}`, "Proforma Invoice", "other", round100(rf(5000, 40000)), date, "הצעות", false, false));
+    documents.push(mkDoc(`הצעת מחיר - ${pick(CUSTOMERS).name}`, "quotation", "other", round100(rf(5000, 40000)), date, "הצעות", false));
   }
   const INVEST = [
     ["מחשב נייד חדש - Apple", 12500],
@@ -365,10 +310,10 @@ function buildDemoData(targetId) {
   ];
   for (const [title, amount] of INVEST) {
     const date = addDays(today, ri(-365, 0));
-    documents.push(mkDoc(title, "Invoice", "expense", amount, date, "השקעות", true, true));
+    documents.push(mkDoc(title, "tax_invoice", "expense", amount, date, "השקעות", true));
   }
 
-  // ── Invoices ──
+  // ── Invoices (מסמכים שהונפקו) ──
   const invoices = [];
   const invSequences = {};
   const mkItems = () => {
@@ -383,31 +328,40 @@ function buildDemoData(targetId) {
     }
     return items;
   };
-  for (let i = 0; i < 24; i++) {
+
+  // עוסק מורשה: חשבונית מס וחשבונית מס/קבלה רושמים הכנסה; זיכוי מקטין;
+  // חשבונית עסקה/הצעה/משלוח/קבלה לא רושמים (מורשה).
+  const typePool = [
+    "tax_invoice", "tax_invoice", "tax_invoice", "tax_invoice",
+    "tax_invoice_receipt", "tax_invoice_receipt",
+    "transaction_account", "transaction_account",
+    "credit_invoice", "quotation", "delivery_note",
+  ];
+  for (let i = 0; i < 34; i++) {
     const issueDate = addDays(today, ri(-365, -1));
     const year = issueDate.getFullYear();
+    const docType = pick(typePool);
+    // מספור מספרי משותף לכל סוגי המסמכים
     invSequences[year] = (invSequences[year] || 0) + 1;
     const items = mkItems();
     const subtotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
-    const vatRate = 17;
+    const vatRate = 18;
     const amount = Math.round(subtotal * (1 + vatRate / 100) * 100) / 100;
     const customer = pick(customers);
     const custProjects = projects.filter((p) => p.customer_id === customer.id);
     const project = custProjects.length && rand() < 0.6 ? pick(custProjects) : null;
-    const status = pick(["draft", "sent", "sent", "paid", "paid"]);
     invoices.push({
       id: uid(), user_id: targetId,
       customer_id: customer.id,
       project_id: project ? project.id : null,
       invoice_number: `${year}-${String(invSequences[year]).padStart(4, "0")}`,
       issue_date: iso(issueDate),
-      due_date: iso(addDays(issueDate, 30)),
+      due_date: docType === "transaction_account" || docType === "quotation" ? iso(addDays(issueDate, 30)) : null,
       items,
-      amount,
+      amount: docType === "credit_invoice" ? Math.round(amount * rf(0.2, 0.5)) : amount,
       vat_rate: vatRate,
-      status,
+      document_type: docType,
       notes: null,
-      sent_at: status === "draft" ? null : new Date(addDays(issueDate, ri(0, 3))).toISOString(),
       created_at: new Date(addDays(issueDate, -2)).toISOString(),
     });
   }
@@ -435,7 +389,7 @@ function buildDemoData(targetId) {
     });
   }
 
-  return { incomes, expenses, savings, customers, projects, documents, invoices, todos, events };
+  return { savings, customers, projects, documents, invoices, todos, events };
 }
 
 function buildLayout() {
@@ -464,7 +418,7 @@ function buildLayout() {
   console.log(`\nSeeding demo data for ${target.email}...\n`);
 
   // Clear (documents/events before projects because of FKs)
-  const tables = ["documents", "events", "invoices", "projects", "customers", "incomes", "expenses", "savings", "todos"];
+  const tables = ["documents", "events", "invoices", "projects", "customers", "savings", "todos"];
   for (const t of tables) {
     try {
       await clearTable(t, target.id);
@@ -477,8 +431,6 @@ function buildLayout() {
   const demo = buildDemoData(target.id);
 
   console.log("Inserting data:");
-  await insertRows("incomes", demo.incomes);
-  await insertRows("expenses", demo.expenses);
   await insertRows("savings", demo.savings);
   await insertRows("customers", demo.customers);
   await insertRows("projects", demo.projects);
@@ -487,10 +439,10 @@ function buildLayout() {
   await insertRows("todos", demo.todos);
   await insertRows("events", demo.events);
 
-  // Tax settings (so tax widgets + preferences have values)
+  // Tax settings (so tax widgets + preferences have values) — עוסק מורשה (ברירת מחדל)
   const { error: taxErr } = await supabase.from("tax_settings").upsert({
     user_id: target.id,
-    vat_rate: 17,
+    vat_rate: 18,
     vat_frequency: "bimonthly",
     vat_billing_day: 15,
     income_tax_advance: 15,
@@ -498,6 +450,9 @@ function buildLayout() {
     bituah_leumi: 5,
     bituah_leumi_billing_day: 15,
     credit_points: 2.25,
+    vat_status: "morashi",
+    income_scheme: "standard",
+    zeair_expense_rate: 0,
     business_name: "העסק שלי בע״מ",
     vat_number: "515000123",
     business_address: "רחוב הרצל 12, תל אביב",
@@ -519,15 +474,14 @@ function buildLayout() {
   }
 
   console.log("\nDone! Summary:");
-  console.log(`  incomes:   ${demo.incomes.length}`);
-  console.log(`  expenses:  ${demo.expenses.length}`);
   console.log(`  savings:   ${demo.savings.length}`);
   console.log(`  projects:  ${demo.projects.length}`);
-  console.log(`  invoices:  ${demo.invoices.length}`);
-  console.log(`  documents: ${demo.documents.length}`);
+  console.log(`  invoices:  ${demo.invoices.length} (מסמכים שהונפקו, כולל כל הסוגים)`);
+  console.log(`  documents: ${demo.documents.length} (סריקות)`);
   console.log(`  todos:     ${demo.todos.length}`);
   console.log(`  events:    ${demo.events.length}`);
-  console.log("\nOpen the app and reload the dashboard to see the rich demo data.");
+  console.log("\nההכנסות וההוצאות נגזרות אוטומטית מהמסמכים.");
+  console.log("Open the app and reload the dashboard to see the rich demo data.");
 })().catch((e) => {
   console.error("\nSeed failed:", e.message);
   process.exit(1);

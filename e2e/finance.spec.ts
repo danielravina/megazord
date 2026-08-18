@@ -33,54 +33,22 @@ test("finance dashboard tab shows net income and tax totals", async ({ page }) =
   await expect(page.locator("text=חבות מס כוללת")).toBeVisible();
 });
 
-test("can switch to incomes tab and see add form", async ({ page }) => {
+test("incomes tab explains income is derived from evidence", async ({ page }) => {
   await page.goto("/finance/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   await page.locator("button:has-text('הכנסות')").click();
-
-  // The add income form should be visible
-  await expect(page.locator("label:has-text('תיאור')")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator("button:has-text('הוסף הכנסה')")).toBeVisible();
+  await expect(page.locator("text=ההכנסות נרשמות אוטומטית")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("button:has-text('הוסף הכנסה')")).toBeHidden();
 });
 
-test("can add an income entry", async ({ page }) => {
-  await page.goto("/finance/");
-  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-
-  await page.locator("button:has-text('הכנסות')").click();
-  await expect(page.locator("label:has-text('תיאור')")).toBeVisible();
-
-  // Fill income form
-  await page.locator("label:has-text('תיאור') + input").fill("בדיקת E2E - הכנסה");
-  await page.locator("label:has-text('סכום') + input").fill("1000");
-  await page.locator("button:has-text('הוסף הכנסה')").click();
-
-  // The income should appear in the table
-  await expect(page.locator("text=בדיקת E2E - הכנסה")).toBeVisible({ timeout: 5000 });
-});
-
-test("can switch to expenses tab and see add form", async ({ page }) => {
+test("expenses tab explains expenses are derived from scans", async ({ page }) => {
   await page.goto("/finance/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   await page.locator("button:has-text('הוצאות')").click();
-  await expect(page.locator("label:has-text('תיאור')")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator("button:has-text('הוסף הוצאה')")).toBeVisible();
-});
-
-test("can add an expense entry", async ({ page }) => {
-  await page.goto("/finance/");
-  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-
-  await page.locator("button:has-text('הוצאות')").click();
-  await expect(page.locator("label:has-text('תיאור')")).toBeVisible();
-
-  await page.locator("label:has-text('תיאור') + input").fill("בדיקת E2E - הוצאה");
-  await page.locator("label:has-text('סכום') + input").fill("500");
-  await page.locator("button:has-text('הוסף הוצאה')").click();
-
-  await expect(page.locator("text=בדיקת E2E - הוצאה")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("text=ההוצאות נרשמות אוטומטית")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("button:has-text('הוסף הוצאה')")).toBeHidden();
 });
 
 test("can switch to taxes tab and see settings form", async ({ page }) => {
@@ -110,6 +78,5 @@ test("can add a saving entry", async ({ page }) => {
   await page.locator("label:has-text('סכום') + input").fill("2000");
   await page.locator("button:has-text('הוסף הפקדה')").click();
 
-  // The saving should appear in the table - look for the formatted amount
   await expect(page.locator("td.font-bold.text-teal-600").first()).toBeVisible({ timeout: 5000 });
 });

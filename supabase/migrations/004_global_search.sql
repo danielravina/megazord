@@ -60,13 +60,6 @@ union all
   where ev.user_id = auth.uid() and ev.title ilike '%' || search_query || '%'
   limit 5
 )
-union all
-(
-  select 'ספקים'::text, '/documents/?supplier=' || b.id::text, b.name, b.vat_number
-  from businesses b
-  where b.user_id = auth.uid() and (b.name ilike '%' || search_query || '%' or b.vat_number ilike '%' || search_query || '%')
-  limit 5
-)
 $$;
 
 grant execute on function global_search(text) to authenticated;
@@ -82,4 +75,3 @@ create index if not exists todos_text_trgm_idx on todos using gin (text gin_trgm
 create index if not exists incomes_description_trgm_idx on incomes using gin (description gin_trgm_ops);
 create index if not exists expenses_description_trgm_idx on expenses using gin (description gin_trgm_ops);
 create index if not exists events_title_trgm_idx on events using gin (title gin_trgm_ops);
-create index if not exists businesses_name_trgm_idx on businesses using gin (name gin_trgm_ops);

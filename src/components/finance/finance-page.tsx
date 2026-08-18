@@ -7,20 +7,21 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Skeleton, SkeletonText, SkeletonCircle } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency } from "@/components/shared/format-currency";
 import { formatDate } from "@/components/shared/format-date";
-import { todayISO } from "@/components/shared/format-date";
 import { generateId } from "@/components/shared/generate-id";
 import { calculateTaxes } from "./tax-engine";
+import { buildLedger } from "./ledger";
+import type { Invoice } from "@/components/documents/invoice-types";
+import type { ScanEvidence } from "./ledger";
 import { ExpensePieChart } from "@/components/ui/expense-pie-chart";
-import { MonthlyExport } from "@/components/documents/monthly-export";
+import { MonthlyExport } from "@/components/scans/monthly-export";
 import {
   PieChart, Wallet, Coins, Receipt, Scale, PiggyBank,
-  TrendingUp, TrendingDown, Plus, Save, Check, Clock, FileText,
+  TrendingUp, TrendingDown, Save, Check, Clock, FileText, Plus,
 } from "lucide-react";
 import type { Income, Expense, TaxSettings, Saving, TaxCalculation } from "./finance-types";
 
@@ -48,11 +49,6 @@ const SAVING_TYPES = [
   { value: "אחר", label: "אחר" },
 ];
 
-const INCOME_TYPES = [
-  { value: "שוטף", label: "שוטף" },
-  { value: "עתידי", label: "עתידי" },
-];
-
 function getNextBillingDay(day: number): string {
   const today = new Date();
   const maxDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
@@ -78,19 +74,10 @@ export function FinancePage() {
   const [taxSettings, setTaxSettings] = useState<TaxSettings | null>(null);
   const [showReport, setShowReport] = useState(false);
 
-  // Form states
-  const [incDesc, setIncDesc] = useState("");
-  const [incAmount, setIncAmount] = useState("");
-  const [incDate, setIncDate] = useState(todayISO());
-  const [incType, setIncType] = useState("שוטף");
-  const [expDesc, setExpDesc] = useState("");
-  const [expAmount, setExpAmount] = useState("");
-  const [expDate, setExpDate] = useState(todayISO());
-  const [expCategory, setExpCategory] = useState("שיווק");
-  const [expPaid, setExpPaid] = useState(false);
+  // Form states (savings only — income/expense are derived from evidence)
   const [savType, setSavType] = useState("קרן השתלמות");
   const [savAmount, setSavAmount] = useState("");
-  const [savDate, setSavDate] = useState(todayISO());
+  const [savDate, setSavDate] = useState(new Date().toISOString().split("T")[0]);
   const [taxSaving, setTaxSaving] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
@@ -127,19 +114,25 @@ export function FinancePage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const [incRes, expRes, savRes, taxRes] = await Promise.all([
-        supabase.from("incomes").select("*").eq("user_id", uid).order("date", { ascending: false }),
-        supabase.from("expenses").select("*").eq("user_id", uid).order("date", { ascending: false }),
+      const [invRes, docRes, savRes, taxRes] = await Promise.all([
+        supabase.from("invoices").select("*").eq("user_id", uid),
+        supabase.from("documents").select("*").eq("user_id", uid),
         supabase.from("savings").select("*").eq("user_id", uid).order("date", { ascending: false }),
         supabase.from("tax_settings").select("*").eq("user_id", uid).maybeSingle(),
       ]);
       if (cancelled) return;
-      if (incRes.error) toast("שגיאה בטעינת הכנסות", "error");
-      if (expRes.error) toast("שגיאה בטעינת הוצאות", "error");
+      if (invRes.error) toast("שגיאה בטעינת המסמכים", "error");
+      if (docRes.error) toast("שגיאה בטעינת הסריקות", "error");
       if (savRes.error) toast("שגיאה בטעינת חסכונות", "error");
       if (taxRes.error && taxRes.error.code !== "PGRST116") toast("שגיאה בטעינת הגדרות מס", "error");
-      setIncomes(incRes.data || []);
-      setExpenses(expRes.data || []);
+      const vatStatus = (taxRes.data as TaxSettings | null)?.vat_status ?? "morashi";
+      const { incomes: derivedIn, expenses: derivedEx } = buildLedger(
+        (invRes.data || []) as unknown as Invoice[],
+        (docRes.data || []) as unknown as ScanEvidence[],
+        vatStatus,
+      );
+      setIncomes(derivedIn);
+      setExpenses(derivedEx);
       setSavings(savRes.data || []);
       setTaxSettings(taxRes.data || null);
       setLoading(false);
@@ -149,41 +142,6 @@ export function FinancePage() {
   }, [user, supabase]);
 
   const taxCalc: TaxCalculation = calculateTaxes(incomes, expenses, savings, taxSettings);
-
-  async function addIncome(e: React.FormEvent) {
-    e.preventDefault();
-    if (!incDesc || !incAmount || !user) return;
-    const row: Income = {
-      id: generateId(), user_id: user.id, description: incDesc,
-      amount: parseFloat(incAmount), date: incDate, type: incType,
-      created_at: new Date().toISOString(),
-    };
-    setIncomes((p) => [row, ...p]);
-    setIncDesc(""); setIncAmount("");
-    const { error } = await supabase.from("incomes").insert({
-      id: row.id, user_id: user.id, description: incDesc,
-      amount: parseFloat(incAmount), date: incDate, type: incType,
-    });
-    if (error) { setIncomes((p) => p.filter((i) => i.id !== row.id)); toast("שגיאה", "error"); }
-  }
-
-  async function addExpense(e: React.FormEvent) {
-    e.preventDefault();
-    if (!expDesc || !expAmount || !user) return;
-    const row: Expense = {
-      id: generateId(), user_id: user.id, description: expDesc,
-      amount: parseFloat(expAmount), date: expDate, category: expCategory,
-      is_paid: expPaid, created_at: new Date().toISOString(),
-    };
-    setExpenses((p) => [row, ...p]);
-    setExpDesc(""); setExpAmount(""); setExpPaid(false);
-    const { error } = await supabase.from("expenses").insert({
-      id: row.id, user_id: user.id, description: expDesc,
-      amount: parseFloat(expAmount), date: expDate, category: expCategory,
-      is_paid: expPaid,
-    });
-    if (error) { setExpenses((p) => p.filter((e) => e.id !== row.id)); toast("שגיאה", "error"); }
-  }
 
   async function addSaving(e: React.FormEvent) {
     e.preventDefault();
@@ -407,19 +365,12 @@ export function FinancePage() {
           {/* Incomes Tab */}
           {tab === "incomes" && (
             <div>
-              <form onSubmit={addIncome} className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6 bg-slate-50 p-4 rounded-lg border">
-                <div className="md:col-span-2">
-                  <Input label="תיאור" value={incDesc} onChange={(e) => setIncDesc(e.target.value)} required />
-                </div>
-                <Input label="סכום (₪)" type="number" min="0" step="0.01" value={incAmount} onChange={(e) => setIncAmount(e.target.value)} required />
-                <Input label="תאריך" type="date" value={incDate} onChange={(e) => setIncDate(e.target.value)} required />
-                <Select label="סוג" options={INCOME_TYPES} value={incType} onChange={(e) => setIncType(e.target.value)} />
-                <div className="md:col-span-5 flex justify-end">
-                  <Button type="submit"><Plus size={14} /> הוסף הכנסה</Button>
-                </div>
-              </form>
+              <p className="text-sm text-slate-500 mb-4 bg-slate-50 border rounded-lg p-3">
+                ההכנסות נרשמות אוטומטית מחשבוניות מס, חשבוניות מס/קבלה וזיכויים שהונפקו ללקוחות (ולעוסק פטור — מקבלות).
+                לצפייה במסמכים יש לגשת למסך מסמכים.
+              </p>
               {incomes.length === 0 ? (
-                <EmptyState title="אין הכנסות להצגה" />
+                <EmptyState title="אין הכנסות להצגה" description="הנפק חשבונית מס או קבלה כדי לרשום הכנסה" />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-200">
@@ -453,22 +404,11 @@ export function FinancePage() {
           {/* Expenses Tab */}
           {tab === "expenses" && (
             <div>
-              <form onSubmit={addExpense} className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-6 bg-slate-50 p-4 rounded-lg border">
-                <div className="md:col-span-2">
-                  <Input label="תיאור" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} required />
-                </div>
-                <Input label="סכום (₪)" type="number" min="0" step="0.01" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} required />
-                <Input label="תאריך" type="date" value={expDate} onChange={(e) => setExpDate(e.target.value)} required />
-                <Select label="קטגוריה" options={EXPENSE_CATEGORIES} value={expCategory} onChange={(e) => setExpCategory(e.target.value)} />
-                <div className="flex items-end pb-2">
-                  <Checkbox label="שולם?" checked={expPaid} onChange={(e) => setExpPaid(e.target.checked)} />
-                </div>
-                <div className="md:col-span-6 flex justify-end">
-                  <Button type="submit" variant="secondary"><Plus size={14} /> הוסף הוצאה</Button>
-                </div>
-              </form>
+              <p className="text-sm text-slate-500 mb-4 bg-slate-50 border rounded-lg p-3">
+                ההוצאות נרשמות אוטומטית מהמסמכים שנסרקו (קבלות, חשבוניות מס וכדומה). מסמכים מסוג חשבונית עסקה (תשלום עתידי) יירשמו רק לאחר סימונם כשולמו.
+              </p>
               {expenses.length === 0 ? (
-                <EmptyState title="אין הוצאות להצגה" />
+                <EmptyState title="אין הוצאות להצגה" description="סרוק קבלה או חשבונית כדי לרשום הוצאה" />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-200">

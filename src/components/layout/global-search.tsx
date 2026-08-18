@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
-  Search, Users, FolderKanban, Receipt, FileText, Wallet,
+  Search, Users, FolderKanban, Receipt, FileText,
   ClipboardList, CalendarDays, Building,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -26,10 +26,8 @@ interface GlobalSearchRow {
 const TYPE_ICONS: Record<string, LucideIcon> = {
   "לקוחות": Users,
   "פרויקטים": FolderKanban,
-  "חשבוניות": Receipt,
-  "מסמכים": FileText,
-  "הכנסות": Wallet,
-  "הוצאות": Wallet,
+  "מסמכים": Receipt,
+  "סריקות": FileText,
   "משימות": ClipboardList,
   "אירועים": CalendarDays,
   "ספקים": Building,

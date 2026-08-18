@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { formatCurrency } from "@/components/shared/format-currency";
-import { buildMonthlyReport, escapeHtml } from "@/components/documents/monthly-report-utils";
+import { buildMonthlyReport, escapeHtml } from "@/components/scans/monthly-report-utils";
 import type { Income, Expense, Saving, TaxSettings } from "@/components/finance/finance-types";
 import { Download, Send, Mail } from "lucide-react";
 

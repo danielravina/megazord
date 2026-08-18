@@ -7,8 +7,8 @@ import { useDashboardData } from "@/components/dashboard/data-sources/use-dashbo
 import { useDashboardLayout } from "@/components/dashboard/dashboard-storage";
 import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
 import { AddTilePicker } from "@/components/dashboard/add-tile-picker";
-import { DocumentScanner } from "@/components/documents/document-scanner";
-import { MonthlyExport } from "@/components/documents/monthly-export";
+import { DocumentScanner } from "@/components/scans/document-scanner";
+import { MonthlyExport } from "@/components/scans/monthly-export";
 import type {
   WidgetType,
   TimeRange,

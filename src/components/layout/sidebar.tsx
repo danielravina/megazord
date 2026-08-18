@@ -13,11 +13,11 @@ const navItems = [
   { href: "/projects/", label: "פרויקטים", icon: FolderKanban },
   { href: "/customers/", label: "לקוחות", icon: Users },
   { href: "/suppliers/", label: "ספקים", icon: Building },
-  { href: "/invoices/", label: "חשבוניות", icon: Receipt },
+  { href: "/documents/", label: "מסמכים", icon: FileText },
+  { href: "/scans/", label: "סריקות", icon: Receipt },
   { href: "/finance/", label: "ניהול כספים", icon: Wallet },
   { href: "/calendar/", label: "יומן", icon: Calendar },
   { href: "/todos/", label: "פתקים", icon: ClipboardList },
-  { href: "/documents/", label: "מסמכים", icon: FileText },
   { href: "/preferences/", label: "העדפות", icon: Settings },
 ];
 

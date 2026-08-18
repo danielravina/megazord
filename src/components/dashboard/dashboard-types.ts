@@ -99,7 +99,6 @@ export interface DocRaw {
   folder: string | null;
   is_investment: boolean;
   direction: string;
-  is_paid: boolean;
   business_id: string | null;
   date: string;
 }

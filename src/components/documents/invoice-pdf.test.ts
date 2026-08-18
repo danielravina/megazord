@@ -9,8 +9,8 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
     id: "inv1", user_id: "u", customer_id: "c1", project_id: null,
     invoice_number: "2026-0001", issue_date: "2026-08-10", due_date: null,
     items: [{ id: "i", description: "שירות", quantity: 1, unit_price: 100 }],
-    amount: 118, vat_rate: 18, status: "draft", document_type: "tax_invoice",
-    notes: null, sent_at: null, created_at: "2026-08-10", customer_name: "לקוח",
+    amount: 118, vat_rate: 18, document_type: "tax_invoice",
+    notes: null, created_at: "2026-08-10", customer_name: "לקוח",
     ...overrides,
   };
 }
@@ -24,38 +24,62 @@ const settings: TaxSettings = {
 };
 
 describe("buildInvoiceHtml — document types", () => {
-  it("renders a tax invoice with the VAT breakdown", () => {
+  it("renders a tax invoice with per-item VAT", () => {
     const html = buildInvoiceHtml(invoice(), null, settings);
     assert.ok(html.includes("חשבונית מס"));
-    assert.ok(html.includes("מע\"מ (18%)"));
+    assert.ok(html.includes("מע\"מ"));
+    assert.ok(!html.includes("מע\"מ (18%)"));
   });
 
-  it("renders a receipt without a VAT breakdown", () => {
+  it("renders a receipt without per-item VAT", () => {
     const html = buildInvoiceHtml(invoice({ document_type: "receipt" }), null, settings);
     assert.ok(html.includes("קבלה"));
     assert.ok(!html.includes("חשבונית מס"));
-    assert.ok(!html.includes("מע\"מ ("));
   });
 
   it("renders a combined tax invoice / receipt", () => {
     const html = buildInvoiceHtml(invoice({ document_type: "tax_invoice_receipt" }), null, settings);
     assert.ok(html.includes("חשבונית מס/קבלה"));
   });
+
+  it("renders a credit invoice with negative styling", () => {
+    const html = buildInvoiceHtml(invoice({ document_type: "credit_invoice", amount: 118 }), null, settings);
+    assert.ok(html.includes("חשבונית מס זיכוי"));
+    assert.ok(html.includes("סה\"כ זיכוי"));
+  });
+
+  it("renders a transaction account with a demand notice", () => {
+    const html = buildInvoiceHtml(invoice({ document_type: "transaction_account" }), null, settings);
+    assert.ok(html.includes("חשבונית עסקה"));
+    assert.ok(html.includes("דרישת תשלום"));
+  });
+
+  it("renders a quotation without a payable total", () => {
+    const html = buildInvoiceHtml(invoice({ document_type: "quotation" }), null, settings);
+    assert.ok(html.includes("הצעת מחיר"));
+    assert.ok(html.includes("סה\"כ להצעה"));
+  });
+
+  it("renders a delivery note without a payable total", () => {
+    const html = buildInvoiceHtml(invoice({ document_type: "delivery_note" }), null, settings);
+    assert.ok(html.includes("תעודת משלוח"));
+    assert.ok(html.includes("סה\"כ פריטים"));
+  });
 });
 
 describe("buildInvoiceHtml — עוסק פטור (exempt)", () => {
-  it("shows the exemption clause and no VAT amount", () => {
+  it("shows the exemption clause and no per-item VAT column", () => {
     const html = buildInvoiceHtml(invoice({ vat_rate: 0 }), null, settings);
     assert.ok(html.includes("עוסק פטור — חשבונית זו אינה כוללת מע\"מ"));
     assert.ok(!html.includes("סעיף 31"));
-    assert.ok(!html.includes("מע\"מ ("));
   });
 });
 
 describe("buildInvoiceHtml — totals", () => {
-  it("renders the totals section with subtotal / total", () => {
+  it("renders a single total with VAT embedded per item", () => {
     const html = buildInvoiceHtml(invoice(), null, settings);
-    assert.ok(html.includes("סכום ללא מע\"מ"));
     assert.ok(html.includes("סה\"כ לתשלום"));
+    assert.ok(!html.includes("סכום ללא מע\"מ"));
+    assert.ok(!html.includes("מע\"מ (18%)"));
   });
 });

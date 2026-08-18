@@ -75,7 +75,7 @@ serve(async (req: Request) => {
 - title: Short descriptive title in Hebrew
 - tags: Array of 2-4 relevant Hebrew tags
 - extractedText: ALL visible text from the document
-- docType: "Invoice" | "Delivery Note" | "Proforma Invoice" | "Other"
+- docType: One of the receipt/vendor document types: "tax_invoice" (חשבונית מס), "transaction_account" (חשבונית עסקה / דרישת תשלום), "tax_invoice_receipt" (חשבונית מס/קבלה), "credit_invoice" (חשבונית מס זיכוי), "receipt" (קבלה), "quotation" (הצעת מחיר), "delivery_note" (תעודת משלוח), or "other"
 - dateOnDoc: Date in YYYY-MM-DD format, or ""
 - totalAmount: Final total as number, or null
 - folderSuggestion: "Bank" | "VAT" | "Income Tax" | "National Insurance" | "Accountant" | "Suppliers" | "Employees" | "Other"
@@ -167,7 +167,7 @@ serve(async (req: Request) => {
       title: String(parsed.title || "מסמך ללא שם"),
       tags: Array.isArray(parsed.tags) ? parsed.tags : ["כללי"],
       extractedText: String(parsed.extractedText || raw),
-      docType: String(parsed.docType || "Other"),
+      docType: String(parsed.docType || "other"),
       dateOnDoc: String(parsed.dateOnDoc || ""),
       totalAmount: parsed.totalAmount != null ? Number(parsed.totalAmount) : null,
       folderSuggestion: String(parsed.folderSuggestion || ""),

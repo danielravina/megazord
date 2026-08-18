@@ -1,48 +1,86 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+async function createCustomer(page: Page, name: string) {
+  await page.goto("/customers/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  await page.locator("button:has-text('לקוח חדש')").click();
+  await expect(page.locator("label:has-text('שם *')")).toBeVisible({ timeout: 5000 });
+  await page.locator("label:has-text('שם *') + input").fill(name);
+  await page.locator("button:has-text('שמור לקוח')").click();
+  await expect(page.locator("text=הלקוח נוצר")).toBeVisible({ timeout: 10000 });
+  await page.reload();
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator(`td:has-text('${name}')`).first()).toBeVisible({ timeout: 10000 });
+}
 
 test("documents page loads with heading", async ({ page }) => {
   await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-  await expect(page.locator("main h1")).toContainText("המסמכים שלי");
+  await expect(page.locator("main h1")).toContainText("מסמכים");
 });
 
-test("documents page has list/folders toggle", async ({ page }) => {
+test("can create a tax invoice which books income immediately", async ({ page }) => {
   await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  await expect(page.locator("button:has-text('רשימה')")).toBeVisible();
-  await expect(page.locator("button:has-text('תיקיות')")).toBeVisible();
-});
+  const custName = `בדיקת E2E - חשבונית ${Date.now()}`;
+  await createCustomer(page, custName);
 
-test("documents page has search input", async ({ page }) => {
   await page.goto("/documents/");
-  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-  await expect(page.locator("input[placeholder='חיפוש מסמכים או תגיות...']")).toBeVisible();
-});
+  await page.locator("button:has-text('מסמך חדש')").click();
+  await expect(page.locator("label:has-text('לקוח *')")).toBeVisible({ timeout: 5000 });
+  await page.locator("label:has-text('לקוח *') + select").selectOption({ label: custName });
 
-test("scan document button exists on dashboard", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-  await expect(page.locator("button:has-text('סרוק מסמך')")).toBeVisible({ timeout: 5000 });
-});
+  // VAT rate comes from Preferences (tax_settings.vat_rate = 18)
+  // so the total is deterministic (200 * 1.18 = 236)
 
-test("can switch to folders view", async ({ page }) => {
-  await page.goto("/documents/");
-  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  // Fill line item
+  await page.locator("input[placeholder='תיאור השירות / המוצר']").fill("בדיקת E2E - שירות");
+  await page.locator("input[placeholder='כמות']").fill("2");
+  await page.locator("input[placeholder='מחיר ליחידה']").fill("100");
+  await page.locator("button:has-text('צור מסמך')").click();
 
-  await page.locator("button:has-text('תיקיות')").click();
-
-  // Should show folder cards
-  await expect(page.locator("h4:has-text('בנק')")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator("h4:has-text('מע\"מ')")).toBeVisible();
-});
-
-test("folders view shows document counts", async ({ page }) => {
+  // After creation we land on the full-page preview (?view=<id>)
+  await expect(page.locator("button:has-text('הורד PDF')")).toBeVisible({ timeout: 10000 });
   await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  await page.locator("button:has-text('תיקיות')").click();
+  const row = page.locator(`tr:has-text('${custName}')`).first();
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await expect(row.locator("td").nth(3)).toContainText("236");
 
-  // Each folder should show a count
-  await expect(page.locator("text=/\\d+ מסמכים/").first()).toBeVisible({ timeout: 5000 });
+  const invoiceNumber = (await row.locator("td").first().textContent())!.trim();
+
+  // Tax invoice books income at issuance
+  await page.goto("/finance/");
+  await page.locator("button:has-text('הכנסות')").click();
+  await expect(page.locator(`text=חשבונית מס ${invoiceNumber}`).first()).toBeVisible({ timeout: 5000 });
+});
+
+test("can create a quotation which does NOT book income", async ({ page }) => {
+  await page.goto("/documents/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+
+  const custName = `בדיקת E2E - הצעה ${Date.now()}`;
+  await createCustomer(page, custName);
+
+  await page.goto("/documents/");
+  await page.locator("button:has-text('מסמך חדש')").click();
+  await expect(page.locator("label:has-text('לקוח *')")).toBeVisible({ timeout: 5000 });
+  await page.locator("label:has-text('לקוח *') + select").selectOption({ label: custName });
+  await page.locator("label:has-text('סוג מסמך') + select").selectOption({ label: "הצעת מחיר" });
+  await page.locator("input[placeholder='תיאור השירות / המוצר']").fill("בדיקת E2E - הצעה");
+  await page.locator("input[placeholder='כמות']").fill("1");
+  await page.locator("input[placeholder='מחיר ליחידה']").fill("500");
+  await page.locator("button:has-text('צור מסמך')").click();
+  await expect(page.locator("button:has-text('הורד PDF')")).toBeVisible({ timeout: 10000 });
+  await page.goto("/documents/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+
+  const quoteNumber = (await page.locator(`tr:has-text('${custName}') td`).first().textContent())!.trim();
+
+  // Quotation must NOT book income
+  await page.goto("/finance/");
+  await page.locator("button:has-text('הכנסות')").click();
+  await expect(page.locator(`text=${quoteNumber}`)).toBeHidden({ timeout: 5000 });
 });

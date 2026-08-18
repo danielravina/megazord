@@ -222,7 +222,7 @@ export function SuppliersPage() {
                     <td className="px-4 py-3 text-sm text-slate-500">{s.email || "-"}</td>
                     <td className="px-4 py-3 text-sm">
                       <Link
-                        href={`/documents/?supplier=${s.id}`}
+                        href={`/scans/?supplier=${s.id}`}
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline"
                         title="הצג מסמכים של הספק"
                       >

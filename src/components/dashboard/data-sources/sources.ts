@@ -411,7 +411,8 @@ function documentsView(
 ): WidgetData {
   let docs = raw.documents;
   if (opts.investment) docs = docs.filter((d) => d.is_investment);
-  if (opts.unpaidIncome) docs = docs.filter((d) => !d.is_paid && d.direction === "income");
+  // חובות לקוחות = מסמכי חשבונית עסקה (תשלום עתידי) שטרם שולמו
+  if (opts.unpaidIncome) docs = docs.filter((d) => d.doc_type === "transaction_account");
   const items = filterByTimeRange(docs, range);
   const total = items.reduce((s, d) => s + Number(d.total_amount || 0), 0);
 
