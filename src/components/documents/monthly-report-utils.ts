@@ -99,5 +99,5 @@ export function buildMonthlyReport(
 
 export function vatForMonth(incomes: Income[], taxSettings: TaxSettings | null, month: number, year: number): number {
   const items = filterByMonth(incomes, month, year);
-  return Math.round(totalVat(items, taxSettings?.vat_rate ?? 17));
+  return Math.round(totalVat(items, taxSettings?.vat_rate ?? 18));
 }

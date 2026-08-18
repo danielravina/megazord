@@ -20,7 +20,7 @@ function computeTaxes(incomes: number[], expenses: number[], savings: number[], 
   const grossWithoutVat = totalIncome - vat;
   const incomeTaxAdv = grossWithoutVat * (settings.income_tax_advance / 100);
   const btlAdv = grossWithoutVat * (settings.bituah_leumi / 100);
-  const creditValue = settings.credit_points * 235;
+  const creditValue = settings.credit_points * 242;
 
   const totalTax = Math.max(0, vat + incomeTaxAdv + btlAdv - creditValue);
   const netIncome = totalIncome - totalTax - allExpenses;
@@ -138,8 +138,8 @@ test("VAT is calculated correctly from gross income", async ({ page }) => {
     // VAT should be less than totalIncome (VAT is part of the gross)
     expect(displayedVat).toBeLessThan(totalIncome + 1);
 
-    // VAT should be approximately totalIncome * rate / (1 + rate) = totalIncome * 0.17/1.17
-    const expectedVat = Math.round(totalIncome * 17 / 117);
+    // VAT should be approximately totalIncome * rate / (1 + rate) = totalIncome * 0.18/1.18
+    const expectedVat = Math.round(totalIncome * 18 / 118);
     // Allow a small tolerance: invoice-generated income carries its own VAT rate
     // (e.g. 18%), so the displayed per-row VAT can differ slightly from a flat 17%
     expect(Math.abs(displayedVat - expectedVat)).toBeLessThanOrEqual(10);
@@ -157,8 +157,8 @@ test("credit points are computed correctly", async ({ page }) => {
   const creditInput = page.locator("input[name='credit_points']");
   const creditValue = parseFloat(await creditInput.inputValue() || "2.25");
 
-  // Each credit point = ₪235/month (verified via the tax engine formula)
-  const creditValueRounded = Math.round(creditValue * 235);
+  // Each credit point = ₪242/month (verified via the tax engine formula)
+  const creditValueRounded = Math.round(creditValue * 242);
   expect(creditValueRounded).toBeGreaterThan(0);
 
   // Switch back to dashboard tab to verify displayed credit value

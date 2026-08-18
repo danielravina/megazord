@@ -306,7 +306,7 @@ function taxView(raw: DashboardRawData, range: TimeRange, view: WidgetType, labe
 
 function taxUpcomingView(raw: DashboardRawData, view: WidgetType): WidgetData {
   const s = raw.taxSettings;
-  const vatRate = s?.vat_rate ?? 17;
+  const vatRate = s?.vat_rate ?? 18;
   const incTaxRate = s?.income_tax_advance ?? 0;
   const blRate = s?.bituah_leumi ?? 5;
   const totalIncome = raw.incomes.reduce((sum, i) => sum + Number(i.amount), 0);

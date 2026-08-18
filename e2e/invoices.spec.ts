@@ -59,7 +59,10 @@ test("can create an invoice with items, preview and mark as sent", async ({ page
   await row.locator("button[title='תצוגה']").click();
   await expect(page.locator("text=חשבונית מס")).toBeVisible({ timeout: 5000 });
 
-  // Mark as sent (income is recorded without email)
+  // WhatsApp share button is present in the preview footer
+  await expect(page.locator("button:has-text('שלח בוואטסאפ')")).toBeVisible({ timeout: 5000 });
+
+  // Mark as sent (no income is recorded on send - cash basis)
   page.on("dialog", (d) => d.accept());
   await page.locator("button:has-text('סמן כנשלח')").click();
   await expect(page.locator("button:has-text('סמן כשולם')")).toBeVisible({ timeout: 5000 });
@@ -68,7 +71,22 @@ test("can create an invoice with items, preview and mark as sent", async ({ page
   await page.locator("button:has-text('סגור')").click();
   await expect(row.locator("span:has-text('נשלחה')").first()).toBeVisible({ timeout: 5000 });
 
-  // The income appears in finance
+  // Sending must NOT record income (cash basis)
+  await page.goto("/finance/");
+  await page.locator("button:has-text('הכנסות')").click();
+  await expect(page.locator(`text=חשבונית ${invoiceNumber}`)).toBeHidden({ timeout: 5000 });
+
+  // Mark as paid -> income is now recorded
+  await page.goto("/invoices/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  const rowAfter = page.locator(`tr:has-text('${custName}')`).first();
+  await rowAfter.locator("button[title='תצוגה']").click();
+  await expect(page.locator("button:has-text('סמן כשולם')")).toBeVisible({ timeout: 5000 });
+  await page.locator("button:has-text('סמן כשולם ורשום הכנסה')").click();
+  await page.locator("button:has-text('סגור')").click();
+  await expect(rowAfter.locator("span:has-text('שולם')").first()).toBeVisible({ timeout: 5000 });
+
+  // The income now appears in finance
   await page.goto("/finance/");
   await page.locator("button:has-text('הכנסות')").click();
   await expect(page.locator(`text=חשבונית ${invoiceNumber}`).first()).toBeVisible({ timeout: 5000 });

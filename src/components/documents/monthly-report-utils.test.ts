@@ -16,9 +16,10 @@ const saving = (id: string, amount: number, date: string): Saving => ({
 });
 
 const settings: TaxSettings = {
-  user_id: "u", vat_rate: 17, vat_frequency: "bimonthly", vat_billing_day: 15,
+  user_id: "u", vat_rate: 18, vat_frequency: "bimonthly", vat_billing_day: 15,
   income_tax_advance: 15, income_tax_billing_day: 15, bituah_leumi: 5, bituah_leumi_billing_day: 15,
-  credit_points: 2.25, business_name: null, vat_number: null, business_address: null,
+  credit_points: 2.25, vat_status: "morashi", income_scheme: "standard", zeair_expense_rate: 0,
+  business_name: null, vat_number: null, business_address: null,
   business_phone: null, accountant_email: null, owner_name: null,
 };
 
@@ -98,7 +99,7 @@ describe("buildMonthlyReport", () => {
 
   it("calculates vat from income", () => {
     const vat = vatForMonth([income("i1", 1170, "2026-08-10"), income("i2", 1170, "2026-07-10")], settings, 7, 2026);
-    // vatFromGross(1170, 17) = 1170 - 1170/1.17 = 170
-    assert.equal(vat, 170);
+    // vatFromGross(1170, 18) = 1170 - 1170/1.18 = 178.47... -> 178
+    assert.equal(vat, 178);
   });
 });

@@ -283,7 +283,7 @@ export function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Skeleton className="w-6 h-6" />
           <Skeleton className="w-6 h-6" />
@@ -326,7 +326,7 @@ export function ProjectDetailPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/projects/" className="text-slate-400 hover:text-slate-600">
           <ArrowRight size={20} />

@@ -29,7 +29,7 @@ interface Props {
 }
 
 export function FutureTaxWidget({ settings, estimatedIncome }: Props) {
-  const vatRate = settings?.vat_rate ?? 17;
+  const vatRate = settings?.vat_rate ?? 18;
   const incTaxRate = settings?.income_tax_advance ?? 0;
   const blRate = settings?.bituah_leumi ?? 5;
 

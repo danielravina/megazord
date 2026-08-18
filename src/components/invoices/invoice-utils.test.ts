@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { nextInvoiceNumber, computeTotals, lineTotal } from "./invoice-utils";
+import { nextInvoiceNumber, computeTotals, computeTotalsInclusive, lineTotal } from "./invoice-utils";
 
 describe("nextInvoiceNumber", () => {
   it("returns YYYY-0001 for an empty list", () => {
@@ -54,5 +54,44 @@ describe("computeTotals", () => {
     const t = computeTotals([{ id: "c", description: "", quantity: 0, unit_price: 100 }], 18);
     assert.equal(lineTotal({ id: "c", description: "", quantity: 0, unit_price: 100 }), 0);
     assert.equal(t.subtotal, 0);
+  });
+});
+
+describe("computeTotalsInclusive", () => {
+  it("derives net and vat from a VAT-inclusive price", () => {
+    // 2 x 100 net (@18%) => gross 118 each => 236 total
+    const items = [
+      { id: "a", description: "שירות 1", quantity: 1, unit_price: 118 },
+      { id: "b", description: "שירות 2", quantity: 1, unit_price: 118 },
+    ];
+    const t = computeTotalsInclusive(items, 18);
+    assert.equal(t.subtotal, 200);
+    assert.equal(t.vat, 36);
+    assert.equal(t.total, 236);
+  });
+
+  it("round-trips with computeTotals for the same net", () => {
+    const grossItems = [{ id: "a", description: "x", quantity: 2, unit_price: 295 }];
+    const inc = computeTotalsInclusive(grossItems, 18);
+    // net per unit = 295 / 1.18 = 250
+    const netItems = [{ id: "a", description: "x", quantity: 2, unit_price: 250 }];
+    const net = computeTotals(netItems, 18);
+    assert.equal(inc.subtotal, net.subtotal);
+    assert.equal(inc.vat, net.vat);
+    assert.equal(inc.total, net.total);
+  });
+
+  it("handles exempt / zero rate", () => {
+    const t = computeTotalsInclusive([{ id: "a", description: "x", quantity: 2, unit_price: 100 }], 0);
+    assert.equal(t.vat, 0);
+    assert.equal(t.subtotal, 200);
+    assert.equal(t.total, 200);
+  });
+
+  it("handles empty items", () => {
+    const t = computeTotalsInclusive([], 18);
+    assert.equal(t.subtotal, 0);
+    assert.equal(t.vat, 0);
+    assert.equal(t.total, 0);
   });
 });

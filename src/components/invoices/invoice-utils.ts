@@ -32,6 +32,16 @@ export function computeTotals(items: InvoiceItem[], vatRate: number): InvoiceTot
   return { subtotal, vat, total: subtotal + vat };
 }
 
+// Compute totals from VAT-inclusive (gross) unit prices: the total is the sum
+// of the gross, with net and VAT backed out. Round-trips with computeTotals.
+export function computeTotalsInclusive(items: InvoiceItem[], vatRate: number): InvoiceTotals {
+  const total = items.reduce((s, i) => s + lineTotal(i), 0);
+  const r = (vatRate || 0) / 100;
+  if (r === 0) return { subtotal: total, vat: 0, total };
+  const net = total / (1 + r);
+  return { subtotal: net, vat: total - net, total };
+}
+
 export function emptyItem(): InvoiceItem {
   return { id: generateId(), description: "", quantity: 1, unit_price: 0 };
 }

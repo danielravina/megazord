@@ -64,6 +64,7 @@ const FOLDERS = [
 
 interface Props {
   onScanned?: () => void;
+  primary?: boolean;
 }
 
 interface TempDoc {
@@ -92,7 +93,7 @@ const EMPTY_TEMP: TempDoc = {
   businessId: "", businessVat: "", newBusinessName: "",
 };
 
-export function DocumentScanner({ onScanned }: Props) {
+export function DocumentScanner({ onScanned, primary = false }: Props) {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -371,7 +372,7 @@ export function DocumentScanner({ onScanned }: Props) {
       <Dropdown
         align="left"
         trigger={
-          <Button variant="secondary" size="sm">
+          <Button variant={primary ? "primary" : "secondary"} size="sm">
             <ScanLine size={14} />
             סרוק מסמך
           </Button>

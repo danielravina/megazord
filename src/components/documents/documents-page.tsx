@@ -245,7 +245,7 @@ export function DocumentsPage() {
           המסמכים שלי
         </h1>
         <div className="flex items-center gap-2">
-          <DocumentScanner onScanned={loadDocs} />
+          <DocumentScanner onScanned={loadDocs} primary />
           <div className="flex bg-slate-100 p-1 rounded-lg">
             <button onClick={() => { setCurrentView("list"); setFolderFilter(null); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "list" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>רשימה</button>
             <button onClick={() => setCurrentView("folders")} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "folders" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>תיקיות</button>

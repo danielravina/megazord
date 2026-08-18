@@ -242,6 +242,21 @@ test("drag handle visible on tiles in customize mode", async ({ page }) => {
   await page.locator("button:has-text('סיום')").click();
 });
 
+test("special widgets show resize handle in customize mode", async ({ page }) => {
+  await authGuard(page);
+  await page.locator("button:has-text('התאמה אישית')").click();
+  await page.locator(".border-dashed").click();
+  await expect(page.locator("h2:has-text('מה תרצה לראות')")).toBeVisible({ timeout: 5000 });
+  await page.locator(".fixed.inset-0.z-50 button:has-text('מחשבון')").click();
+  await page.waitForTimeout(800);
+
+  const calcTile = page.locator("[data-tile]").filter({ has: page.locator("button:has-text('7')") }).first();
+  await expect(calcTile).toBeVisible({ timeout: 5000 });
+  await expect(calcTile.locator("button[aria-label='שנה רוחב']")).toBeVisible({ timeout: 3000 });
+
+  await page.locator("button:has-text('סיום')").click();
+});
+
 // ── Responsive Grid ────────────────────────────
 
 test("grid adjusts columns on mobile viewport", async ({ page }) => {

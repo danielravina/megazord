@@ -7,6 +7,14 @@ import { computeTotals, lineTotal } from "./invoice-utils";
 
 const fmtDate = (d?: string | null) => (d ? d.split("-").reverse().join("/") : "-");
 
+const DOC_TITLE: Record<string, string> = {
+  tax_invoice: "חשבונית מס",
+  receipt: "קבלה",
+  tax_invoice_receipt: "חשבונית מס/קבלה",
+};
+
+const EXEMPT_CLAUSE = 'עוסק פטור — חשבונית זו אינה כוללת מע"מ';
+
 // Pure HTML string with inline styles (no Tailwind / oklch colors) for PDF capture
 export function buildInvoiceHtml(
   invoice: Invoice,
@@ -16,6 +24,8 @@ export function buildInvoiceHtml(
   const items = invoice.items || [];
   const totals = computeTotals(items, invoice.vat_rate);
   const isExempt = invoice.vat_rate === 0;
+  const isReceipt = invoice.document_type === "receipt";
+  const title = DOC_TITLE[invoice.document_type] || DOC_TITLE.tax_invoice;
 
   const rows = items
     .map(
@@ -29,6 +39,34 @@ export function buildInvoiceHtml(
     )
     .join("");
 
+  // A pure receipt shows a single total (no separate VAT breakdown).
+  const totalBlock = isReceipt
+    ? `
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
+        <span>סה"כ לתשלום</span>
+        <span>${formatCurrency(totals.total)}</span>
+      </div>
+      ${isExempt ? `<p style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.5;">${EXEMPT_CLAUSE}</p>` : ""}
+    `
+    : `
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
+        <span>סכום ללא מע"מ</span>
+        <span>${formatCurrency(totals.subtotal)}</span>
+      </div>
+      ${
+        isExempt
+          ? `<p style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.5;">${EXEMPT_CLAUSE}</p>`
+          : `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
+               <span>מע"מ (${invoice.vat_rate}%)</span>
+               <span>${formatCurrency(totals.vat)}</span>
+             </div>`
+      }
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
+        <span>סה"כ לתשלום</span>
+        <span>${formatCurrency(totals.total)}</span>
+      </div>
+    `;
+
   return `
   <div dir="rtl" style="font-family:Arial,'Heebo',sans-serif;color:#1e293b;padding:24px;background:#fff;max-width:700px;overflow:hidden;">
     <div style="display:flex;justify-content:space-between;border-bottom:2px solid #1e293b;padding-bottom:12px;">
@@ -39,7 +77,7 @@ export function buildInvoiceHtml(
         ${settings?.business_phone ? `<p style="font-size:12px;margin:2px 0;">טל: ${escapeHtml(settings.business_phone)}</p>` : ""}
       </div>
       <div style="text-align:left;">
-        <h2 style="font-size:18px;margin:0;font-weight:700;">חשבונית מס</h2>
+        <h2 style="font-size:18px;margin:0;font-weight:700;">${escapeHtml(title)}</h2>
         <p style="font-size:13px;margin:6px 0 2px;">מספר: ${escapeHtml(invoice.invoice_number)}</p>
         <p style="font-size:12px;margin:2px 0;">תאריך: ${fmtDate(invoice.issue_date)}</p>
         ${invoice.due_date ? `<p style="font-size:12px;margin:2px 0;">יעד לתשלום: ${fmtDate(invoice.due_date)}</p>` : ""}
@@ -70,22 +108,7 @@ export function buildInvoiceHtml(
 
     <div style="margin-top:16px;display:flex;justify-content:flex-end;">
       <div style="width:260px;">
-        <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
-          <span>סכום ללא מע"מ</span>
-          <span>${formatCurrency(totals.subtotal)}</span>
-        </div>
-        ${
-          isExempt
-            ? '<p style="font-size:11px;color:#64748b;margin:6px 0;line-height:1.5;">עוסק פטור - אין חיוב מע"מ (סעיף 31 לחוק מס ערך מוסף)</p>'
-            : `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">
-                 <span>מע"מ (${invoice.vat_rate}%)</span>
-                 <span>${formatCurrency(totals.vat)}</span>
-               </div>`
-        }
-        <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
-          <span>סה"כ לתשלום</span>
-          <span>${formatCurrency(totals.total)}</span>
-        </div>
+        ${totalBlock}
       </div>
     </div>
 
@@ -95,6 +118,30 @@ export function buildInvoiceHtml(
         : ""
     }
   </div>`;
+}
+
+// Render the HTML to a PDF (client-side html2pdf), return a Blob for sharing / files
+export async function generateInvoicePdfBlob(html: string): Promise<Blob> {
+  const html2pdf = (await import("html2pdf.js")).default;
+  const el = document.createElement("div");
+  el.innerHTML = html;
+  el.style.width = "700px";
+  document.body.appendChild(el);
+  await new Promise((r) => setTimeout(r, 100));
+  try {
+    const buffer = await html2pdf()
+      .set({
+        margin: 10,
+        image: { type: "jpeg", quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      })
+      .from(el.firstElementChild as HTMLElement)
+      .outputPdf("arraybuffer");
+    return new Blob([buffer], { type: "application/pdf" });
+  } finally {
+    document.body.removeChild(el);
+  }
 }
 
 // Render the HTML to a PDF (client-side html2pdf), return raw base64 for emailing

@@ -3,7 +3,7 @@ import type { Project } from "@/components/projects/project-types";
 
 export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "calculator" | "clock" | "weather" | "calendar";
 
-export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut", "calendar"];
+export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut", "calendar", "calculator", "clock", "weather"];
 export const LOCKED_1x1: WidgetType[] = ["calculator", "clock", "weather"];
 export const STATIC_WIDGETS: WidgetType[] = ["calculator", "clock", "weather"];
 export const DISPLAY_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut"];

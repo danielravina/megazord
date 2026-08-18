@@ -5,6 +5,9 @@ export interface InvoiceItem {
   unit_price: number;
 }
 
+// סוג מסמך: חשבונית מס / קבלה / חשבונית מס+קבלה
+export type DocumentType = "tax_invoice" | "receipt" | "tax_invoice_receipt";
+
 export interface Invoice {
   id: string;
   user_id: string;
@@ -17,6 +20,7 @@ export interface Invoice {
   amount: number;
   vat_rate: number;
   status: string;
+  document_type: DocumentType;
   notes: string | null;
   sent_at: string | null;
   created_at: string;
@@ -31,6 +35,7 @@ export interface InvoiceFormData {
   due_date: string;
   vat_rate: number;
   is_exempt: boolean;
+  document_type: DocumentType;
   items: InvoiceItem[];
   notes: string;
 }

@@ -19,13 +19,14 @@ import {
   Receipt, Plus, Save, Trash2, Pencil, Eye, Send, Download,
   CheckCircle2, UserPlus, X,
 } from "lucide-react";
-import type { Invoice, InvoiceItem, InvoiceFormData } from "./invoice-types";
+import type { Invoice, InvoiceItem, InvoiceFormData, DocumentType } from "./invoice-types";
 import type { Customer } from "@/components/customers/customer-types";
 import type { TaxSettings } from "@/components/finance/finance-types";
-import { nextInvoiceNumber, computeTotals, emptyItem } from "./invoice-utils";
+import { nextInvoiceNumber, computeTotals, computeTotalsInclusive, emptyItem } from "./invoice-utils";
 import { embeddedName } from "@/components/projects/project-types";
 import { isValidEmail } from "@/components/shared/validate-email";
-import { buildInvoiceHtml, generateInvoicePdfBase64 } from "./invoice-pdf";
+import { WhatsAppIcon } from "@/components/shared/whatsapp-icon";
+import { buildInvoiceHtml, generateInvoicePdfBase64, generateInvoicePdfBlob } from "./invoice-pdf";
 
 const STATUS_META: Record<string, { label: string; variant: "gray" | "blue" | "green" }> = {
   draft: { label: "טיוטה", variant: "gray" },
@@ -62,10 +63,12 @@ export function InvoicesPage() {
   const [newCustOpen, setNewCustOpen] = useState(false);
   const [newCustName, setNewCustName] = useState("");
   const [newCustEmail, setNewCustEmail] = useState("");
+  const [vatInclusive, setVatInclusive] = useState(false);
 
   const [preview, setPreview] = useState<Invoice | null>(null);
   const [sendConfirm, setSendConfirm] = useState<Invoice | null>(null);
   const [sending, setSending] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -113,12 +116,14 @@ export function InvoicesPage() {
 
   function openNew(prefill?: { customer_id?: string; project_id?: string; item_description?: string; unit_price?: number }) {
     setEditingId(null);
-    const defaultRate = taxSettings?.vat_rate ?? 18;
+    const isPatoor = taxSettings?.vat_status === "patoor";
+    const defaultRate = isPatoor ? 0 : (taxSettings?.vat_rate ?? 18);
     const item = emptyItem();
     if (prefill) {
       item.description = prefill.item_description || "";
       item.unit_price = prefill.unit_price ?? 0;
     }
+    setVatInclusive(false);
     setForm({
       customer_id: prefill?.customer_id || "",
       project_id: prefill?.project_id || "",
@@ -126,7 +131,8 @@ export function InvoicesPage() {
       issue_date: new Date().toISOString().split("T")[0],
       due_date: "",
       vat_rate: defaultRate,
-      is_exempt: defaultRate === 0,
+      is_exempt: isPatoor,
+      document_type: isPatoor ? "receipt" : "tax_invoice",
       items: [item],
       notes: "",
     });
@@ -136,6 +142,7 @@ export function InvoicesPage() {
 
   function openEdit(inv: Invoice) {
     setEditingId(inv.id);
+    setVatInclusive(false);
     setForm({
       customer_id: inv.customer_id,
       project_id: inv.project_id || "",
@@ -144,6 +151,7 @@ export function InvoicesPage() {
       due_date: inv.due_date || "",
       vat_rate: inv.vat_rate,
       is_exempt: inv.vat_rate === 0,
+      document_type: inv.document_type || "tax_invoice",
       items: inv.items.length ? inv.items : [emptyItem()],
       notes: inv.notes || "",
     });
@@ -192,16 +200,27 @@ export function InvoicesPage() {
     }
     setSaving(true);
 
-    const totals = computeTotals(form.items, form.vat_rate);
+    const isExemptInvoice = form.is_exempt;
+    const rate = isExemptInvoice ? 0 : form.vat_rate;
+    // When entering VAT-inclusive prices, convert each line to a net unit price
+    // so the stored/persisted totals always use the net+VAT model.
+    const netItems = vatInclusive && !isExemptInvoice
+      ? form.items.map((it) => ({ ...it, unit_price: it.unit_price / (1 + rate / 100) }))
+      : form.items;
+
+    const totals = computeTotals(netItems.filter((it) => it.description.trim()), rate);
+    const isReceipt = form.document_type === "receipt";
+    const now = new Date().toISOString();
     const payload = {
       customer_id: form.customer_id,
       project_id: form.project_id || null,
       invoice_number: form.invoice_number.trim() || nextInvoiceNumber(invoices, new Date()),
       issue_date: form.issue_date,
       due_date: form.due_date || null,
-      items: form.items.filter((it) => it.description.trim()),
+      items: netItems.filter((it) => it.description.trim()),
       amount: Math.round(totals.total * 100) / 100,
-      vat_rate: form.is_exempt ? 0 : form.vat_rate,
+      vat_rate: rate,
+      document_type: form.document_type,
       notes: form.notes || null,
     };
 
@@ -216,14 +235,27 @@ export function InvoicesPage() {
     } else {
       const newId = generateId();
       const custName = customers.find((c) => c.id === form.customer_id)?.name || null;
-      const newInv: Invoice = { id: newId, user_id: user.id, customer_name: custName, ...payload, status: "draft", sent_at: null, created_at: new Date().toISOString() } as Invoice;
+      const status = isReceipt ? "paid" : "draft";
+      const newInv: Invoice = {
+        id: newId, user_id: user.id, customer_name: custName, ...payload,
+        status, sent_at: null, created_at: now,
+      } as Invoice;
       setInvoices((prev) => [newInv, ...prev]);
-      const { error } = await supabase.from("invoices").insert({ id: newId, user_id: user.id, ...payload });
+      const { error } = await supabase.from("invoices").insert({ id: newId, user_id: user.id, ...payload, status });
       if (error) {
         setInvoices((prev) => prev.filter((i) => i.id !== newId));
         toast("שגיאה בשמירה", "error");
       } else {
-        toast("החשבונית נוצרה", "success");
+        toast(isReceipt ? "הקבלה נוצרה ורשמה הכנסה" : "החשבונית נוצרה", "success");
+        if (isReceipt) {
+          await bookIncome({
+            invoice_number: newInv.invoice_number,
+            customer_id: newInv.customer_id,
+            amount: newInv.amount,
+            vat_rate: newInv.vat_rate,
+            project_id: newInv.project_id,
+          });
+        }
       }
     }
 
@@ -243,31 +275,51 @@ export function InvoicesPage() {
     }
   }
 
-  async function applySent(inv: Invoice) {
+  // Record the invoice as income in the books. Called ONLY on payment (cash basis).
+  async function bookIncome(opts: { invoice_number: string; customer_id: string; amount: number; vat_rate: number; project_id: string | null }) {
     if (!user) return;
-    const customer = customers.find((c) => c.id === inv.customer_id);
-    const desc = `חשבונית ${inv.invoice_number}: ${customer?.name || ""}`;
+    const customer = customers.find((c) => c.id === opts.customer_id);
+    const desc = `חשבונית ${opts.invoice_number}: ${customer?.name || ""}`;
     const date = new Date().toISOString().split("T")[0];
-    const incomePayload = { description: desc, amount: inv.amount, date, type: "שוטף", vat_rate: inv.vat_rate };
+    const incomePayload = { description: desc, amount: opts.amount, date, type: "שוטף", vat_rate: opts.vat_rate };
 
-    if (inv.project_id) {
+    if (opts.project_id) {
       const { data: existing } = await supabase
-        .from("incomes").select("id").eq("user_id", user.id).eq("project_id", inv.project_id)
+        .from("incomes").select("id").eq("user_id", user.id).eq("project_id", opts.project_id)
         .ilike("description", "הכנסה מפרויקט%").maybeSingle();
       if (existing) {
-        await supabase.from("incomes").update({ ...incomePayload, project_id: inv.project_id }).eq("id", existing.id);
+        await supabase.from("incomes").update({ ...incomePayload, project_id: opts.project_id }).eq("id", existing.id);
       } else {
-        await supabase.from("incomes").insert({ id: generateId(), user_id: user.id, project_id: inv.project_id, ...incomePayload });
+        await supabase.from("incomes").insert({ id: generateId(), user_id: user.id, project_id: opts.project_id, ...incomePayload });
       }
     } else {
       await supabase.from("incomes").insert({ id: generateId(), user_id: user.id, ...incomePayload });
     }
+  }
 
+  async function applySent(inv: Invoice) {
     const { error } = await supabase.from("invoices").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", inv.id);
     if (error) {
       toast("שגיאה בעדכון סטטוס החשבונית", "error");
     } else {
       setInvoices((prev) => prev.map((i) => (i.id === inv.id ? { ...i, status: "sent", sent_at: new Date().toISOString() } : i)));
+    }
+  }
+
+  // Mark as paid AND book the income (money received => income recognized).
+  async function applyPaid(inv: Invoice) {
+    await bookIncome({
+      invoice_number: inv.invoice_number,
+      customer_id: inv.customer_id,
+      amount: inv.amount,
+      vat_rate: inv.vat_rate,
+      project_id: inv.project_id,
+    });
+    const { error } = await supabase.from("invoices").update({ status: "paid" }).eq("id", inv.id);
+    if (error) {
+      toast("שגיאה בעדכון", "error");
+    } else {
+      setInvoices((prev) => prev.map((i) => (i.id === inv.id ? { ...i, status: "paid" } : i)));
     }
   }
 
@@ -319,20 +371,48 @@ export function InvoicesPage() {
     }
   }
 
+  async function handleSendWhatsApp(inv: Invoice) {
+    if (typeof navigator === "undefined" || !navigator.share) {
+      toast("הדפדפן אינו תומך בשיתוף", "error");
+      return;
+    }
+    setSendingWhatsApp(true);
+    try {
+      const customer = customers.find((c) => c.id === inv.customer_id) || null;
+      const html = buildInvoiceHtml(inv, customer, taxSettings);
+      const blob = await generateInvoicePdfBlob(html);
+      const file = new File([blob], `חשבונית-${inv.invoice_number}.pdf`, { type: "application/pdf" });
+
+      await navigator.share({
+        files: [file],
+        title: `חשבונית ${inv.invoice_number}`,
+      });
+
+      if (inv.status === "draft") {
+        await applySent(inv);
+      }
+      toast("החשבונית שותפה בהצלחה", "success");
+      setPreview(null);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
+      toast("שגיאה בשיתוף החשבונית", "error");
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  }
+
   async function markSentWithoutEmail(inv: Invoice) {
-    if (!confirm(`לסמן את החשבונית ${inv.invoice_number} כנשלחה? ההכנסה תירשם בספרי ההנהלת חשבונות.`)) return;
+    if (!confirm(`לסמן את החשבונית ${inv.invoice_number} כנשלחה?`)) return;
     await applySent(inv);
     toast("החשבונית סומנה כנשלחה", "success");
   }
 
   async function markPaid(inv: Invoice) {
-    const { error } = await supabase.from("invoices").update({ status: "paid" }).eq("id", inv.id);
-    if (error) {
-      toast("שגיאה בעדכון", "error");
-    } else {
-      setInvoices((prev) => prev.map((i) => (i.id === inv.id ? { ...i, status: "paid" } : i)));
-      toast("החשבונית סומנה כשולם", "success");
-    }
+    if (!confirm(`לסמן את החשבונית ${inv.invoice_number} כשולמה? ההכנסה תירשם בספרי ההנהלת חשבונות.`)) return;
+    await applyPaid(inv);
+    toast("החשבונית סומנה כשולמה", "success");
   }
 
   async function handleDownload() {
@@ -404,7 +484,11 @@ export function InvoicesPage() {
   // Reflect live status (e.g. after marking as sent) in the preview footer
   const livePreview = preview ? invoices.find((i) => i.id === preview.id) || preview : null;
   const previewHtml = preview ? buildInvoiceHtml(preview, previewCustomer, taxSettings) : "";
-  const total = form ? computeTotals(form.items, form.is_exempt ? 0 : form.vat_rate) : null;
+  const total = form
+    ? vatInclusive && !form.is_exempt
+      ? computeTotalsInclusive(form.items, form.vat_rate)
+      : computeTotals(form.items, form.is_exempt ? 0 : form.vat_rate)
+    : null;
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -531,20 +615,41 @@ export function InvoicesPage() {
               <Checkbox
                 label='עוסק פטור (ללא מע"מ)'
                 checked={form.is_exempt}
-                onChange={(e) => setForm({ ...form, is_exempt: e.target.checked })}
+                onChange={(e) => setForm({ ...form, is_exempt: e.target.checked, document_type: e.target.checked ? "receipt" : "tax_invoice" })}
               />
-              {!form.is_exempt && (
-                <Input
-                  label='שיעור מע"מ (%)'
-                  type="number"
-                  min="0"
-                  max="100"
-                  className="w-32"
-                  value={form.vat_rate}
-                  onChange={(e) => setForm({ ...form, vat_rate: parseFloat(e.target.value) || 0 })}
-                />
-              )}
+              {!form.is_exempt ? (
+                <>
+                  <Input
+                    label='שיעור מע"מ (%)'
+                    type="number"
+                    min="0"
+                    max="100"
+                    className="w-32"
+                    value={form.vat_rate}
+                    onChange={(e) => setForm({ ...form, vat_rate: parseFloat(e.target.value) || 0 })}
+                  />
+                  <Checkbox
+                    label='מחיר כולל מע"מ'
+                    checked={vatInclusive}
+                    onChange={(e) => setVatInclusive(e.target.checked)}
+                  />
+                </>
+              ) : null}
             </div>
+
+            <Select
+              label="סוג מסמך"
+              value={form.document_type}
+              onChange={(e) => setForm({ ...form, document_type: e.target.value as DocumentType })}
+              options={
+                form.is_exempt
+                  ? [{ value: "receipt", label: "קבלה" }]
+                  : [
+                      { value: "tax_invoice", label: "חשבונית מס" },
+                      { value: "tax_invoice_receipt", label: "חשבונית מס/קבלה" },
+                    ]
+              }
+            />
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">פריטים</label>
@@ -552,7 +657,7 @@ export function InvoicesPage() {
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      {["תיאור", "כמות", "מחיר ליחידה", 'סה"כ'].map((h) => (
+                      {["תיאור", "כמות", vatInclusive && !form.is_exempt ? "מחיר ליחידה (כולל מע״מ)" : "מחיר ליחידה", 'סה"כ'].map((h) => (
                         <th key={h} className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">{h}</th>
                       ))}
                       <th className="px-3 py-2" />
@@ -615,7 +720,7 @@ export function InvoicesPage() {
               <div className="flex gap-2">
                 <Button variant="secondary" onClick={handleDownload}><Download size={14} /> הורד PDF</Button>
                 {livePreview!.status === "sent" && (
-                  <Button variant="secondary" onClick={() => markPaid(preview)}><CheckCircle2 size={14} /> סמן כשולם</Button>
+                  <Button variant="secondary" onClick={() => markPaid(preview)}><CheckCircle2 size={14} /> סמן כשולם ורשום הכנסה</Button>
                 )}
                 {livePreview!.status === "draft" && (
                   <>
@@ -631,6 +736,9 @@ export function InvoicesPage() {
                     </Button>
                   </>
                 )}
+                <Button variant="success" loading={sendingWhatsApp} onClick={() => preview && handleSendWhatsApp(preview)}>
+                  <WhatsAppIcon size={14} /> שלח בוואטסאפ
+                </Button>
               </div>
             </div>
           )
@@ -665,7 +773,7 @@ export function InvoicesPage() {
                 <p className="font-medium">{customer?.name || "-"}</p>
                 <p className="text-slate-500">{customer?.email || "ללא אימייל"}</p>
               </div>
-              <p className="text-xs text-slate-400">השליחה תרשום את ההכנסה בספרי ההנהלת חשבונות.</p>
+              <p className="text-xs text-slate-400">ההכנסה תירשם רק לאחר סימון החשבונית כשולמה.</p>
             </div>
           );
         })()}

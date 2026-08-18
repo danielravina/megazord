@@ -210,7 +210,7 @@ export function FinancePage() {
     const fd = new FormData(form);
     const settings: TaxSettings = {
       user_id: user.id,
-      vat_rate: parseFloat(fd.get("vat_rate") as string) || 17,
+      vat_rate: parseFloat(fd.get("vat_rate") as string) || 18,
       vat_frequency: fd.get("vat_frequency") as string || "bimonthly",
       vat_billing_day: parseInt(fd.get("vat_billing_day") as string) || 15,
       income_tax_advance: parseFloat(fd.get("income_tax_advance") as string) || 0,
@@ -218,6 +218,9 @@ export function FinancePage() {
       bituah_leumi: parseFloat(fd.get("bituah_leumi") as string) || 5,
       bituah_leumi_billing_day: parseInt(fd.get("bituah_leumi_billing_day") as string) || 15,
       credit_points: parseFloat(fd.get("credit_points") as string) || 2.25,
+      vat_status: taxSettings?.vat_status ?? "morashi",
+      income_scheme: taxSettings?.income_scheme ?? "standard",
+      zeair_expense_rate: taxSettings?.zeair_expense_rate ?? 0,
       business_name: null,
       vat_number: null,
       business_address: null,
@@ -506,7 +509,7 @@ export function FinancePage() {
                 <div className="md:col-span-2">
                   <h3 className="text-lg font-bold border-b pb-2 mb-4">הגדרות מיסים ומועדי חיוב</h3>
                 </div>
-                <Input label='מע"מ (%)' name="vat_rate" type="number" min="0" max="100" step="0.1" defaultValue={taxSettings?.vat_rate ?? 17} />
+                <Input label='מע"מ (%)' name="vat_rate" type="number" min="0" max="100" step="0.1" defaultValue={taxSettings?.vat_rate ?? 18} />
                 <Input label="יום חיוב מע״מ" name="vat_billing_day" type="number" min="1" max="31" defaultValue={taxSettings?.vat_billing_day ?? 15} />
                 <Select label="תדירות דיווח מע״מ" name="vat_frequency" options={[{ value: "bimonthly", label: "דו-חודשי" }, { value: "monthly", label: "חודשי" }]} defaultValue={taxSettings?.vat_frequency ?? "bimonthly"} />
                 <Input label="מקדמות מס הכנסה (%)" name="income_tax_advance" type="number" min="0" max="100" step="0.1" defaultValue={taxSettings?.income_tax_advance ?? 0} />
