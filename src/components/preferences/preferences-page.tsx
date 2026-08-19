@@ -13,7 +13,10 @@ import type { TaxSettings } from "@/components/finance/finance-types";
 
 const FIELD_NAMES = [
   "owner_name", "business_name", "vat_number", "business_phone", "business_address",
-  "accountant_email", "vat_status", "income_scheme", "zeair_expense_rate",
+  "accountant_email", "vat_status", "zeair_expense_rate",
+  "vat_rate", "vat_frequency", "vat_billing_day",
+  "income_tax_advance", "income_tax_billing_day",
+  "bituah_leumi", "bituah_leumi_billing_day", "credit_points",
 ];
 
 function getInitialValues(settings: TaxSettings | null): Record<string, string> {
@@ -27,6 +30,14 @@ function getInitialValues(settings: TaxSettings | null): Record<string, string> 
     vat_status: settings?.vat_status || "morashi",
     income_scheme: settings?.income_scheme || "standard",
     zeair_expense_rate: String(settings?.zeair_expense_rate ?? ""),
+    vat_rate: String(settings?.vat_rate ?? 18),
+    vat_frequency: settings?.vat_frequency || "bimonthly",
+    vat_billing_day: String(settings?.vat_billing_day ?? 15),
+    income_tax_advance: String(settings?.income_tax_advance ?? 0),
+    income_tax_billing_day: String(settings?.income_tax_billing_day ?? 15),
+    bituah_leumi: String(settings?.bituah_leumi ?? 5),
+    bituah_leumi_billing_day: String(settings?.bituah_leumi_billing_day ?? 15),
+    credit_points: String(settings?.credit_points ?? 2.25),
   };
 }
 
@@ -37,6 +48,8 @@ export function PreferencesPage() {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<TaxSettings | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [vatStatus, setVatStatus] = useState<"morashi" | "patoor" | "zeair">("morashi");
+  const [zeairExpenseRate, setZeairExpenseRate] = useState("");
   const initialValues = useRef<Record<string, string>>({});
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -54,6 +67,8 @@ export function PreferencesPage() {
       .maybeSingle();
     setSettings(data || null);
     initialValues.current = getInitialValues(data || null);
+    setVatStatus((data?.vat_status as "morashi" | "patoor" | "zeair") || "morashi");
+    setZeairExpenseRate(String(data?.zeair_expense_rate ?? ""));
     setDirty(false);
     setLoading(false);
   }
@@ -80,18 +95,24 @@ export function PreferencesPage() {
     const form = e.target as HTMLFormElement;
     const fd = new FormData(form);
 
+    const rawStatus = (fd.get("vat_status") as string) || "morashi";
+    const status: "morashi" | "patoor" | "zeair" =
+      rawStatus === "zeair" ? "zeair" : rawStatus === "patoor" ? "patoor" : "morashi";
+    // מסלול ההוצאות נגזר מסוג העוסק: זעיר => הכרה אוטומטית, אחרת הוצאות בפועל
+    const scheme: "standard" | "zeair" = status === "zeair" ? "zeair" : "standard";
+
     const payload: TaxSettings = {
       user_id: user.id,
-      vat_rate: settings?.vat_rate ?? 18,
-      vat_frequency: settings?.vat_frequency || "bimonthly",
-      vat_billing_day: settings?.vat_billing_day ?? 15,
-      income_tax_advance: settings?.income_tax_advance ?? 0,
-      income_tax_billing_day: settings?.income_tax_billing_day ?? 15,
-      bituah_leumi: settings?.bituah_leumi ?? 5,
-      bituah_leumi_billing_day: settings?.bituah_leumi_billing_day ?? 15,
-      credit_points: settings?.credit_points ?? 2.25,
-      vat_status: (fd.get("vat_status") as string) === "patoor" ? "patoor" : "morashi",
-      income_scheme: (fd.get("income_scheme") as string) === "zeair" ? "zeair" : "standard",
+      vat_rate: parseFloat((fd.get("vat_rate") as string) || "") || 18,
+      vat_frequency: (fd.get("vat_frequency") as string) || "bimonthly",
+      vat_billing_day: parseInt((fd.get("vat_billing_day") as string) || "", 10) || 15,
+      income_tax_advance: parseFloat((fd.get("income_tax_advance") as string) || "") || 0,
+      income_tax_billing_day: parseInt((fd.get("income_tax_billing_day") as string) || "", 10) || 15,
+      bituah_leumi: parseFloat((fd.get("bituah_leumi") as string) || "") || 5,
+      bituah_leumi_billing_day: parseInt((fd.get("bituah_leumi_billing_day") as string) || "", 10) || 15,
+      credit_points: parseFloat((fd.get("credit_points") as string) || "") || 2.25,
+      vat_status: status,
+      income_scheme: scheme,
       zeair_expense_rate: parseFloat((fd.get("zeair_expense_rate") as string) || "") || 0,
       business_name: (fd.get("business_name") as string) || null,
       vat_number: (fd.get("vat_number") as string) || null,
@@ -182,38 +203,70 @@ export function PreferencesPage() {
             <Select
               label="הרשמה במע״מ"
               name="vat_status"
+              value={vatStatus}
+              onChange={(e) => {
+                const v = e.target.value as "morashi" | "patoor" | "zeair";
+                setVatStatus(v);
+                checkDirty();
+              }}
               options={[
                 { value: "morashi", label: "עוסק מורשה (גובה מע״מ)" },
                 { value: "patoor", label: "עוסק פטור (ללא מע״מ)" },
+                { value: "zeair", label: "עוסק זעיר (פטור ממע״מ + הכרה אוטומטית באחוז הוצאות)" },
               ]}
-              defaultValue={settings?.vat_status || "morashi"}
             />
             <p className="text-xs text-slate-400 -mt-2">
-              עוסק פטור אינו גובה מע״מ ואינו מוציא חשבוניות מס (אלא קבלות). תקרת הפטור לשנת 2026 עומדת על כ-122,833 ש״ח לשנה.
+              עוסק זעיר אינו גובה מע״מ וזוכה להכרה אוטומטית באחוז קבוע של הוצאות. תקרה משוערת לשנת 2026: כ-122,833 ש״ח לשנה.
             </p>
 
+            {vatStatus === "zeair" ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600 bg-slate-50 border rounded-lg p-3">
+                  מסלול ניהול הוצאות: <strong>כרה אוטומטית באחוז הוצאות</strong> (עוסק זעיר)
+                </p>
+                <Input
+                  label='שיעור הוצאות מוכר (%)'
+                  name="zeair_expense_rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={zeairExpenseRate}
+                  onChange={(e) => {
+                    setZeairExpenseRate(e.target.value);
+                    checkDirty();
+                  }}
+                  placeholder="לדוגמה 10"
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                מסלול ניהול הוצאות: <strong>רגיל</strong> — הוצאות בפועל מתועדות מראיות (סריקות).
+              </p>
+            )}
+          </div>
+        </Card>
+
+        {/* Tax Settings & Billing Days */}
+        <Card className="p-6">
+          <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
+            <Building size={20} className="text-blue-500" />
+            הגדרות מיסים ומועדי חיוב
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label='שיעור מע"מ (%)' name="vat_rate" type="number" min="0" max="100" step="0.1" defaultValue={settings?.vat_rate ?? 18} />
+            <Input label="יום חיוב מע״מ" name="vat_billing_day" type="number" min="1" max="31" defaultValue={settings?.vat_billing_day ?? 15} />
             <Select
-              label="מסלול ניהול הוצאות במס הכנסה"
-              name="income_scheme"
-              options={[
-                { value: "standard", label: "רגיל (הוצאות בפועל)" },
-                { value: "zeair", label: 'עוסק זעיר (הכרה אוטומטית באחוז הוצאות)' },
-              ]}
-              defaultValue={settings?.income_scheme || "standard"}
+              label="תדירות דיווח מע״מ"
+              name="vat_frequency"
+              options={[{ value: "bimonthly", label: "דו-חודשי" }, { value: "monthly", label: "חודשי" }]}
+              defaultValue={settings?.vat_frequency ?? "bimonthly"}
             />
-            <Input
-              label='שיעור הוצאות מוכר (%)'
-              name="zeair_expense_rate"
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              defaultValue={settings?.zeair_expense_rate ?? 0}
-              placeholder="לדוגמה 10"
-            />
-            <p className="text-xs text-slate-400 -mt-2">
-              עוסק זעיר זוכה להכרה אוטומטית באחוז קבוע של הוצאות לצורך מס הכנסה, ללא צורך בניהול קבלות על הוצאות בפועל. המע״מ ממשיך להתנהל לפי סוג ההרשמה לעיל.
-            </p>
+            <Input label="מקדמות מס הכנסה (%)" name="income_tax_advance" type="number" min="0" max="100" step="0.1" defaultValue={settings?.income_tax_advance ?? 0} />
+            <Input label="יום חיוב מס הכנסה" name="income_tax_billing_day" type="number" min="1" max="31" defaultValue={settings?.income_tax_billing_day ?? 15} />
+            <Input label="ביטוח לאומי (%)" name="bituah_leumi" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bituah_leumi ?? 5} />
+            <Input label="יום חיוב ביטוח לאומי" name="bituah_leumi_billing_day" type="number" min="1" max="31" defaultValue={settings?.bituah_leumi_billing_day ?? 15} />
+            <Input label="נקודות זכות" name="credit_points" type="number" min="0" max="20" step="0.25" defaultValue={settings?.credit_points ?? 2.25} />
           </div>
         </Card>
 

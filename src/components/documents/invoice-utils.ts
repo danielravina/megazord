@@ -57,19 +57,19 @@ export function lineTotal(item: InvoiceItem): number {
   return (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
 }
 
-// Per-line VAT and gross, handling both net and VAT-inclusive unit prices.
+// The VAT rate that applies to this line: its own rate, or the document default.
+export function effectiveLineVatRate(item: InvoiceItem, defaultRate: number): number {
+  const r = item.vat_rate;
+  return r == null || Number.isNaN(r) ? defaultRate : r;
+}
+
+// Per-line net / vat / gross. Prices are treated as net (VAT added on top).
 export function lineVatBreakdown(
   item: InvoiceItem,
   vatRate: number,
-  inclusive: boolean,
 ): { vat: number; net: number; gross: number } {
   const raw = lineTotal(item);
   const r = (vatRate || 0) / 100;
-  if (r === 0) return { vat: 0, net: raw, gross: raw };
-  if (inclusive) {
-    const net = raw / (1 + r);
-    return { vat: raw - net, net, gross: raw };
-  }
   const vat = raw * r;
   return { vat, net: raw, gross: raw + vat };
 }
@@ -86,16 +86,20 @@ export function computeTotals(items: InvoiceItem[], vatRate: number): InvoiceTot
   return { subtotal, vat, total: subtotal + vat };
 }
 
-// Compute totals from VAT-inclusive (gross) unit prices: the total is the sum
-// of the gross, with net and VAT backed out. Round-trips with computeTotals.
-export function computeTotalsInclusive(items: InvoiceItem[], vatRate: number): InvoiceTotals {
-  const total = items.reduce((s, i) => s + lineTotal(i), 0);
-  const r = (vatRate || 0) / 100;
-  if (r === 0) return { subtotal: total, vat: 0, total };
-  const net = total / (1 + r);
-  return { subtotal: net, vat: total - net, total };
+// Compute totals honoring each item's own vat_rate (per-line VAT, mixed rates).
+export function computeLineTotals(items: InvoiceItem[], defaultRate: number): InvoiceTotals {
+  let subtotal = 0;
+  let vat = 0;
+  let total = 0;
+  for (const it of items) {
+    const bd = lineVatBreakdown(it, effectiveLineVatRate(it, defaultRate));
+    subtotal += bd.net;
+    vat += bd.vat;
+    total += bd.gross;
+  }
+  return { subtotal, vat, total };
 }
 
 export function emptyItem(): InvoiceItem {
-  return { id: generateId(), description: "", quantity: 1, unit_price: 0 };
+  return { id: generateId(), description: "", quantity: 1, unit_price: 0, vat_rate: null };
 }

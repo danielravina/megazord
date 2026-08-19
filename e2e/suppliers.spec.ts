@@ -23,7 +23,7 @@ test("can create a supplier", async ({ page }) => {
   await expect(page.locator("td:has-text('בדיקת E2E - ספק')").first()).toBeVisible({ timeout: 10000 });
 });
 
-test("can edit a supplier", async ({ page }) => {
+test("can edit a supplier from its profile page", async ({ page }) => {
   await page.goto("/suppliers/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
@@ -33,13 +33,19 @@ test("can edit a supplier", async ({ page }) => {
   await page.locator("button:has-text('שמור ספק')").click();
   await expect(page.locator("text=הספק נוצר")).toBeVisible({ timeout: 10000 });
 
-  // Reload so the row reflects the committed DB write before editing
+  // Reload so the row reflects the committed DB write before opening the profile
   await page.reload();
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-  await page.locator("tr:has-text('בדיקת E2E - עריכת ספק') button[title='ערוך']").first().click();
+
+  // Click anywhere on the row to open the supplier profile
+  await page.locator("tr:has-text('בדיקת E2E - עריכת ספק')").first().click();
+  await expect(page.locator("main h1")).toContainText("בדיקת E2E - עריכת ספק", { timeout: 10000 });
+
+  // Edit from within the profile page
+  await page.locator("button:has-text('ערוך ספק')").click();
   await expect(page.locator("label:has-text('שם *')")).toBeVisible();
   await page.locator("label:has-text('שם *') + input").fill("בדיקת E2E - עריכת ספק 2");
   await page.locator("button:has-text('שמור שינויים')").click();
 
-  await expect(page.locator("td:has-text('בדיקת E2E - עריכת ספק 2')").first()).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("main h1")).toContainText("בדיקת E2E - עריכת ספק 2", { timeout: 10000 });
 });

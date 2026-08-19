@@ -39,6 +39,8 @@ src/app/
 ├── (dashboard)/projects/detail/page.tsx  ← ?project=xxx
 ├── (dashboard)/finance/page.tsx
 ├── (dashboard)/documents/page.tsx
+├── (dashboard)/suppliers/page.tsx
+├── (dashboard)/suppliers/detail/page.tsx  ← ?supplier=xxx
 ├── (dashboard)/preferences/page.tsx
 └── layout.tsx                 ← RootLayout: RTL, Heebo font, AuthProvider
 ```
@@ -64,6 +66,9 @@ src/components/
 ├── projects/        ProjectsPage, ProjectDetailPage, project-types
 ├── finance/         FinancePage, tax-engine, finance-types
 ├── documents/       DocumentsPage, monthly-export
+├── suppliers/       SuppliersPage, SupplierProfilePage, SupplierFormModal, supplier-types, supplier-expenses
+├── scans/           ScansPage, DocumentScanner, monthly-export, monthly-report-utils
+├── customers/       CustomersPage, CustomerDetailPage
 └── preferences/     PreferencesPage
 ```
 

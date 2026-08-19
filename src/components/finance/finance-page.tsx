@@ -20,8 +20,8 @@ import type { ScanEvidence } from "./ledger";
 import { ExpensePieChart } from "@/components/ui/expense-pie-chart";
 import { MonthlyExport } from "@/components/scans/monthly-export";
 import {
-  PieChart, Wallet, Coins, Receipt, Scale, PiggyBank,
-  TrendingUp, TrendingDown, Save, Check, Clock, FileText, Plus,
+  PieChart, Wallet, Coins, Receipt, PiggyBank,
+  TrendingUp, TrendingDown, Check, Clock, FileText, Plus,
 } from "lucide-react";
 import type { Income, Expense, TaxSettings, Saving, TaxCalculation } from "./finance-types";
 
@@ -29,7 +29,6 @@ const TAB_DEFS = [
   { id: "dashboard", label: "לוח בקרה", icon: PieChart },
   { id: "incomes", label: "הכנסות", icon: Coins },
   { id: "expenses", label: "הוצאות", icon: Receipt },
-  { id: "taxes", label: "מיסים", icon: Scale },
   { id: "savings", label: "חסכונות", icon: PiggyBank },
 ] as const;
 
@@ -78,7 +77,6 @@ export function FinancePage() {
   const [savType, setSavType] = useState("קרן השתלמות");
   const [savAmount, setSavAmount] = useState("");
   const [savDate, setSavDate] = useState(new Date().toISOString().split("T")[0]);
-  const [taxSaving, setTaxSaving] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
   // Switch to the requested tab directly when navigating with ?tab=<id> (e.g. from global search)
@@ -158,39 +156,6 @@ export function FinancePage() {
       amount: parseFloat(savAmount), date: savDate,
     });
     if (error) { setSavings((p) => p.filter((s) => s.id !== row.id)); toast("שגיאה", "error"); }
-  }
-
-  async function saveTaxSettings(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user) return;
-    setTaxSaving(true);
-    const form = e.target as HTMLFormElement;
-    const fd = new FormData(form);
-    const settings: TaxSettings = {
-      user_id: user.id,
-      vat_rate: parseFloat(fd.get("vat_rate") as string) || 18,
-      vat_frequency: fd.get("vat_frequency") as string || "bimonthly",
-      vat_billing_day: parseInt(fd.get("vat_billing_day") as string) || 15,
-      income_tax_advance: parseFloat(fd.get("income_tax_advance") as string) || 0,
-      income_tax_billing_day: parseInt(fd.get("income_tax_billing_day") as string) || 15,
-      bituah_leumi: parseFloat(fd.get("bituah_leumi") as string) || 5,
-      bituah_leumi_billing_day: parseInt(fd.get("bituah_leumi_billing_day") as string) || 15,
-      credit_points: parseFloat(fd.get("credit_points") as string) || 2.25,
-      vat_status: taxSettings?.vat_status ?? "morashi",
-      income_scheme: taxSettings?.income_scheme ?? "standard",
-      zeair_expense_rate: taxSettings?.zeair_expense_rate ?? 0,
-      business_name: null,
-      vat_number: null,
-      business_address: null,
-      business_phone: null,
-      accountant_email: null,
-      owner_name: null,
-    };
-    setTaxSettings(settings);
-    const { error } = await supabase.from("tax_settings").upsert(settings);
-    if (error) toast("שגיאה בשמירה", "error");
-    else toast("הגדרות נשמרו", "success");
-    setTaxSaving(false);
   }
 
   if (loading && incomes.length === 0 && expenses.length === 0) {
@@ -366,7 +331,7 @@ export function FinancePage() {
           {tab === "incomes" && (
             <div>
               <p className="text-sm text-slate-500 mb-4 bg-slate-50 border rounded-lg p-3">
-                ההכנסות נרשמות אוטומטית מחשבוניות מס, חשבוניות מס/קבלה וזיכויים שהונפקו ללקוחות (ולעוסק פטור — מקבלות).
+                ההכנסות נרשמות אוטומטית מחשבוניות מס, חשבוניות מס/קבלה וזיכויים שהונפקו ללקוחות (ולעוסק פטור או זעיר — מקבלות).
                 לצפייה במסמכים יש לגשת למסך מסמכים.
               </p>
               {incomes.length === 0 ? (
@@ -439,28 +404,6 @@ export function FinancePage() {
                   </table>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Taxes Tab */}
-          {tab === "taxes" && (
-            <div>
-              <form onSubmit={saveTaxSettings} className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-lg border">
-                <div className="md:col-span-2">
-                  <h3 className="text-lg font-bold border-b pb-2 mb-4">הגדרות מיסים ומועדי חיוב</h3>
-                </div>
-                <Input label='מע"מ (%)' name="vat_rate" type="number" min="0" max="100" step="0.1" defaultValue={taxSettings?.vat_rate ?? 18} />
-                <Input label="יום חיוב מע״מ" name="vat_billing_day" type="number" min="1" max="31" defaultValue={taxSettings?.vat_billing_day ?? 15} />
-                <Select label="תדירות דיווח מע״מ" name="vat_frequency" options={[{ value: "bimonthly", label: "דו-חודשי" }, { value: "monthly", label: "חודשי" }]} defaultValue={taxSettings?.vat_frequency ?? "bimonthly"} />
-                <Input label="מקדמות מס הכנסה (%)" name="income_tax_advance" type="number" min="0" max="100" step="0.1" defaultValue={taxSettings?.income_tax_advance ?? 0} />
-                <Input label="יום חיוב מס הכנסה" name="income_tax_billing_day" type="number" min="1" max="31" defaultValue={taxSettings?.income_tax_billing_day ?? 15} />
-                <Input label="ביטוח לאומי (%)" name="bituah_leumi" type="number" min="0" max="100" step="0.1" defaultValue={taxSettings?.bituah_leumi ?? 5} />
-                <Input label="יום חיוב ביטוח לאומי" name="bituah_leumi_billing_day" type="number" min="1" max="31" defaultValue={taxSettings?.bituah_leumi_billing_day ?? 15} />
-                <Input label="נקודות זכות" name="credit_points" type="number" min="0" max="20" step="0.25" defaultValue={taxSettings?.credit_points ?? 2.25} />
-                <div className="md:col-span-2 flex justify-end mt-4">
-                  <Button type="submit" loading={taxSaving}><Save size={14} /> שמור הגדרות מיסים</Button>
-                </div>
-              </form>
             </div>
           )}
 

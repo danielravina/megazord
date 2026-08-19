@@ -82,4 +82,24 @@ describe("buildInvoiceHtml — totals", () => {
     assert.ok(!html.includes("סכום ללא מע\"מ"));
     assert.ok(!html.includes("מע\"מ (18%)"));
   });
+
+  it("renders per-line VAT with mixed rates and a dash for exempt lines", () => {
+    const doc = invoice({
+      items: [
+        { id: "labour", description: "עבודה", quantity: 2, unit_price: 100, vat_rate: 18 }, // vat 36, gross 236
+        { id: "mat", description: "חומר", quantity: 1, unit_price: 118, vat_rate: 0 }, // exempt => vat "—", gross 118
+      ],
+    });
+    const html = buildInvoiceHtml(doc, null, settings);
+    // labour: gross 236
+    assert.ok(html.includes("236"));
+    // exempt material: vat cell shows a dash, gross 118
+    assert.ok(html.includes("—"));
+    assert.ok(html.includes("118"));
+    // total = 236 + 118 = 354
+    assert.ok(html.includes("354"));
+    // tax invoice shows the per-line rate column (18%)
+    assert.ok(html.includes("18%"));
+    assert.ok(html.includes("0%"));
+  });
 });

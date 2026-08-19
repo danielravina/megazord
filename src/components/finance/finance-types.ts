@@ -31,7 +31,7 @@ export interface TaxSettings {
   bituah_leumi: number;
   bituah_leumi_billing_day: number;
   credit_points: number;
-  vat_status: "morashi" | "patoor";
+  vat_status: "morashi" | "patoor" | "zeair";
   income_scheme: "standard" | "zeair";
   zeair_expense_rate: number;
   business_name: string | null;

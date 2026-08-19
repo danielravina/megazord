@@ -3,6 +3,8 @@ export interface InvoiceItem {
   description: string;
   quantity: number;
   unit_price: number;
+  // שיעור מע"מ לשורה. ברירת מחדל (undefined/null) = שיעור המסמך; 0 = פטור.
+  vat_rate?: number | null;
 }
 
 // סוגי מסמכים ללקוח: מצב המסמך (= מתי רושמים הכנסה) נגזר מהסוג + סוג העוסק.
@@ -15,10 +17,22 @@ export type DocumentType =
   | "quotation" // הצעת מחיר
   | "delivery_note"; // תעודת משלוח
 
-export type VatStatus = "morashi" | "patoor";
+export type VatStatus = "morashi" | "patoor" | "zeair";
+
+// עוסק זעיר מתנהג כפטור לצורכי מע"מ (אינו גובה מע"מ, מוציא קבלות)
+export function vatBehaviorStatus(status: VatStatus): "morashi" | "patoor" {
+  return status === "morashi" ? "morashi" : "patoor";
+}
+
+// Is this status VAT-exempt (does not charge VAT)?
+export function isVatExempt(status: VatStatus): boolean {
+  return status !== "morashi";
+}
 
 export interface DocumentTypeMeta {
   label: string;
+  // צורת הרבים של שם המסמך (למשל "קבלות")
+  labelPlural: string;
   // האם הוצאת המסמך רושמת הכנסה (לפי סוג העוסק)
   booksIncome: Record<VatStatus, boolean>;
   // סימן ההכנסה (זיכוי = שלילי)
@@ -34,49 +48,56 @@ export interface DocumentTypeMeta {
 export const DOC_TYPE_META: Record<DocumentType, DocumentTypeMeta> = {
   tax_invoice: {
     label: "חשבונית מס",
-    booksIncome: { morashi: true, patoor: false },
+    labelPlural: "חשבוניות מס",
+    booksIncome: { morashi: true, patoor: false, zeair: false },
     incomeSign: 1,
     vatMode: "breakdown",
   },
   transaction_account: {
     label: "חשבונית עסקה",
-    booksIncome: { morashi: false, patoor: false },
+    labelPlural: "חשבוניות עסקה",
+    booksIncome: { morashi: false, patoor: false, zeair: false },
     incomeSign: 1,
     vatMode: "breakdown",
   },
   tax_invoice_receipt: {
     label: "חשבונית מס/קבלה",
-    booksIncome: { morashi: true, patoor: false },
+    labelPlural: "חשבוניות מס/קבלה",
+    booksIncome: { morashi: true, patoor: false, zeair: false },
     incomeSign: 1,
     vatMode: "breakdown",
   },
   credit_invoice: {
     label: "חשבונית מס זיכוי",
-    booksIncome: { morashi: true, patoor: false },
+    labelPlural: "חשבוניות מס זיכוי",
+    booksIncome: { morashi: true, patoor: false, zeair: false },
     incomeSign: -1,
     vatMode: "breakdown",
   },
   receipt: {
     label: "קבלה",
-    booksIncome: { morashi: false, patoor: true },
+    labelPlural: "קבלות",
+    booksIncome: { morashi: false, patoor: true, zeair: true },
     incomeSign: 1,
     vatMode: "single",
   },
   quotation: {
     label: "הצעת מחיר",
-    booksIncome: { morashi: false, patoor: false },
+    labelPlural: "הצעות מחיר",
+    booksIncome: { morashi: false, patoor: false, zeair: false },
     incomeSign: 1,
     vatMode: "none",
   },
   delivery_note: {
     label: "תעודת משלוח",
-    booksIncome: { morashi: false, patoor: false },
+    labelPlural: "תעודות משלוח",
+    booksIncome: { morashi: false, patoor: false, zeair: false },
     incomeSign: 1,
     vatMode: "none",
   },
 };
 
-// סוגי מסמכים שמותר לעסק פטור להוציא (לא רשומים במע"מ)
+// סוגי מסמכים שמותר לעסק פטור / זעיר להוציא (לא רשומים במע"מ)
 export const DOC_TYPES_FOR_PATOOR: DocumentType[] = ["receipt", "transaction_account", "quotation", "delivery_note"];
 export const DOC_TYPES_FOR_MORASHI: DocumentType[] = [
   "tax_invoice",
@@ -89,7 +110,7 @@ export const DOC_TYPES_FOR_MORASHI: DocumentType[] = [
 ];
 
 export function docTypesFor(vatStatus: VatStatus): DocumentType[] {
-  return vatStatus === "patoor" ? DOC_TYPES_FOR_PATOOR : DOC_TYPES_FOR_MORASHI;
+  return vatBehaviorStatus(vatStatus) === "patoor" ? DOC_TYPES_FOR_PATOOR : DOC_TYPES_FOR_MORASHI;
 }
 
 export interface Invoice {
@@ -116,7 +137,6 @@ export interface InvoiceFormData {
   issue_date: string;
   due_date: string;
   vat_rate: number;
-  is_exempt: boolean;
   document_type: DocumentType;
   items: InvoiceItem[];
   notes: string;

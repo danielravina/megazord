@@ -7,23 +7,23 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton, SkeletonButton, SkeletonText } from "@/components/ui/skeleton";
+import { Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown";
 import { formatCurrency } from "@/components/shared/format-currency";
 import { generateId } from "@/components/shared/generate-id";
 import {
   Receipt, Plus, Save, Trash2, Pencil, Eye, Send, Download,
-  UserPlus, X, ArrowRight,
+  UserPlus, X, ArrowRight, ChevronDown,
 } from "lucide-react";
 import type { Invoice, InvoiceItem, InvoiceFormData, DocumentType, VatStatus } from "./invoice-types";
-import { DOC_TYPE_META, docTypesFor } from "./invoice-types";
+import { DOC_TYPE_META, docTypesFor, isVatExempt } from "./invoice-types";
 import type { Customer } from "@/components/customers/customer-types";
 import type { TaxSettings } from "@/components/finance/finance-types";
-import { nextNumberFor, computeTotals, computeTotalsInclusive, lineVatBreakdown, emptyItem } from "./invoice-utils";
+import { nextNumberFor, computeLineTotals, effectiveLineVatRate, lineVatBreakdown, emptyItem } from "./invoice-utils";
 import { embeddedName } from "@/components/projects/project-types";
 import { isValidEmail } from "@/components/shared/validate-email";
 import { WhatsAppIcon } from "@/components/shared/whatsapp-icon";
@@ -61,11 +61,9 @@ export function DocumentsPage() {
   const [newCustOpen, setNewCustOpen] = useState(false);
   const [newCustName, setNewCustName] = useState("");
   const [newCustEmail, setNewCustEmail] = useState("");
-  const [vatInclusive, setVatInclusive] = useState(false);
 
   const [sendConfirm, setSendConfirm] = useState<Invoice | null>(null);
   const [sending, setSending] = useState(false);
-  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | DocumentType>("all");
 
   const vatStatus: VatStatus = taxSettings?.vat_status ?? "morashi";
@@ -95,12 +93,12 @@ export function DocumentsPage() {
 
   // ── Form init for create/edit views ─────────────────────────────
   function defaultType(): DocumentType {
-    return vatStatus === "patoor" ? "receipt" : "tax_invoice";
+    return isVatExempt(vatStatus) ? "receipt" : "tax_invoice";
   }
 
   function initNew(prefill?: { customer_id?: string; project_id?: string; item_description?: string; unit_price?: number; document_type?: DocumentType }) {
     setEditingId(null);
-    const isPatoor = vatStatus === "patoor";
+    const isPatoor = isVatExempt(vatStatus);
     const type = prefill?.document_type ?? defaultType();
     const defaultRate = isPatoor ? 0 : (taxSettings?.vat_rate ?? 18);
     const item = emptyItem();
@@ -108,7 +106,6 @@ export function DocumentsPage() {
       item.description = prefill.item_description || "";
       item.unit_price = prefill.unit_price ?? 0;
     }
-    setVatInclusive(false);
     setForm({
       customer_id: prefill?.customer_id || "",
       project_id: prefill?.project_id || "",
@@ -116,7 +113,6 @@ export function DocumentsPage() {
       issue_date: new Date().toISOString().split("T")[0],
       due_date: "",
       vat_rate: defaultRate,
-      is_exempt: isPatoor,
       document_type: type,
       items: [item],
       notes: "",
@@ -126,7 +122,6 @@ export function DocumentsPage() {
 
   function initEdit(doc: Invoice) {
     setEditingId(doc.id);
-    setVatInclusive(false);
     setForm({
       customer_id: doc.customer_id,
       project_id: doc.project_id || "",
@@ -134,7 +129,6 @@ export function DocumentsPage() {
       issue_date: doc.issue_date,
       due_date: doc.due_date || "",
       vat_rate: doc.vat_rate,
-      is_exempt: doc.vat_rate === 0,
       document_type: doc.document_type,
       items: doc.items.length ? doc.items : [emptyItem()],
       notes: doc.notes || "",
@@ -151,6 +145,7 @@ export function DocumentsPage() {
     } else if (isNew) {
       const project = newProjectId ? projects.find((p) => p.id === newProjectId) : null;
       // Prefill from a transaction-account conversion (?new=1&document_type=...&customer=...)
+      // or from the "מסמך חדש" dropdown (?new=1&document_type=...)
       const convType = searchParams.get("document_type") as DocumentType | null;
       const convCustomer = searchParams.get("customer");
       const convProject = searchParams.get("project");
@@ -162,6 +157,7 @@ export function DocumentsPage() {
             project_id: project.id,
             item_description: project.location ? `פרויקט ${project.location}` : "פרויקט",
             unit_price: project.closing_price ?? project.quote_price ?? 0,
+            document_type: convType ?? undefined,
           }
         : convCustomer
           ? {
@@ -171,7 +167,9 @@ export function DocumentsPage() {
               unit_price: parseFloat(convPrice || "0"),
               document_type: convType ?? undefined,
             }
-          : undefined;
+          : {
+              document_type: convType ?? undefined,
+            };
       initNew(prefill); // eslint-disable-line react-hooks/set-state-in-effect
       if (newProjectId) router.replace("/documents/?new=1", { scroll: false });
       else if (convCustomer) router.replace("/documents/?new=1", { scroll: false });
@@ -210,26 +208,10 @@ export function DocumentsPage() {
     setForm((f) => (f ? { ...f, customer_id: value, project_id: "" } : f));
   }
 
-  function handleTypeChange(type: DocumentType) {
-    setForm((f) => {
-      if (!f) return f;
-      const isPatoor = vatStatus === "patoor";
-      const isExempt = isPatoor;
-      const rate = isExempt ? 0 : f.vat_rate;
-      return {
-        ...f,
-        document_type: type,
-        is_exempt: isExempt,
-        vat_rate: rate,
-        invoice_number: nextNumberFor(type, documents, new Date()),
-      };
-    });
-  }
-
   // Create a NEW payment-time document (tax invoice for מורשה / receipt for פטור)
   // based on an existing transaction account (payment demand). The demand stays.
   function openFromTransactionAccount(doc: Invoice) {
-    const target: DocumentType = vatStatus === "patoor" ? "receipt" : "tax_invoice";
+    const target: DocumentType = isVatExempt(vatStatus) ? "receipt" : "tax_invoice";
     const firstItem = (doc.items || [])[0];
     router.push(`/documents/?new=1&document_type=${target}&customer=${doc.customer_id}&project=${doc.project_id || ""}&desc=${encodeURIComponent(firstItem?.description || "")}&price=${firstItem?.unit_price ?? 0}`);
   }
@@ -243,13 +225,11 @@ export function DocumentsPage() {
     }
     setSaving(true);
 
-    const isExemptInvoice = form.is_exempt;
+    const isExemptInvoice = isVatExempt(vatStatus);
     const rate = isExemptInvoice ? 0 : form.vat_rate;
-    const netItems = vatInclusive && !isExemptInvoice
-      ? form.items.map((it) => ({ ...it, unit_price: it.unit_price / (1 + rate / 100) }))
-      : form.items;
+    const filledItems = form.items.filter((it) => it.description.trim());
 
-    const totals = computeTotals(netItems.filter((it) => it.description.trim()), rate);
+    const totals = computeLineTotals(filledItems, rate);
     const now = new Date().toISOString();
     const payload = {
       customer_id: form.customer_id,
@@ -257,7 +237,7 @@ export function DocumentsPage() {
       invoice_number: form.invoice_number.trim() || nextNumberFor(form.document_type, documents, new Date()),
       issue_date: form.issue_date,
       due_date: form.due_date || null,
-      items: netItems.filter((it) => it.description.trim()),
+      items: filledItems,
       amount: Math.round(totals.total * 100) / 100,
       vat_rate: rate,
       document_type: form.document_type,
@@ -366,7 +346,6 @@ export function DocumentsPage() {
       toast("הדפדפן אינו תומך בשיתוף", "error");
       return;
     }
-    setSendingWhatsApp(true);
     try {
       const customer = customers.find((c) => c.id === doc.customer_id) || null;
       const html = buildInvoiceHtml(doc, customer, taxSettings);
@@ -384,8 +363,6 @@ export function DocumentsPage() {
         return;
       }
       toast("שגיאה בשיתוף המסמך", "error");
-    } finally {
-      setSendingWhatsApp(false);
     }
   }
 
@@ -473,7 +450,7 @@ export function DocumentsPage() {
         {/* Action buttons */}
         <div className="flex flex-wrap items-center justify-between gap-2 mt-6 border-t pt-4">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => router.push(`/documents/?edit=${doc.id}`)}>
+            <Button variant="secondary" onClick={() => router.push(`/documents/?edit=${doc.id}`)}>
               <Pencil size={14} /> ערוך
             </Button>
             <Button variant="secondary" onClick={async () => {
@@ -500,24 +477,52 @@ export function DocumentsPage() {
             }}>
               <Download size={14} /> הורד PDF
             </Button>
-            <Button
-              disabled={!previewCustomer?.email}
-              title={!previewCustomer?.email ? "ללקוח אין כתובת אימייל" : undefined}
-              onClick={() => setSendConfirm(doc)}
+            <Dropdown
+              align="right"
+              trigger={
+                <Button>
+                  <Send size={14} /> שלח מסמך <ChevronDown size={14} />
+                </Button>
+              }
             >
-              <Send size={14} /> שלח במייל
-            </Button>
-            <Button variant="success" loading={sendingWhatsApp} onClick={() => handleSendWhatsApp(doc)}>
-              <WhatsAppIcon size={14} /> שלח בוואטסאפ
-            </Button>
+              {(close) => (
+                <div>
+                  <MenuItem
+                    icon={<Send size={14} />}
+                    onClick={() => {
+                      if (!previewCustomer?.email) {
+                        toast("ללקוח אין כתובת אימייל", "error");
+                        close();
+                        return;
+                      }
+                      setSendConfirm(doc);
+                      close();
+                    }}
+                  >
+                    שלח במייל
+                  </MenuItem>
+                  <MenuItem
+                    icon={<WhatsAppIcon size={14} />}
+                    onClick={() => {
+                      handleSendWhatsApp(doc);
+                      close();
+                    }}
+                  >
+                    שלח בוואטסאפ
+                  </MenuItem>
+                </div>
+              )}
+            </Dropdown>
             {doc.document_type === "transaction_account" && (
               <Button variant="secondary" onClick={() => openFromTransactionAccount(doc)}>
-                <Send size={14} /> {vatStatus === "patoor" ? "הפק קבלה על התשלום" : "הפק חשבונית מס על התשלום"}
+                <Send size={14} /> {isVatExempt(vatStatus) ? "הפק קבלה על התשלום" : "הפק חשבונית מס על התשלום"}
               </Button>
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="danger" onClick={() => handleDelete(doc)}><Trash2 size={14} /> מחק</Button>
+            <button onClick={() => handleDelete(doc)} className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1.5 rounded-md transition-colors">
+              <Trash2 size={14} /> מחק
+            </button>
           </div>
         </div>
       </div>
@@ -526,30 +531,21 @@ export function DocumentsPage() {
 
   // ── Create/Edit full page (?new=1 | ?edit=<id>) ──────────────────
   if (isNew || editId) {
-    const total = form
-      ? vatInclusive && !form.is_exempt
-        ? computeTotalsInclusive(form.items, form.vat_rate)
-        : computeTotals(form.items, form.is_exempt ? 0 : form.vat_rate)
-      : null;
+    const isExempt = isVatExempt(vatStatus);
+    const total = form ? computeLineTotals(form.items, isExempt ? 0 : form.vat_rate) : null;
     const meta = form ? DOC_TYPE_META[form.document_type] : null;
-    const showVatFields = !!meta && meta.vatMode === "breakdown" && !form?.is_exempt;
+    const showVatFields = !!meta && meta.vatMode === "breakdown" && !isExempt;
 
     return (
       <div className="max-w-5xl mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-          <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/documents/")} className="text-slate-400 hover:text-blue-600" title="חזור">
-              <ArrowRight size={20} />
-            </button>
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <Receipt size={24} className="text-blue-500" />
-              {editingId ? "עריכת מסמך" : "מסמך חדש"}
-            </h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" onClick={() => router.push("/documents/")}>ביטול</Button>
-            <Button loading={saving} onClick={handleSubmit}><Save size={14} /> {editingId ? "שמור שינויים" : "צור מסמך"}</Button>
-          </div>
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => router.push("/documents/")} className="text-slate-400 hover:text-blue-600" title="חזור">
+            <ArrowRight size={20} />
+          </button>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Receipt size={24} className="text-blue-500" />
+            {editingId ? "עריכת מסמך" : "מסמך חדש"}
+          </h1>
         </div>
 
         {form ? (
@@ -588,12 +584,6 @@ export function DocumentsPage() {
                 value={form.project_id}
                 onChange={(e) => setForm({ ...form, project_id: e.target.value })}
               />
-              <Select
-                label="סוג מסמך"
-                value={form.document_type}
-                onChange={(e) => handleTypeChange(e.target.value as DocumentType)}
-                options={allowedTypes.map((t) => ({ value: t, label: DOC_TYPE_META[t].label }))}
-              />
               <Input label="מספר מסמך" value={form.invoice_number} onChange={(e) => setForm({ ...form, invoice_number: e.target.value })} />
               <div className="grid grid-cols-2 gap-3">
                 <Input label="תאריך" type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} required />
@@ -601,30 +591,13 @@ export function DocumentsPage() {
               </div>
             </div>
 
-            {showVatFields && (
-              <div className="flex items-center gap-4">
-                <Checkbox
-                  label='עוסק פטור (ללא מע"מ)'
-                  checked={form.is_exempt}
-                  onChange={(e) => setForm({ ...form, is_exempt: e.target.checked })}
-                />
-                {!form.is_exempt && (
-                  <Checkbox
-                    label='מחיר כולל מע"מ'
-                    checked={vatInclusive}
-                    onChange={(e) => setVatInclusive(e.target.checked)}
-                  />
-                )}
-              </div>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">פריטים</label>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
-                      {["תיאור", "כמות", vatInclusive && showVatFields ? "מחיר ליחידה (כולל מע״מ)" : "מחיר ליחידה", ...(showVatFields ? ['מע"מ'] : []), "סה\"כ"].map((h) => (
+                      {["תיאור", "כמות", "מחיר ליחידה", ...(showVatFields ? ['שיעור מע"מ', 'מע"מ'] : []), "סה\"כ"].map((h) => (
                         <th key={h} className="px-3 py-2 text-right text-xs font-medium text-slate-500 uppercase">{h}</th>
                       ))}
                       <th className="px-3 py-2" />
@@ -632,9 +605,9 @@ export function DocumentsPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {form.items.map((it) => {
-                      const bd = vatInclusive && !form.is_exempt
-                        ? lineVatBreakdown(it, form.vat_rate, true)
-                        : lineVatBreakdown(it, form.is_exempt ? 0 : form.vat_rate, false);
+                      const lineRate = effectiveLineVatRate(it, form.vat_rate);
+                      const bd = lineVatBreakdown(it, isExempt ? 0 : lineRate);
+                      const isExemptLine = isExempt || (lineRate || 0) === 0;
                       return (
                         <tr key={it.id}>
                           <td className="px-3 py-2">
@@ -647,7 +620,21 @@ export function DocumentsPage() {
                             <Input type="number" min="0" step="0.01" placeholder="מחיר ליחידה" value={it.unit_price} onChange={(e) => updateItem(it.id, { unit_price: parseFloat(e.target.value) || 0 })} />
                           </td>
                           {showVatFields && (
-                            <td className="px-3 py-2 text-sm text-slate-600 whitespace-nowrap">{formatCurrency(bd.vat)}</td>
+                            <td className="px-3 py-2 w-28">
+                              <select
+                                value={it.vat_rate == null ? String(form.vat_rate) : String(it.vat_rate)}
+                                onChange={(e) => updateItem(it.id, { vat_rate: parseFloat(e.target.value) })}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                              >
+                                <option value={form.vat_rate}>{form.vat_rate}%</option>
+                                <option value="0">0% / פטור</option>
+                              </select>
+                            </td>
+                          )}
+                          {showVatFields && (
+                            <td className="px-3 py-2 text-sm text-slate-600 whitespace-nowrap">
+                              {isExemptLine ? "—" : formatCurrency(bd.vat)}
+                            </td>
                           )}
                           <td className="px-3 py-2 text-sm font-bold whitespace-nowrap">{formatCurrency(bd.gross)}</td>
                           <td className="px-3 py-2">
@@ -681,6 +668,11 @@ export function DocumentsPage() {
             </div>
 
             <Input label="הערות" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-200">
+              <Button variant="ghost" type="button" onClick={() => router.push("/documents/")}>ביטול</Button>
+              <Button loading={saving} type="submit"><Save size={14} /> {editingId ? "שמור שינויים" : "צור מסמך"}</Button>
+            </div>
           </form>
         ) : (
           <Card className="p-12">
@@ -703,7 +695,25 @@ export function DocumentsPage() {
           <h1 className="text-2xl font-bold text-slate-800">מסמכים</h1>
           <Badge variant="blue">{documents.length}</Badge>
         </div>
-        <Button onClick={() => router.push("/documents/?new=1")}><Plus size={14} /> מסמך חדש</Button>
+        <Dropdown
+          align="right"
+          trigger={
+            <Button>
+              <Plus size={14} /> מסמך חדש <ChevronDown size={14} />
+            </Button>
+          }
+        >
+          {(close) => (
+            <div>
+              <MenuLabel>סוג מסמך</MenuLabel>
+              {allowedTypes.map((t) => (
+                <MenuItem key={t} onClick={() => { router.push(`/documents/?new=1&document_type=${t}`); close(); }}>
+                  {DOC_TYPE_META[t].label}
+                </MenuItem>
+              ))}
+            </div>
+          )}
+        </Dropdown>
       </div>
 
       {/* Type tabs */}
@@ -715,14 +725,14 @@ export function DocumentsPage() {
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${
+              className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${
                 typeFilter === t
                   ? "bg-blue-50 border-blue-200 text-blue-700"
                   : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
-              {label}
-              <span className="text-xs text-slate-400 ml-1.5">({count})</span>
+              <span>{label}</span>
+              <span className="text-xs text-slate-400">({count})</span>
             </button>
           );
         })}
@@ -732,7 +742,7 @@ export function DocumentsPage() {
         <Card className="p-12">
           <EmptyState
             icon={<Receipt size={40} className="text-slate-300" />}
-            title={typeFilter === "all" ? "אין מסמכים עדיין" : `אין ${DOC_TYPE_META[typeFilter as DocumentType]?.label || "מסמכים"} עדיין`}
+            title={typeFilter === "all" ? "אין מסמכים עדיין" : `אין ${DOC_TYPE_META[typeFilter as DocumentType]?.labelPlural || "מסמכים"} עדיין`}
             description='לחץ על "מסמך חדש" כדי להתחיל'
           />
         </Card>
@@ -761,7 +771,7 @@ export function DocumentsPage() {
                           <Eye size={16} />
                         </button>
                         {doc.document_type === "transaction_account" && (
-                          <button onClick={(e) => { e.stopPropagation(); openFromTransactionAccount(doc); }} className="text-slate-400 hover:text-emerald-600" title={vatStatus === "patoor" ? "הפק קבלה על התשלום" : "הפק חשבונית מס על התשלום"}>
+                          <button onClick={(e) => { e.stopPropagation(); openFromTransactionAccount(doc); }} className="text-slate-400 hover:text-emerald-600" title={isVatExempt(vatStatus) ? "הפק קבלה על התשלום" : "הפק חשבונית מס על התשלום"}>
                             <Send size={16} />
                           </button>
                         )}

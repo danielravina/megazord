@@ -28,6 +28,7 @@ test("can create a tax invoice which books income immediately", async ({ page })
 
   await page.goto("/documents/");
   await page.locator("button:has-text('מסמך חדש')").click();
+  await page.getByRole("button", { name: "חשבונית מס", exact: true }).click();
   await expect(page.locator("label:has-text('לקוח *')")).toBeVisible({ timeout: 5000 });
   await page.locator("label:has-text('לקוח *') + select").selectOption({ label: custName });
 
@@ -66,9 +67,9 @@ test("can create a quotation which does NOT book income", async ({ page }) => {
 
   await page.goto("/documents/");
   await page.locator("button:has-text('מסמך חדש')").click();
+  await page.getByRole("button", { name: "הצעת מחיר", exact: true }).click();
   await expect(page.locator("label:has-text('לקוח *')")).toBeVisible({ timeout: 5000 });
   await page.locator("label:has-text('לקוח *') + select").selectOption({ label: custName });
-  await page.locator("label:has-text('סוג מסמך') + select").selectOption({ label: "הצעת מחיר" });
   await page.locator("input[placeholder='תיאור השירות / המוצר']").fill("בדיקת E2E - הצעה");
   await page.locator("input[placeholder='כמות']").fill("1");
   await page.locator("input[placeholder='מחיר ליחידה']").fill("500");

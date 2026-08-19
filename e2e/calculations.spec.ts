@@ -147,11 +147,10 @@ test("VAT is calculated correctly from gross income", async ({ page }) => {
 });
 
 test("credit points are computed correctly", async ({ page }) => {
-  await page.goto("/finance/");
+  await page.goto("/preferences/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  await page.locator("button:has-text('מיסים')").click();
-  await expect(page.locator("h3:has-text('הגדרות מיסים')")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("h2:has-text('הגדרות מיסים ומועדי חיוב')")).toBeVisible({ timeout: 5000 });
 
   // Read credit points from the form
   const creditInput = page.locator("input[name='credit_points']");
@@ -161,7 +160,9 @@ test("credit points are computed correctly", async ({ page }) => {
   const creditValueRounded = Math.round(creditValue * 242);
   expect(creditValueRounded).toBeGreaterThan(0);
 
-  // Switch back to dashboard tab to verify displayed credit value
+  // Go to finance dashboard to verify displayed credit value
+  await page.goto("/finance/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
   await page.locator("button:has-text('לוח בקרה')").click();
   await expect(page.locator("text=הכנסות נטו (מוערך)")).toBeVisible({ timeout: 5000 });
 

@@ -70,6 +70,16 @@ describe("buildLedger — issued documents", () => {
     assert.equal(incomes.length, 1);
     assert.equal(incomes[0].amount, 118);
   });
+
+  it("zeair behaves like patoor: receipt books income, tax_invoice does not", () => {
+    const { incomes } = buildLedger(
+      [invoice({ document_type: "receipt" }), invoice({ document_type: "tax_invoice" })],
+      [],
+      "zeair",
+    );
+    assert.equal(incomes.length, 1);
+    assert.equal(incomes[0].amount, 118);
+  });
 });
 
 describe("buildLedger — scanned evidence", () => {

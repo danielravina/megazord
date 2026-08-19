@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  nextInvoiceNumber, nextQuotationNumber, nextDeliveryNoteNumber, computeTotals, computeTotalsInclusive, lineTotal, lineVatBreakdown, booksIncome, incomeSign,
+  nextInvoiceNumber, nextQuotationNumber, nextDeliveryNoteNumber, computeTotals, computeLineTotals, effectiveLineVatRate, lineTotal, lineVatBreakdown, booksIncome, incomeSign,
 } from "./invoice-utils";
 
 describe("nextInvoiceNumber", () => {
@@ -71,6 +71,14 @@ describe("booksIncome / incomeSign", () => {
     assert.equal(booksIncome("transaction_account", "patoor"), false);
   });
 
+  it("zeair behaves like patoor: only receipt books income", () => {
+    assert.equal(booksIncome("receipt", "zeair"), true);
+    assert.equal(booksIncome("tax_invoice", "zeair"), false);
+    assert.equal(booksIncome("tax_invoice_receipt", "zeair"), false);
+    assert.equal(booksIncome("credit_invoice", "zeair"), false);
+    assert.equal(booksIncome("transaction_account", "zeair"), false);
+  });
+
   it("credit invoices are negative", () => {
     assert.equal(incomeSign("credit_invoice"), -1);
     assert.equal(incomeSign("tax_invoice"), 1);
@@ -112,64 +120,62 @@ describe("computeTotals", () => {
   });
 });
 
-describe("computeTotalsInclusive", () => {
-  it("derives net and vat from a VAT-inclusive price", () => {
-    // 2 x 100 net (@18%) => gross 118 each => 236 total
-    const items = [
-      { id: "a", description: "שירות 1", quantity: 1, unit_price: 118 },
-      { id: "b", description: "שירות 2", quantity: 1, unit_price: 118 },
-    ];
-    const t = computeTotalsInclusive(items, 18);
-    assert.equal(t.subtotal, 200);
-    assert.equal(t.vat, 36);
-    assert.equal(t.total, 236);
-  });
-
-  it("round-trips with computeTotals for the same net", () => {
-    const grossItems = [{ id: "a", description: "x", quantity: 2, unit_price: 295 }];
-    const inc = computeTotalsInclusive(grossItems, 18);
-    // net per unit = 295 / 1.18 = 250
-    const netItems = [{ id: "a", description: "x", quantity: 2, unit_price: 250 }];
-    const net = computeTotals(netItems, 18);
-    assert.equal(inc.subtotal, net.subtotal);
-    assert.equal(inc.vat, net.vat);
-    assert.equal(inc.total, net.total);
-  });
-
-  it("handles exempt / zero rate", () => {
-    const t = computeTotalsInclusive([{ id: "a", description: "x", quantity: 2, unit_price: 100 }], 0);
-    assert.equal(t.vat, 0);
-    assert.equal(t.subtotal, 200);
-    assert.equal(t.total, 200);
-  });
-
-  it("handles empty items", () => {
-    const t = computeTotalsInclusive([], 18);
-    assert.equal(t.subtotal, 0);
-    assert.equal(t.vat, 0);
-    assert.equal(t.total, 0);
-  });
-});
-
 describe("lineVatBreakdown", () => {
   it("splits a net price into per-line net / vat / gross", () => {
-    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 2, unit_price: 100 }, 18, false);
+    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 2, unit_price: 100 }, 18);
     assert.equal(bd.net, 200);
     assert.equal(bd.vat, 36);
     assert.equal(bd.gross, 236);
   });
 
-  it("backs VAT out of a gross (inclusive) price", () => {
-    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 1, unit_price: 118 }, 18, true);
-    assert.equal(bd.net, 100);
-    assert.equal(bd.vat, 18);
-    assert.equal(bd.gross, 118);
-  });
-
   it("handles exempt / zero rate", () => {
-    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 3, unit_price: 50 }, 0, false);
+    const bd = lineVatBreakdown({ id: "a", description: "x", quantity: 3, unit_price: 50 }, 0);
     assert.equal(bd.net, 150);
     assert.equal(bd.vat, 0);
     assert.equal(bd.gross, 150);
+  });
+});
+
+describe("effectiveLineVatRate", () => {
+  it("uses the line's own rate when set, otherwise the default", () => {
+    assert.equal(effectiveLineVatRate({ id: "a", description: "x", quantity: 1, unit_price: 100, vat_rate: 0 }, 18), 0);
+    assert.equal(effectiveLineVatRate({ id: "a", description: "x", quantity: 1, unit_price: 100, vat_rate: 17 }, 18), 17);
+    assert.equal(effectiveLineVatRate({ id: "a", description: "x", quantity: 1, unit_price: 100 }, 18), 18);
+    assert.equal(effectiveLineVatRate({ id: "a", description: "x", quantity: 1, unit_price: 100, vat_rate: null }, 18), 18);
+  });
+});
+
+describe("computeLineTotals (per-line VAT rates)", () => {
+  it("sums net / vat / gross across mixed rates", () => {
+    // labour at default 18%: 2x100 net => vat 36, gross 236
+    // material exempt (0%): 1x118 => vat 0, gross 118
+    const items = [
+      { id: "labour", description: "עבודה", quantity: 2, unit_price: 100, vat_rate: 18 },
+      { id: "mat", description: "חומר", quantity: 1, unit_price: 118, vat_rate: 0 },
+    ];
+    const t = computeLineTotals(items, 18);
+    assert.equal(t.subtotal, 318);
+    assert.equal(t.vat, 36);
+    assert.equal(t.total, 354);
+  });
+
+  it("defaults items without a rate to the document rate", () => {
+    const t = computeLineTotals([{ id: "a", description: "x", quantity: 1, unit_price: 100 }], 18);
+    assert.equal(t.subtotal, 100);
+    assert.equal(t.vat, 18);
+    assert.equal(t.total, 118);
+  });
+
+  it("handles a fully exempt document / zero default rate", () => {
+    const t = computeLineTotals(
+      [
+        { id: "a", description: "x", quantity: 2, unit_price: 100 },
+        { id: "b", description: "y", quantity: 1, unit_price: 118, vat_rate: 0 },
+      ],
+      0,
+    );
+    assert.equal(t.subtotal, 318);
+    assert.equal(t.vat, 0);
+    assert.equal(t.total, 318);
   });
 });

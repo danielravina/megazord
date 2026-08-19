@@ -14,14 +14,15 @@ test("finance page shows income and expense total cards", async ({ page }) => {
   await expect(page.locator("text=סך הוצאות")).toBeVisible();
 });
 
-test("finance page has tabs: dashboard, incomes, expenses, taxes, savings", async ({ page }) => {
+test("finance page has tabs: dashboard, incomes, expenses, savings", async ({ page }) => {
   await page.goto("/finance/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  const tabs = ["לוח בקרה", "הכנסות", "הוצאות", "מיסים", "חסכונות"];
+  const tabs = ["לוח בקרה", "הכנסות", "הוצאות", "חסכונות"];
   for (const tab of tabs) {
     await expect(page.locator(`button:has-text("${tab}")`)).toBeVisible();
   }
+  await expect(page.locator("button:has-text('מיסים')")).toBeHidden();
 });
 
 test("finance dashboard tab shows net income and tax totals", async ({ page }) => {
@@ -51,13 +52,13 @@ test("expenses tab explains expenses are derived from scans", async ({ page }) =
   await expect(page.locator("button:has-text('הוסף הוצאה')")).toBeHidden();
 });
 
-test("can switch to taxes tab and see settings form", async ({ page }) => {
-  await page.goto("/finance/");
+test("tax settings live in preferences", async ({ page }) => {
+  await page.goto("/preferences/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  await page.locator("button:has-text('מיסים')").click();
-  await expect(page.locator("h3:has-text('הגדרות מיסים')")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator("button:has-text('שמור הגדרות מיסים')")).toBeVisible();
+  await expect(page.locator("h2:has-text('הגדרות מיסים ומועדי חיוב')")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("label:has-text('שיעור מע')")).toBeVisible();
+  await expect(page.locator("button:has-text('שמור העדפות')")).toBeVisible();
 });
 
 test("can switch to savings tab and see add form", async ({ page }) => {

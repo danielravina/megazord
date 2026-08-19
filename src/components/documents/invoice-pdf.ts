@@ -4,7 +4,7 @@ import type { TaxSettings } from "@/components/finance/finance-types";
 import { DOC_TYPE_META } from "./invoice-types";
 import { escapeHtml } from "@/components/shared/escape-html";
 import { formatCurrency } from "@/components/shared/format-currency";
-import { lineVatBreakdown } from "./invoice-utils";
+import { effectiveLineVatRate, lineVatBreakdown } from "./invoice-utils";
 
 const fmtDate = (d?: string | null) => (d ? d.split("-").reverse().join("/") : "-");
 
@@ -28,9 +28,14 @@ export function buildInvoiceHtml(
 
   const rows = items
     .map((it) => {
-      const bd = lineVatBreakdown(it, invoice.vat_rate, false);
+      const lineRate = effectiveLineVatRate(it, invoice.vat_rate);
+      const bd = lineVatBreakdown(it, lineRate);
+      const isExemptLine = (lineRate || 0) === 0;
+      const rateCell = vatBreakdown && !isExempt
+        ? `<td style="padding:8px;text-align:left;font-size:12px;">${isExemptLine ? "0%" : `${lineRate}%`}</td>`
+        : "";
       const vatCell = vatBreakdown && !isExempt
-        ? `<td style="padding:8px;text-align:left;font-size:12px;">${formatCurrency(isCredit ? -bd.vat : bd.vat)}</td>`
+        ? `<td style="padding:8px;text-align:left;font-size:12px;${isExemptLine ? "color:#94a3b8;" : ""}">${isExemptLine ? "—" : formatCurrency(isCredit ? -bd.vat : bd.vat)}</td>`
         : "";
       const grossCell = vatBreakdown && !isExempt
         ? formatCurrency(isCredit ? -bd.gross : bd.gross)
@@ -40,16 +45,17 @@ export function buildInvoiceHtml(
           <td style="padding:8px;text-align:right;font-size:12px;">${escapeHtml(it.description)}</td>
           <td style="padding:8px;text-align:center;font-size:12px;">${it.quantity}</td>
           <td style="padding:8px;text-align:left;font-size:12px;">${formatCurrency(it.unit_price)}</td>
+          ${rateCell}
           ${vatCell}
           <td style="padding:8px;text-align:left;font-size:12px;font-weight:600;">${grossCell}</td>
         </tr>`;
     })
     .join("");
 
-  let totalBlock: string;
+let totalBlock: string;
   if (isInformational) {
     // Quotation / delivery note: no "payable now" — informational total only.
-    const gross = items.reduce((s, it) => s + lineVatBreakdown(it, invoice.vat_rate, false).gross, 0);
+    const gross = items.reduce((s, it) => s + lineVatBreakdown(it, effectiveLineVatRate(it, invoice.vat_rate)).gross, 0);
     totalBlock = `
       <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
         <span>${invoice.document_type === "quotation" ? "סה\"כ להצעה" : "סה\"כ פריטים"}</span>
@@ -58,7 +64,7 @@ export function buildInvoiceHtml(
     `;
   } else {
     // Every other type: single total. For tax documents the VAT already appears per item.
-    const gross = items.reduce((s, it) => s + lineVatBreakdown(it, invoice.vat_rate, false).gross, 0);
+    const gross = items.reduce((s, it) => s + lineVatBreakdown(it, effectiveLineVatRate(it, invoice.vat_rate)).gross, 0);
     totalBlock = `
       <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding:8px 0;border-top:2px solid #1e293b;">
         <span>${isCredit ? "סה\"כ זיכוי" : invoice.document_type === "quotation" ? "סה\"כ להצעה" : "סה\"כ לתשלום"}</span>
@@ -105,12 +111,13 @@ export function buildInvoiceHtml(
           <th style="padding:8px;text-align:right;">תיאור</th>
           <th style="padding:8px;text-align:center;">כמות</th>
           <th style="padding:8px;text-align:left;">מחיר ליחידה</th>
+          ${vatBreakdown && !isExempt ? `<th style="padding:8px;text-align:left;">שיעור מע"מ</th>` : ""}
           ${vatBreakdown && !isExempt ? `<th style="padding:8px;text-align:left;">מע"מ</th>` : ""}
           <th style="padding:8px;text-align:left;">סה"כ</th>
         </tr>
       </thead>
       <tbody>
-        ${items.length ? rows : `<tr><td colspan="${vatBreakdown && !isExempt ? 5 : 4}" style="padding:8px;text-align:center;color:#94a3b8;font-size:12px;">אין פריטים</td></tr>`}
+        ${items.length ? rows : `<tr><td colspan="${vatBreakdown && !isExempt ? 6 : 4}" style="padding:8px;text-align:center;color:#94a3b8;font-size:12px;">אין פריטים</td></tr>`}
       </tbody>
     </table>
 
