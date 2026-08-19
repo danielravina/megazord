@@ -99,7 +99,7 @@ export function GlobalSearch() {
           if (e.key === "Escape") setOpen(false);
         }}
         placeholder="חיפוש..."
-        className="w-40 sm:w-56 lg:w-72 bg-slate-100 rounded-lg py-2 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+        className="w-28 sm:w-56 lg:w-72 bg-slate-100 rounded-lg py-2 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
       />
 
       {open && hasQuery && (

@@ -10,6 +10,8 @@ interface DropdownProps {
   menuClassName?: string;
 }
 
+const MENU_WIDTH_EST = 240;
+
 export function Dropdown({
   trigger,
   children,
@@ -18,6 +20,7 @@ export function Dropdown({
   menuClassName = "",
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
+  const [flip, setFlip] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,13 +39,28 @@ export function Dropdown({
     };
   }, [open]);
 
+  const onToggle = () => {
+    if (!open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const vw = window.innerWidth || 375;
+      if (align === "left" && rect.left + MENU_WIDTH_EST > vw - 8) {
+        setFlip(true);
+      } else if (align === "right" && rect.right - MENU_WIDTH_EST < 8) {
+        setFlip(false);
+      }
+    }
+    setOpen((o) => !o);
+  };
+
+  const effectiveAlign = flip ? (align === "left" ? "right" : "left") : align;
+
   return (
     <div ref={ref} className={`relative ${className}`}>
-      <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
+      <div onClick={onToggle}>{trigger}</div>
       {open && (
         <div
-          className={`absolute top-full mt-1 z-50 min-w-[190px] rounded-lg border border-slate-200 bg-white shadow-lg p-1.5 ${
-            align === "left" ? "left-0" : "right-0"
+          className={`absolute top-full mt-1 z-50 min-w-[190px] max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1.5 ${
+            effectiveAlign === "left" ? "left-0" : "right-0"
           } ${menuClassName}`}
         >
           {typeof children === "function" ? children(() => setOpen(false)) : children}

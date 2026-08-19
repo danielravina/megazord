@@ -38,7 +38,7 @@ export function TodoItem({ todo, onToggle, onDelete, highlight }: TodoItemProps)
       </div>
       <button
         onClick={() => onDelete(todo.id)}
-        className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+        className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
         aria-label="מחק משימה"
       >
         <Trash2 size={16} />

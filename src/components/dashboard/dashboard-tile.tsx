@@ -203,7 +203,7 @@ function ResizeHandle({
       onPointerMove={movePointer}
       onPointerUp={endPointer}
       onPointerCancel={endPointer}
-      className={`absolute bottom-1.5 left-1.5 p-1 rounded-md text-slate-400 cursor-col-resize hover:text-blue-500 hover:bg-blue-50 transition-colors select-none ${
+      className={`hidden md:flex absolute bottom-1.5 left-1.5 p-1 rounded-md text-slate-400 cursor-col-resize hover:text-blue-500 hover:bg-blue-50 transition-colors select-none ${
         active ? "bg-blue-50 text-blue-500" : "opacity-60"
       }`}
       style={{ touchAction: "none" }}

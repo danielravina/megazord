@@ -454,7 +454,7 @@ export function DocumentsPage() {
 
     return (
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push("/documents/")} className="text-slate-400 hover:text-blue-600" title="חזור">
               <ArrowRight size={20} />
@@ -536,7 +536,7 @@ export function DocumentsPage() {
 
     return (
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push("/documents/")} className="text-slate-400 hover:text-blue-600" title="חזור">
               <ArrowRight size={20} />
@@ -546,7 +546,7 @@ export function DocumentsPage() {
               {editingId ? "עריכת מסמך" : "מסמך חדש"}
             </h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="ghost" onClick={() => router.push("/documents/")}>ביטול</Button>
             <Button loading={saving} onClick={handleSubmit}><Save size={14} /> {editingId ? "שמור שינויים" : "צור מסמך"}</Button>
           </div>
@@ -697,7 +697,7 @@ export function DocumentsPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-6">
         <div className="flex items-center gap-3">
           <Receipt size={24} className="text-blue-500" />
           <h1 className="text-2xl font-bold text-slate-800">מסמכים</h1>

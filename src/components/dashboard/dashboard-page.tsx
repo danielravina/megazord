@@ -68,9 +68,9 @@ export function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-bold text-slate-700">לוח בקרה</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-700">לוח בקרה</h2>
           <button
             onClick={() => refresh()}
             disabled={isRefreshing}
@@ -83,7 +83,7 @@ export function DashboardPage() {
             />
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <DocumentScanner onScanned={refresh} />
           <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>
             <FileText size={14} />
@@ -92,6 +92,7 @@ export function DashboardPage() {
           <Button
             variant={customizing ? "primary" : "secondary"}
             size="sm"
+            className="max-md:hidden"
             onClick={() => {
               setCustomizing((c) => !c);
             }}

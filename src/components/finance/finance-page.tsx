@@ -245,7 +245,7 @@ export function FinancePage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <Wallet size={24} className="text-blue-500" />
           ניהול כספים

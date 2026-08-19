@@ -21,13 +21,25 @@ const navItems = [
   { href: "/preferences/", label: "העדפות", icon: Settings },
 ];
 
-export function Sidebar({ pinned, onTogglePin }: { pinned: boolean; onTogglePin: () => void }) {
+export function Sidebar({
+  pinned,
+  onTogglePin,
+  mobileOpen,
+  onClose,
+}: {
+  pinned: boolean;
+  onTogglePin: () => void;
+  mobileOpen: boolean;
+  onClose: () => void;
+}) {
   const pathname = usePathname();
 
   return (
     <aside
-      className={`fixed right-0 top-14 bottom-0 z-40 bg-white border-l border-slate-200 flex flex-col transition-[width] duration-150 overflow-hidden ${
-        pinned ? "w-48" : "w-14 group hover:w-48"
+      className={`fixed right-0 top-14 bottom-0 z-40 bg-white border-l border-slate-200 flex flex-col overflow-hidden group transition-transform duration-200 lg:transition-[width] lg:duration-150 ${
+        mobileOpen ? "translate-x-0 w-64" : "translate-x-full w-64"
+      } lg:translate-x-0 ${
+        pinned ? "lg:w-48" : "lg:w-14 lg:hover:w-48"
       }`}
     >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-1">
@@ -41,6 +53,7 @@ export function Sidebar({ pinned, onTogglePin }: { pinned: boolean; onTogglePin:
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={`flex items-center gap-3 px-[19px] py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                 isActive
                   ? "bg-blue-50 text-blue-700"
@@ -48,7 +61,9 @@ export function Sidebar({ pinned, onTogglePin }: { pinned: boolean; onTogglePin:
               }`}
             >
               <Icon size={18} className="shrink-0" />
-              <span className={`leading-[18px] ${pinned ? "inline" : "hidden group-hover:inline"}`}>
+              <span className={`leading-[18px] max-lg:inline ${
+                pinned ? "inline" : "hidden lg:group-hover:inline"
+              }`}>
                 {item.label}
               </span>
             </Link>
@@ -56,7 +71,7 @@ export function Sidebar({ pinned, onTogglePin }: { pinned: boolean; onTogglePin:
         })}
       </nav>
 
-      <div className="py-4 border-t border-slate-100">
+      <div className="py-4 border-t border-slate-100 max-lg:hidden">
         <button
           onClick={onTogglePin}
           title={pinned ? "כווץ את התפריט" : "הצמד תפריט פתוח"}

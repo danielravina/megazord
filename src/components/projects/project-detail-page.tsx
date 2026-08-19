@@ -370,9 +370,9 @@ export function ProjectDetailPage() {
           </div>
           <Input label="מילות חיפוש / תגיות" placeholder="פסיק בין מילה למילה" value={form.search_words} onChange={(e) => setForm({ ...form, search_words: e.target.value })} />
 
-          <div className="flex gap-2 justify-between pt-4 border-t">
+          <div className="flex flex-wrap gap-2 justify-between pt-4 border-t">
             <Button loading={saving} type="submit"><Save size={14} /> שמור שינויים</Button>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="secondary" type="button" onClick={() => router.push(`/documents/?newDocument=${projectId}`)}>
                 <Receipt size={14} /> צור חשבונית
               </Button>

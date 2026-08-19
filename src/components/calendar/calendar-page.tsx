@@ -223,7 +223,7 @@ export function CalendarPage() {
   if (loading && events.length === 0) {
     return (
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+<div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <Skeleton className="w-48 h-8" />
           <div className="flex gap-2">
             <Skeleton className="w-20 h-9" />

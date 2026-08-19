@@ -186,7 +186,7 @@ export function ProjectsPage() {
   if (loading && projects.length === 0) {
     return (
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+<div className="flex flex-wrap justify-between items-center gap-2 mb-6">
           <div className="flex items-center gap-3">
             <Skeleton className="w-6 h-6" />
             <Skeleton className="w-40 h-8" />

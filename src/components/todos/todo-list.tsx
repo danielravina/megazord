@@ -153,7 +153,7 @@ export function TodoList() {
         </h1>
       </div>
 
-      <form onSubmit={addTodo} className="flex gap-3 mb-6">
+      <form onSubmit={addTodo} className="flex flex-col sm:flex-row gap-3 mb-6">
         <input
           type="text"
           value={input}
@@ -165,7 +165,7 @@ export function TodoList() {
         />
         <button
           type="submit"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-sm flex items-center gap-2 active:scale-95"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-sm flex items-center justify-center gap-2 active:scale-95 sm:w-auto w-full"
         >
           <span>הוסף</span>
           <Plus size={14} />
