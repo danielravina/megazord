@@ -41,6 +41,35 @@ test("clicking a calendar day opens add event modal", async ({ page }) => {
 });
 
 test("multi-day project event shows once and spans the calendar", async ({ page }) => {
+  // The grid renders only the first 3 events per day, so pick a day in the
+  // current month with no events to guarantee the new pill is visible.
+  await page.goto("/calendar/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("main h1")).toBeVisible({ timeout: 10000 });
+
+  const dayCells = page.locator(".grid-cols-7").last().locator("> div");
+  const cellCount = await dayCells.count();
+  let bestDay: number | null = null;
+  let bestPills = Infinity;
+  for (let i = 0; i < cellCount; i++) {
+    const cell = dayCells.nth(i);
+    const cls = (await cell.getAttribute("class")) || "";
+    if (cls.includes("text-slate-400")) continue; // skip other-month filler cells
+    const pills = await cell.locator("div[style*='background-color']").count();
+    const dayNum = parseInt((await cell.locator("> div").first().textContent()) || "", 10);
+    if (Number.isInteger(dayNum) && dayNum >= 1 && pills < bestPills) {
+      bestDay = dayNum;
+      bestPills = pills;
+    }
+  }
+  // The grid renders only the first 3 events per day, so require a day with
+  // room (otherwise the new pill would be hidden behind the "+N" overflow).
+  expect(bestDay).not.toBeNull();
+  expect(bestPills).toBeLessThan(3);
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const startDate = `${now.getFullYear()}-${month}-${String(bestDay).padStart(2, "0")}`;
+
   // Create a customer
   await page.goto("/customers/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 15000 });
@@ -51,10 +80,7 @@ test("multi-day project event shows once and spans the calendar", async ({ page 
   await page.locator("button:has-text('שמור לקוח')").click();
   await expect(page.locator("text=הלקוח נוצר")).toBeVisible({ timeout: 10000 });
 
-  // Create a project starting on the 20th of the current month (a quiet day),
-  // duration 5 days
-  const now = new Date();
-  const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-20`;
+  // Create a project starting on the empty day, duration 5 days
   await page.goto("/projects/");
   await page.locator("button:has-text('פרויקט חדש')").click();
   await expect(page.locator("label:has-text('לקוח')")).toBeVisible({ timeout: 5000 });
