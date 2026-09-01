@@ -6,6 +6,7 @@ import {
   creditValue,
   VAT_DEFAULT,
   CREDIT_POINT_VALUE,
+  CREDIT_POINT_ANNUAL_VALUE,
 } from "./israeli-tax";
 
 describe("TAX_BRACKETS_2026", () => {
@@ -69,6 +70,12 @@ describe("creditValue", () => {
 describe("CREDIT_POINT_VALUE", () => {
   it("is 242", () => {
     assert.equal(CREDIT_POINT_VALUE, 242);
+  });
+});
+
+describe("CREDIT_POINT_ANNUAL_VALUE", () => {
+  it("is 242 * 12 = 2904", () => {
+    assert.equal(CREDIT_POINT_ANNUAL_VALUE, 2904);
   });
 });
 

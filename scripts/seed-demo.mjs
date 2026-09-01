@@ -450,6 +450,8 @@ function buildLayout() {
     bituah_leumi: 5,
     bituah_leumi_billing_day: 15,
     credit_points: 2.25,
+    tax_advances_paid: 0,
+    tax_advances_year: new Date().getFullYear(),
     vat_status: "morashi",
     income_scheme: "standard",
     zeair_expense_rate: 0,

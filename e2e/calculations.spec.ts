@@ -77,16 +77,16 @@ test("finance dashboard tab tax calculations are internally consistent", async (
   };
 
   const displayedVat = await readRow('מע"מ');
-  const displayedIncomeTax = await readRow("מקדמות מס הכנסה");
+  const displayedIncomeTax = await readRow("מס הכנסה (אומדן)");
   const displayedBituahLeumi = await readRow("ביטוח לאומי");
 
   // Basic sanity checks
   expect(displayedTotalTax).toBeGreaterThanOrEqual(0);
   expect(displayedVat + displayedIncomeTax + displayedBituahLeumi).toBeGreaterThanOrEqual(0);
 
-  // Verify the total tax matches sum of components minus credits:
-  // totalTax = Math.max(0, vat + incomeTax + bituahLeumi - creditValue)
-  // Since credits reduce tax (floor at 0), totalTax <= vat + incomeTax + bituahLeumi
+  // Verify the total tax matches sum of components after credit offset:
+  // totalTax = vat + bituahLeumi + max(0, incomeTax - annualCredit)
+  // Since taxAfterCredits floors at 0, totalTax <= vat + incomeTax + bituahLeumi
   expect(displayedTotalTax).toBeLessThanOrEqual(displayedVat + displayedIncomeTax + displayedBituahLeumi + 1);
 
   // Verify netIncome = totalIncome - totalTax - businessExpenses
@@ -171,4 +171,30 @@ test("credit points are computed correctly", async ({ page }) => {
   const totalTaxText = await page.locator(".bg-rose-50 .text-3xl").textContent();
   const displayedTotalTax = parseCurrency(totalTaxText || "0");
   expect(displayedTotalTax).toBeGreaterThanOrEqual(0);
+});
+
+test("tax advances paid field persists in preferences", async ({ page }) => {
+  await page.goto("/preferences/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("h2:has-text('הגדרות מיסים ומועדי חיוב')")).toBeVisible({ timeout: 5000 });
+
+  const advancesInput = page.locator("input[name='tax_advances_paid']");
+  await expect(advancesInput).toBeVisible({ timeout: 5000 });
+
+  // Save a value, reload, verify persistence
+  await advancesInput.fill("1500");
+  await page.locator("button:has-text('שמור העדפות')").click();
+  await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
+
+  await page.reload();
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("h2:has-text('הגדרות מיסים ומועדי חיוב')")).toBeVisible({ timeout: 5000 });
+
+  const persisted = await page.locator("input[name='tax_advances_paid']").inputValue();
+  expect(parseFloat(persisted)).toBe(1500);
+
+  // Cleanup: restore to 0 so we don't pollute later assertions
+  await page.locator("input[name='tax_advances_paid']").fill("0");
+  await page.locator("button:has-text('שמור העדפות')").click();
+  await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
 });

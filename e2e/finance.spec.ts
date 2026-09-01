@@ -34,6 +34,30 @@ test("finance dashboard tab shows net income and tax totals", async ({ page }) =
   await expect(page.locator("text=חבות מס כוללת")).toBeVisible();
 });
 
+test("finance dashboard tax card shows advances and final balance", async ({ page }) => {
+  // Set a known advance so the final balance row is guaranteed to render
+  await page.goto("/preferences/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  await page.locator("input[name='tax_advances_paid']").fill("1500");
+  await page.locator("button:has-text('שמור העדפות')").click();
+  await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
+
+  await page.goto("/finance/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+
+  await page.locator("button:has-text('לוח בקרה')").click();
+  await expect(page.locator("text=מס הכנסה (אומדן)")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("text=מקדמות ששולמו")).toBeVisible();
+  await expect(page.locator("text=יתרה סופית")).toBeVisible();
+
+  // Cleanup: restore advances to 0
+  await page.goto("/preferences/");
+  await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
+  await page.locator("input[name='tax_advances_paid']").fill("0");
+  await page.locator("button:has-text('שמור העדפות')").click();
+  await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
+});
+
 test("incomes tab explains income is derived from evidence", async ({ page }) => {
   await page.goto("/finance/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });

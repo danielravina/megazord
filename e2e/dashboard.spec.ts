@@ -134,6 +134,7 @@ test("add-tile picker opens with list of options", async ({ page }) => {
   const picker = page.locator(".fixed.inset-0.z-50");
   await expect(picker.locator("button:has-text('הכנסות')")).toBeVisible();
   await expect(picker.locator("button:has-text('הוצאות')")).toBeVisible();
+  await expect(picker.locator("button:has-text('אומדן מס שנתי')")).toBeVisible();
   await expect(picker.locator("button:has-text('משימות פתוחות')")).toBeVisible();
   await expect(picker.locator("button:has-text('מחשבון')")).toBeVisible();
   await expect(picker.locator("button:has-text('שעון')")).toBeVisible();
@@ -166,8 +167,9 @@ test("adding a calculator tile works with one click", async ({ page }) => {
   // remove
   await calcTile.hover();
   await page.waitForTimeout(300);
-  const btns = calcTile.locator("button");
-  if ((await btns.count()) > 0) await btns.last().click();
+  await calcTile.locator("button[aria-label='אפשרויות טייל']").click();
+  await page.waitForTimeout(200);
+  await page.locator("button:has-text('הסר')").last().click();
   await page.waitForTimeout(300);
   await page.locator("button:has-text('סיום')").click();
 });
@@ -185,12 +187,13 @@ test("adding a clock tile works with one click", async ({ page }) => {
   const hasClock = (await page.locator("[data-tile]").locator("svg").count() > 0);
   expect(hasClock || (await page.locator("[data-tile]").count() > 0)).toBe(true);
 
-  // clean up — remove any tile with a clock-like icon
+  // clean up — remove the last tile (the clock)
   const lastTile = page.locator("[data-tile]").last();
   await lastTile.hover();
   await page.waitForTimeout(300);
-  const btns = lastTile.locator("button");
-  if ((await btns.count()) > 0) await btns.last().click();
+  await lastTile.locator("button[aria-label='אפשרויות טייל']").click();
+  await page.waitForTimeout(200);
+  await page.locator("button:has-text('הסר')").last().click();
   await page.waitForTimeout(300);
 
   await page.locator("button:has-text('סיום')").click();

@@ -1,5 +1,5 @@
 import type { TaxSettings, TaxCalculation, Income, Expense, Saving } from "./finance-types";
-import { incomeTaxOnIncome, creditValue, VAT_DEFAULT } from "../shared/israeli-tax";
+import { incomeTaxOnIncome, VAT_DEFAULT, CREDIT_POINT_ANNUAL_VALUE } from "../shared/israeli-tax";
 
 // VAT "absorbed" (מגולם) from a VAT-inclusive gross amount
 export function vatFromGross(amount: number, rate: number): number {
@@ -29,6 +29,13 @@ function deductibleExpenses(
   return totalExpenses + totalSavings;
 }
 
+// Tax advances (מקדמות ששולמו) only count for the year they were set for.
+// Zeroing stale values prevents silently double-counting last year's advances.
+export function effectiveTaxAdvances(settings: TaxSettings | null): number {
+  if ((settings?.tax_advances_year ?? 0) !== new Date().getFullYear()) return 0;
+  return settings?.tax_advances_paid ?? 0;
+}
+
 export function calculateTaxes(
   incomes: Income[],
   expenses: Expense[],
@@ -42,19 +49,24 @@ export function calculateTaxes(
 
   const grossWithoutVat = totalIncome - vat;
 
-  // Income tax via 2026 progressive monthly brackets, annualized.
-  // The aggregated income is treated as annual; we tax the monthly average and
-  // scale back up to a year.
-  const incomeTax = incomeTaxOnIncome(grossWithoutVat / 12) * 12;
+  const dedExpenses = deductibleExpenses(grossWithoutVat, expenses, savings, settings);
+
+  // Income tax is computed on NET PROFIT via the 2026 progressive monthly
+  // brackets, annualized. Net profit is floored at 0 — losses never generate tax.
+  const netProfit = Math.max(0, grossWithoutVat - dedExpenses);
+  const incomeTax = incomeTaxOnIncome(netProfit / 12) * 12;
 
   const btlAdv = grossWithoutVat * ((settings?.bituah_leumi ?? 5) / 100);
 
-  // Credit points (נקודות זכות): monthly value x12 to annualize.
-  const annualCredit = creditValue(settings?.credit_points ?? 2.25) * 12;
+  // Credit points (נקודות זכות) offset Income Tax ONLY — they never reduce VAT
+  // or Bituach Leumi liabilities. The result is floored at 0.
+  const annualCredit = (settings?.credit_points ?? 2.25) * CREDIT_POINT_ANNUAL_VALUE;
+  const taxAfterCredits = Math.max(0, incomeTax - annualCredit);
 
-  const dedExpenses = deductibleExpenses(grossWithoutVat, expenses, savings, settings);
+  const taxAdvancesPaid = effectiveTaxAdvances(settings);
+  const balanceDue = taxAfterCredits - taxAdvancesPaid;
 
-  const totalTax = Math.max(0, vat + incomeTax + btlAdv - annualCredit);
+  const totalTax = vat + btlAdv + taxAfterCredits;
   const netIncome = totalIncome - totalTax - dedExpenses;
 
   return {
@@ -64,5 +76,12 @@ export function calculateTaxes(
     creditValue: Math.round(annualCredit),
     totalTax: Math.round(totalTax),
     netIncome: Math.round(netIncome),
+    totalIncome: Math.round(totalIncome),
+    grossWithoutVat: Math.round(grossWithoutVat),
+    dedExpenses: Math.round(dedExpenses),
+    netProfit: Math.round(netProfit),
+    taxAfterCredits: Math.round(taxAfterCredits),
+    taxAdvancesPaid: Math.round(taxAdvancesPaid),
+    balanceDue: Math.round(balanceDue),
   };
 }

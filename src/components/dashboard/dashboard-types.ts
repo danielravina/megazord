@@ -1,9 +1,9 @@
 import type { Income, Expense, TaxSettings, Saving } from "@/components/finance/finance-types";
 import type { Project } from "@/components/projects/project-types";
 
-export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "calculator" | "clock" | "weather" | "calendar";
+export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "calculator" | "clock" | "weather" | "calendar" | "waterfall";
 
-export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut", "calendar", "calculator", "clock", "weather"];
+export const RESIZABLE_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut", "calendar", "calculator", "clock", "weather", "waterfall"];
 export const LOCKED_1x1: WidgetType[] = ["calculator", "clock", "weather"];
 export const STATIC_WIDGETS: WidgetType[] = ["calculator", "clock", "weather"];
 export const DISPLAY_TYPES: WidgetType[] = ["hero", "table", "bar", "timeline", "doughnut"];
@@ -83,7 +83,19 @@ export interface CalendarData {
   events: CalendarEvent[];
 }
 
-export type WidgetData = HeroData | TableData | BarData | DoughnutData | CalendarData | null;
+export interface WaterfallStep {
+  label: string;
+  value: number;
+  hint?: string;
+  kind: "income" | "deduction" | "subtotal" | "result";
+}
+
+export interface WaterfallData {
+  steps: WaterfallStep[];
+  balanceDue: number;
+}
+
+export type WidgetData = HeroData | TableData | BarData | DoughnutData | CalendarData | WaterfallData | null;
 
 export interface DocRaw {
   id: string;

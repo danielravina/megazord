@@ -17,6 +17,7 @@ const FIELD_NAMES = [
   "vat_rate", "vat_frequency", "vat_billing_day",
   "income_tax_advance", "income_tax_billing_day",
   "bituah_leumi", "bituah_leumi_billing_day", "credit_points",
+  "tax_advances_paid", "tax_advances_year",
 ];
 
 function getInitialValues(settings: TaxSettings | null): Record<string, string> {
@@ -38,6 +39,8 @@ function getInitialValues(settings: TaxSettings | null): Record<string, string> 
     bituah_leumi: String(settings?.bituah_leumi ?? 5),
     bituah_leumi_billing_day: String(settings?.bituah_leumi_billing_day ?? 15),
     credit_points: String(settings?.credit_points ?? 2.25),
+    tax_advances_paid: String(settings?.tax_advances_paid ?? 0),
+    tax_advances_year: String(settings?.tax_advances_year ?? new Date().getFullYear()),
   };
 }
 
@@ -111,6 +114,8 @@ export function PreferencesPage() {
       bituah_leumi: parseFloat((fd.get("bituah_leumi") as string) || "") || 5,
       bituah_leumi_billing_day: parseInt((fd.get("bituah_leumi_billing_day") as string) || "", 10) || 15,
       credit_points: parseFloat((fd.get("credit_points") as string) || "") || 2.25,
+      tax_advances_paid: parseFloat((fd.get("tax_advances_paid") as string) || "") || 0,
+      tax_advances_year: parseInt((fd.get("tax_advances_year") as string) || "", 10) || new Date().getFullYear(),
       vat_status: status,
       income_scheme: scheme,
       zeair_expense_rate: parseFloat((fd.get("zeair_expense_rate") as string) || "") || 0,
@@ -263,6 +268,11 @@ export function PreferencesPage() {
               defaultValue={settings?.vat_frequency ?? "bimonthly"}
             />
             <Input label="מקדמות מס הכנסה (%)" name="income_tax_advance" type="number" min="0" max="100" step="0.1" defaultValue={settings?.income_tax_advance ?? 0} />
+            <Input label="מקדמות ששולמו (₪)" name="tax_advances_paid" type="number" min="0" step="0.01" defaultValue={settings?.tax_advances_paid ?? 0} />
+            <Input label="שנה למקדמות ששולמו" name="tax_advances_year" type="number" min="2000" max="2100" step="1" defaultValue={settings?.tax_advances_year ?? new Date().getFullYear()} />
+            <p className="text-xs text-slate-400 -mt-2 sm:col-span-2">
+              מקדמות ששולמו לא נספרות משנה קודמת — ניתן לאפס אותן עם המעבר לשנה חדשה.
+            </p>
             <Input label="יום חיוב מס הכנסה" name="income_tax_billing_day" type="number" min="1" max="31" defaultValue={settings?.income_tax_billing_day ?? 15} />
             <Input label="ביטוח לאומי (%)" name="bituah_leumi" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bituah_leumi ?? 5} />
             <Input label="יום חיוב ביטוח לאומי" name="bituah_leumi_billing_day" type="number" min="1" max="31" defaultValue={settings?.bituah_leumi_billing_day ?? 15} />

@@ -7,6 +7,7 @@ import type {
   TableData,
   BarData,
   DoughnutData,
+  WaterfallData,
   TimeRange,
 } from "@/components/dashboard/dashboard-types";
 import { DISPLAY_TYPES } from "@/components/dashboard/dashboard-types";
@@ -369,6 +370,37 @@ function taxUpcomingView(raw: DashboardRawData, view: WidgetType): WidgetData {
   return null;
 }
 
+// אומדן מס שנתי: מפל מים מתוך רווח נקי (הכנסות פחות הוצאות) — progressive brackets,
+// נקודות זיכוי הפועלות רק על מס ההכנסה, וקיזוז מקדמות ששולמו.
+function annualTaxView(raw: DashboardRawData): WaterfallData {
+  const range: TimeRange = "this_year";
+  const incItems = filterByTimeRange(raw.incomes, range);
+  const expItems = filterByTimeRange(raw.expenses, range);
+  const savItems = filterByTimeRange(raw.savings, range);
+
+  const tax = calculateTaxes(incItems, expItems, savItems, raw.taxSettings);
+  const appliedCredit = tax.incomeTax - tax.taxAfterCredits;
+
+  const s = raw.taxSettings;
+  const yearOk = (s?.tax_advances_year ?? 0) === new Date().getFullYear();
+  const advanceHint = !yearOk && (s?.tax_advances_paid ?? 0) > 0 && tax.taxAdvancesPaid === 0
+    ? "לא עודכן לשנה זו"
+    : undefined;
+
+  return {
+    balanceDue: tax.balanceDue,
+    steps: [
+      { label: "סך הכנסות (נטו ממע״מ)", value: tax.grossWithoutVat, kind: "income" },
+      { label: "פחות: הוצאות מוכרות", value: tax.dedExpenses, kind: "deduction" },
+      { label: "= רווח נקי", value: tax.netProfit, kind: "subtotal" },
+      { label: "מס הכנסה גולמי (מדרגות)", value: tax.incomeTax, kind: "income" },
+      { label: "פחות: נקודות זיכוי", value: appliedCredit, kind: "deduction" },
+      { label: "= מס לאחר נקודות זיכוי", value: tax.taxAfterCredits, kind: "subtotal" },
+      { label: "פחות: מקדמות ששולמו", value: tax.taxAdvancesPaid, kind: "deduction", hint: advanceHint },
+    ],
+  };
+}
+
 function savingsView(
   raw: DashboardRawData,
   range: TimeRange,
@@ -485,6 +517,7 @@ export const DATA_SOURCES: DataSourceDef[] = [
   { key: "profit", label: "רווח נטו", compatibleTypes: DISPLAY_TYPES, needsTimeRange: true },
   { key: "tax", label: "חבות מס", compatibleTypes: NO_TIMELINE, needsTimeRange: true },
   { key: "tax:upcoming", label: "תשלומים קרובים", compatibleTypes: NO_TIMELINE, needsTimeRange: false },
+  { key: "tax:annual", label: "אומדן מס שנתי", compatibleTypes: ["waterfall"], needsTimeRange: false },
   { key: "savings", label: "חסכונות", compatibleTypes: DISPLAY_TYPES, needsTimeRange: false },
   { key: "savings:pension", label: "פנסיה", compatibleTypes: NO_DOUGHNUT, needsTimeRange: false },
   { key: "savings:hishtalmut", label: "קרן השתלמות", compatibleTypes: NO_DOUGHNUT, needsTimeRange: false },
@@ -560,6 +593,9 @@ export function resolveDataSource(
 
     case "tax:upcoming":
       return taxUpcomingView(raw, view);
+
+    case "tax:annual":
+      return annualTaxView(raw);
 
     // ── Savings ─────────────
     case "savings":

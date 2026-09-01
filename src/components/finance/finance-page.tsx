@@ -300,17 +300,26 @@ export function FinancePage() {
                   <div className="space-y-3">
                     {[
                       { label: 'מע"מ (מגולם)', due: getNextBillingDay(taxSettings?.vat_billing_day ?? 15), val: taxCalc.vat },
-                      { label: "מקדמות מס הכנסה", due: getNextBillingDay(taxSettings?.income_tax_billing_day ?? 15), val: taxCalc.incomeTax },
+                      { label: "מס הכנסה (אומדן)", due: getNextBillingDay(taxSettings?.income_tax_billing_day ?? 15), val: taxCalc.incomeTax },
                       { label: "ביטוח לאומי", due: getNextBillingDay(taxSettings?.bituah_leumi_billing_day ?? 15), val: taxCalc.bituahLeumi },
+                      { label: "מקדמות ששולמו", val: taxCalc.taxAdvancesPaid },
                     ].map((row) => (
                       <div key={row.label} className="flex justify-between items-center">
                         <div>
                           <span className="text-sm text-slate-600">{row.label}</span>
-                          <p className="text-xs text-blue-500">חיוב הבא: {row.due}</p>
+                          {row.due && <p className="text-xs text-blue-500">חיוב הבא: {row.due}</p>}
                         </div>
                         <span className="font-bold">{formatCurrency(row.val)}</span>
                       </div>
                     ))}
+                    {taxCalc.balanceDue !== 0 && (
+                      <div className={`flex justify-between items-center border-t pt-2 ${taxCalc.balanceDue > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                        <span className="text-sm font-semibold">
+                          יתרה סופית: {taxCalc.balanceDue > 0 ? "לתשלום" : "זכאי להחזר"}
+                        </span>
+                        <span className="font-bold">{formatCurrency(Math.abs(taxCalc.balanceDue))}</span>
+                      </div>
+                    )}
                   </div>
                 </Card>
                 <Card className="p-5">

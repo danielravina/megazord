@@ -31,6 +31,8 @@ export interface TaxSettings {
   bituah_leumi: number;
   bituah_leumi_billing_day: number;
   credit_points: number;
+  tax_advances_paid: number;
+  tax_advances_year: number;
   vat_status: "morashi" | "patoor" | "zeair";
   income_scheme: "standard" | "zeair";
   zeair_expense_rate: number;
@@ -58,4 +60,11 @@ export interface TaxCalculation {
   creditValue: number;
   totalTax: number;
   netIncome: number;
+  totalIncome: number;
+  grossWithoutVat: number;
+  dedExpenses: number;
+  netProfit: number;
+  taxAfterCredits: number;
+  taxAdvancesPaid: number;
+  balanceDue: number;
 }

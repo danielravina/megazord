@@ -6,6 +6,9 @@ export const VAT_DEFAULT = 18;
 // Value of a single credit point (נקודת זיכוי) per month in ILS (2026).
 export const CREDIT_POINT_VALUE = 242;
 
+// Annual value of a single credit point (242 * 12 = 2904 ILS).
+export const CREDIT_POINT_ANNUAL_VALUE = CREDIT_POINT_VALUE * 12;
+
 // Israeli monthly income tax brackets for 2026 (personal/יגיעה אישית).
 // Each bracket: max (upper bound, Infinity = top) and marginal rate.
 // The top 50% rate includes the 3% surcharge (יסף) on very high incomes.

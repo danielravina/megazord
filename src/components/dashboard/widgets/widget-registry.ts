@@ -1,6 +1,6 @@
 import type { WidgetType } from "@/components/dashboard/dashboard-types";
 import {
-  Hash, Table2, BarChart3, LineChart, PieChart, Calculator, Clock, CloudSun, CalendarDays,
+  Hash, Table2, BarChart3, LineChart, PieChart, Calculator, Clock, CloudSun, CalendarDays, Scale,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { HeroWidget } from "./hero-widget";
@@ -12,6 +12,7 @@ import { CalculatorWidget } from "./calculator-widget";
 import { ClockWidget } from "./clock-widget";
 import { WeatherWidget } from "./weather-widget";
 import { CalendarWidget } from "./calendar-widget";
+import { WaterfallWidget } from "./waterfall-widget";
 
 export const widgetRegistry: Record<WidgetType, React.ComponentType<{ data: unknown; tile: { id: string; type: string; span: number; title?: string } }>> = {
   hero: HeroWidget,
@@ -23,6 +24,7 @@ export const widgetRegistry: Record<WidgetType, React.ComponentType<{ data: unkn
   clock: ClockWidget,
   weather: WeatherWidget,
   calendar: CalendarWidget,
+  waterfall: WaterfallWidget,
 };
 
 export const widgetMeta: Record<WidgetType, { label: string; icon: LucideIcon; spanLocked: boolean }> = {
@@ -35,4 +37,5 @@ export const widgetMeta: Record<WidgetType, { label: string; icon: LucideIcon; s
   clock:     { label: "שעון",       icon: Clock,         spanLocked: true },
   weather:   { label: "מזג אוויר",  icon: CloudSun,      spanLocked: true },
   calendar:  { label: "יומן",       icon: CalendarDays,  spanLocked: false },
+  waterfall: { label: "אומדן מס שנתי", icon: Scale,     spanLocked: false },
 };
