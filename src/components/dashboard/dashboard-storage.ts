@@ -13,6 +13,7 @@ export function useDashboardLayout() {
   const [layout, setLayout] = useState<DashboardTile[]>(getDefaultLayout());
   const [loading, setLoading] = useState(false);
   const loaded = useRef(false);
+  const touched = useRef(false);
 
   // Load persisted layout from DB — runs once after mount, non-blocking
   useEffect(() => {
@@ -26,6 +27,10 @@ export function useDashboardLayout() {
           .select("layout")
           .eq("user_id", user!.id)
           .maybeSingle();
+
+        // If the user already made an edit before this fetch resolved, don't
+        // clobber their in-memory layout with the (stale) persisted state.
+        if (touched.current) return;
 
         if (data?.layout && Array.isArray(data.layout) && data.layout.length > 0) {
           const migrated = (data.layout as DashboardTile[]).map((t) => ({
@@ -48,6 +53,7 @@ export function useDashboardLayout() {
   const saveLayout = useCallback(
     async (tiles: DashboardTile[]) => {
       if (!user) return;
+      touched.current = true;
       const safe = tiles.map((t) => ({
         ...t,
         span: LOCKED_1x1.includes(t.type) ? 1 : t.span,
