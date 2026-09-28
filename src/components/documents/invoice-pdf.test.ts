@@ -21,6 +21,7 @@ const settings: TaxSettings = {
   credit_points: 2.25, vat_status: "morashi", income_scheme: "standard", zeair_expense_rate: 0,
   business_name: "העסק", vat_number: "512345678", business_address: null,
   business_phone: null, accountant_email: null, owner_name: null,
+  tax_advances_paid: 0, tax_advances_year: new Date().getFullYear(),
 };
 
 describe("buildInvoiceHtml — document types", () => {

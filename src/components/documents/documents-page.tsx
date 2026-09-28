@@ -549,7 +549,7 @@ export function DocumentsPage() {
         </div>
 
         {form ? (
-          <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-2xl border border-slate-200 p-6">
+          <form onSubmit={handleSubmit} className="space-y-4 bg-white rounded-2xl border border-slate-200 p-4 sm:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Select
@@ -585,15 +585,70 @@ export function DocumentsPage() {
                 onChange={(e) => setForm({ ...form, project_id: e.target.value })}
               />
               <Input label="מספר מסמך" value={form.invoice_number} onChange={(e) => setForm({ ...form, invoice_number: e.target.value })} />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="תאריך" type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} required />
-                <Input label="יעד לתשלום" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-              </div>
+              <Input label="תאריך" type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} required />
+              <Input label="יעד לתשלום" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">פריטים</label>
-              <div className="overflow-x-auto">
+
+              {/* Mobile: stacked item cards */}
+              <div className="space-y-3 md:hidden">
+                {form.items.map((it) => {
+                  const lineRate = effectiveLineVatRate(it, form.vat_rate);
+                  const bd = lineVatBreakdown(it, isExempt ? 0 : lineRate);
+                  const isExemptLine = isExempt || (lineRate || 0) === 0;
+                  return (
+                    <div key={it.id} className="border border-slate-200 rounded-xl p-3 space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">תיאור</label>
+                        <Input value={it.description} onChange={(e) => updateItem(it.id, { description: e.target.value })} placeholder="תיאור השירות / המוצר" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">כמות</label>
+                          <Input type="number" min="0" placeholder="כמות" value={it.quantity} onChange={(e) => updateItem(it.id, { quantity: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">מחיר ליחידה</label>
+                          <Input type="number" min="0" step="0.01" placeholder="מחיר ליחידה" value={it.unit_price} onChange={(e) => updateItem(it.id, { unit_price: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                      </div>
+                      {showVatFields && (
+                        <div className="grid grid-cols-2 gap-3 items-end">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">שיעור מע&quot;מ</label>
+                            <select
+                              value={it.vat_rate == null ? String(form.vat_rate) : String(it.vat_rate)}
+                              onChange={(e) => updateItem(it.id, { vat_rate: parseFloat(e.target.value) })}
+                              className="w-full px-2 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            >
+                              <option value={form.vat_rate}>{form.vat_rate}%</option>
+                              <option value="0">0% / פטור</option>
+                            </select>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-bold text-slate-500 mb-1 uppercase">מע&quot;מ</div>
+                            <p className="text-sm text-slate-600 py-2">{isExemptLine ? "—" : formatCurrency(bd.vat)}</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-500 uppercase">סכום כולל</div>
+                          <p className="text-sm font-bold">{formatCurrency(bd.gross)}</p>
+                        </div>
+                        <button type="button" onClick={() => setForm((f) => (f ? { ...f, items: f.items.filter((x) => x.id !== it.id) } : f))} className="text-slate-400 hover:text-red-500" title="מחק שורה">
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: items table */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>

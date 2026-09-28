@@ -36,9 +36,9 @@ test("can create a tax invoice which books income immediately", async ({ page })
   // so the total is deterministic (200 * 1.18 = 236)
 
   // Fill line item
-  await page.locator("input[placeholder='תיאור השירות / המוצר']").fill("בדיקת E2E - שירות");
-  await page.locator("input[placeholder='כמות']").fill("2");
-  await page.locator("input[placeholder='מחיר ליחידה']").fill("100");
+  await page.locator("table input[placeholder='תיאור השירות / המוצר']").first().fill("בדיקת E2E - שירות");
+  await page.locator("table input[placeholder='כמות']").first().fill("2");
+  await page.locator("table input[placeholder='מחיר ליחידה']").first().fill("100");
   await page.locator("button:has-text('צור מסמך')").click();
 
   // After creation we land on the full-page preview (?view=<id>)
@@ -70,9 +70,9 @@ test("can create a quotation which does NOT book income", async ({ page }) => {
   await page.getByRole("button", { name: "הצעת מחיר", exact: true }).click();
   await expect(page.locator("label:has-text('לקוח *')")).toBeVisible({ timeout: 5000 });
   await page.locator("label:has-text('לקוח *') + select").selectOption({ label: custName });
-  await page.locator("input[placeholder='תיאור השירות / המוצר']").fill("בדיקת E2E - הצעה");
-  await page.locator("input[placeholder='כמות']").fill("1");
-  await page.locator("input[placeholder='מחיר ליחידה']").fill("500");
+  await page.locator("table input[placeholder='תיאור השירות / המוצר']").first().fill("בדיקת E2E - הצעה");
+  await page.locator("table input[placeholder='כמות']").first().fill("1");
+  await page.locator("table input[placeholder='מחיר ליחידה']").first().fill("500");
   await page.locator("button:has-text('צור מסמך')").click();
   await expect(page.locator("button:has-text('הורד PDF')")).toBeVisible({ timeout: 10000 });
   await page.goto("/documents/");
