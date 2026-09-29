@@ -22,11 +22,12 @@ export function useDashboardLayout() {
 
     async function load() {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("user_dashboard")
           .select("layout")
           .eq("user_id", user!.id)
           .maybeSingle();
+        console.log("[DBG layout-load]", { error, hasLayout: !!data?.layout, len: data?.layout?.length });
 
         // If the user already made an edit before this fetch resolved, don't
         // clobber their in-memory layout with the (stale) persisted state.
@@ -60,13 +61,14 @@ export function useDashboardLayout() {
       }));
       setLayout(safe);
       try {
-        await supabase.from("user_dashboard").upsert({
+        const { error } = await supabase.from("user_dashboard").upsert({
           user_id: user.id,
           layout: safe,
           updated_at: new Date().toISOString(),
         });
-      } catch {
-        /* UI already updated */
+        console.log("[DBG layout-save]", { error, tiles: safe.map((t) => `${t.id.slice(0, 6)}/w=${t.width ?? "-"}`) });
+      } catch (e) {
+        console.error("[DBG layout-save EXCEPTION]", e);
       }
     },
     [user, supabase],

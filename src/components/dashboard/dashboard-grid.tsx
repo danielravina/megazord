@@ -25,7 +25,7 @@ import type {
 import { DashboardTileComponent } from "@/components/dashboard/dashboard-tile";
 import { resolveDataSource } from "@/components/dashboard/data-sources/sources";
 
-const TILE_CLASS = "flex-1 min-w-0 max-md:basis-full!";
+const TILE_CLASS = "flex-1 min-w-0 max-md:basis-full! md:min-w-[288px]";
 
 interface GridProps {
   tiles: DashboardTileType[];
