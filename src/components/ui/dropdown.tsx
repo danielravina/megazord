@@ -6,6 +6,8 @@ interface DropdownProps {
   trigger: ReactNode;
   children: ReactNode | ((close: () => void) => ReactNode);
   align?: "left" | "right";
+  /** איפה נפתח התפריט יחסית לכפתור (ברירת מחדל: מתחת) */
+  direction?: "up" | "down";
   className?: string;
   menuClassName?: string;
 }
@@ -16,6 +18,7 @@ export function Dropdown({
   trigger,
   children,
   align = "left",
+  direction = "down",
   className = "",
   menuClassName = "",
 }: DropdownProps) {
@@ -59,7 +62,9 @@ export function Dropdown({
       <div onClick={onToggle}>{trigger}</div>
       {open && (
         <div
-          className={`absolute top-full mt-1 z-50 min-w-[190px] max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1.5 ${
+          className={`absolute z-50 min-w-[190px] max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1.5 ${
+            direction === "up" ? "bottom-full mb-1" : "top-full mt-1"
+          } ${
             effectiveAlign === "left" ? "left-0" : "right-0"
           } ${menuClassName}`}
         >

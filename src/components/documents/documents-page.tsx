@@ -17,7 +17,7 @@ import { formatCurrency } from "@/components/shared/format-currency";
 import { generateId } from "@/components/shared/generate-id";
 import {
   Receipt, Plus, Save, Trash2, Pencil, Eye, Send, Download,
-  UserPlus, X, ArrowRight, ChevronDown,
+  UserPlus, X, ArrowRight, ChevronUp, ChevronDown,
 } from "lucide-react";
 import type { Invoice, InvoiceItem, InvoiceFormData, InvoicePayment, DocumentType, PaymentMethod, VatStatus } from "./invoice-types";
 import { DOC_TYPE_META, PAYMENT_METHOD_LABELS, docTypesFor, isVatExempt, paymentUsesBank } from "./invoice-types";
@@ -520,9 +520,10 @@ export function DocumentsPage() {
             </Button>
             <Dropdown
               align="right"
+              direction="up"
               trigger={
                 <Button>
-                  <Send size={14} /> שלח מסמך <ChevronDown size={14} />
+                  <Send size={14} /> שלח מסמך <ChevronUp size={14} />
                 </Button>
               }
             >

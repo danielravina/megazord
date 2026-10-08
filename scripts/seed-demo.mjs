@@ -315,7 +315,17 @@ function buildDemoData(targetId) {
 
   // ── Invoices (מסמכים שהונפקו) ──
   const invoices = [];
-  const invSequences = {};
+  // מספור לפי קטגוריה: {ספרת קטגוריה}{רצף 4 ספרות} — כמו במסמכים אמיתיים
+  const DOC_CATEGORY = {
+    quotation: "1",
+    transaction_account: "2",
+    tax_invoice: "3",
+    credit_invoice: "4",
+    tax_invoice_receipt: "5",
+    receipt: "6",
+    delivery_note: "7",
+  };
+  const catSequences = {};
   const mkItems = () => {
     const items = [];
     for (let i = 0, n = ri(1, 3); i < n; i++) {
@@ -329,6 +339,29 @@ function buildDemoData(targetId) {
     return items;
   };
 
+  // תשלומים לקבלה: שורה אחת (מזומן/Bit/אשראי) או שתיים (מזומן + העברה/צ'ק)
+  // שסכומן יחד = סכום המסמך.
+  const BANKS = ["לאומי", "הפועלים", "דיסקונט", "מזרחי טפחות"];
+  function mkPayments(total, issueDate) {
+    const date = iso(issueDate);
+    if (rand() < 0.5) {
+      return [{ id: uid(), method: pick(["cash", "bit", "credit_card"]), date, amount: total }];
+    }
+    const first = Math.round(total * rf(0.3, 0.7) * 100) / 100;
+    const second = Math.round((total - first) * 100) / 100;
+    const bankish = pick(["bank_transfer", "cheque"]);
+    return [
+      { id: uid(), method: "cash", date, amount: first },
+      {
+        id: uid(), method: bankish, date,
+        bank_name: pick(BANKS),
+        bank_branch: String(ri(100, 999)),
+        bank_account: String(ri(100000, 999999)),
+        amount: second,
+      },
+    ];
+  }
+
   // עוסק מורשה: חשבונית מס וחשבונית מס/קבלה רושמים הכנסה; זיכוי מקטין;
   // חשבונית עסקה/הצעה/משלוח/קבלה לא רושמים (מורשה).
   const typePool = [
@@ -339,10 +372,8 @@ function buildDemoData(targetId) {
   ];
   for (let i = 0; i < 34; i++) {
     const issueDate = addDays(today, ri(-365, -1));
-    const year = issueDate.getFullYear();
     const docType = pick(typePool);
-    // מספור מספרי משותף לכל סוגי המסמכים
-    invSequences[year] = (invSequences[year] || 0) + 1;
+    catSequences[docType] = (catSequences[docType] || 0) + 1;
     const items = mkItems();
     const subtotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0);
     const vatRate = 18;
@@ -350,15 +381,17 @@ function buildDemoData(targetId) {
     const customer = pick(customers);
     const custProjects = projects.filter((p) => p.customer_id === customer.id);
     const project = custProjects.length && rand() < 0.6 ? pick(custProjects) : null;
+    const finalAmount = docType === "credit_invoice" ? Math.round(amount * rf(0.2, 0.5)) : amount;
     invoices.push({
       id: uid(), user_id: targetId,
       customer_id: customer.id,
       project_id: project ? project.id : null,
-      invoice_number: `${year}-${String(invSequences[year]).padStart(4, "0")}`,
+      invoice_number: `${DOC_CATEGORY[docType]}${String(catSequences[docType]).padStart(4, "0")}`,
       issue_date: iso(issueDate),
       due_date: docType === "transaction_account" || docType === "quotation" ? iso(addDays(issueDate, 30)) : null,
       items,
-      amount: docType === "credit_invoice" ? Math.round(amount * rf(0.2, 0.5)) : amount,
+      payments: docType === "tax_invoice_receipt" ? mkPayments(finalAmount, issueDate) : [],
+      amount: finalAmount,
       vat_rate: vatRate,
       document_type: docType,
       notes: null,
@@ -459,6 +492,7 @@ function buildLayout() {
     vat_number: "515000123",
     business_address: "רחוב הרצל 12, תל אביב",
     business_phone: "050-1234567",
+    business_email: "office@haesek.co.il",
     accountant_email: "roeh@example.com",
     owner_name: target.email,
   });
