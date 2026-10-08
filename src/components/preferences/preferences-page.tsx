@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Skeleton, SkeletonButton, SkeletonText } from "@/components/ui/skeleton";
-import { Settings, Save, Building } from "lucide-react";
+import { Settings, Save, Building, ImageUp, Trash2 } from "lucide-react";
 import type { TaxSettings } from "@/components/finance/finance-types";
 
 const FIELD_NAMES = [
@@ -26,6 +26,7 @@ function getInitialValues(settings: TaxSettings | null): Record<string, string> 
     business_name: settings?.business_name || "",
     vat_number: settings?.vat_number || "",
     business_phone: settings?.business_phone || "",
+    business_email: settings?.business_email || "",
     business_address: settings?.business_address || "",
     accountant_email: settings?.accountant_email || "",
     vat_status: settings?.vat_status || "morashi",
@@ -53,6 +54,12 @@ export function PreferencesPage() {
   const [dirty, setDirty] = useState(false);
   const [vatStatus, setVatStatus] = useState<"morashi" | "patoor" | "zeair">("morashi");
   const [zeairExpenseRate, setZeairExpenseRate] = useState("");
+  // תצוגות מקדימות למיתוג המסמכים (URL ציבורי מהדלי)
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingBranding, setUploadingBranding] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const initialValues = useRef<Record<string, string>>({});
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -60,6 +67,11 @@ export function PreferencesPage() {
     if (!user) return;
     loadSettings();
   }, [user]);
+
+  function publicUrl(path: string | null | undefined): string | null {
+    if (!path) return null;
+    return supabase.storage.from("branding").getPublicUrl(path).data?.publicUrl || null;
+  }
 
   async function loadSettings() {
     setLoading(true);
@@ -72,6 +84,8 @@ export function PreferencesPage() {
     initialValues.current = getInitialValues(data || null);
     setVatStatus((data?.vat_status as "morashi" | "patoor" | "zeair") || "morashi");
     setZeairExpenseRate(String(data?.zeair_expense_rate ?? ""));
+    setCoverUrl(publicUrl((data as TaxSettings | null)?.cover_image_path));
+    setLogoUrl(publicUrl((data as TaxSettings | null)?.logo_path));
     setDirty(false);
     setLoading(false);
   }
@@ -88,6 +102,76 @@ export function PreferencesPage() {
       }
     }
     setDirty(false);
+  }
+
+  // ── מיתוג מסמכים: תמונת שער + לוגו ──────────────────────────────
+  async function uploadBrandingImage(kind: "cover" | "logo", file: File) {
+    if (!user || !file) return;
+    setUploadingBranding(true);
+    try {
+      const ext = (file.name.split(".").pop() || "png").toLowerCase();
+      const path = `${user.id}/${kind}_${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("branding").upload(path, file, { upsert: true });
+      if (error) {
+        toast("שגיאה בהעלאת התמונה", "error");
+        return;
+      }
+      const column = kind === "cover" ? "cover_image_path" : "logo_path";
+      const { error: dbError } = await supabase.from("tax_settings").upsert({ user_id: user.id, [column]: path });
+      if (dbError) {
+        toast("שגיאה בשמירת המיתוג", "error");
+        return;
+      }
+      const url = supabase.storage.from("branding").getPublicUrl(path).data?.publicUrl || null;
+      if (kind === "cover") {
+        setCoverUrl(url);
+        setSettings((s) => (s ? { ...s, cover_image_path: path } : s));
+      } else {
+        setLogoUrl(url);
+        setSettings((s) => (s ? { ...s, logo_path: path } : s));
+      }
+      toast(kind === "cover" ? "תמונת השער הועלתה" : "הלוגו הועלה", "success");
+    } finally {
+      setUploadingBranding(false);
+    }
+  }
+
+  async function removeBrandingImage(kind: "cover" | "logo") {
+    if (!user) return;
+    const column = kind === "cover" ? "cover_image_path" : "logo_path";
+    const path = kind === "cover" ? settings?.cover_image_path : settings?.logo_path;
+    const { error: dbError } = await supabase.from("tax_settings").upsert({ user_id: user.id, [column]: null });
+    if (dbError) {
+      toast("שגיאה בשמירה", "error");
+      return;
+    }
+    if (path) {
+      // best-effort: the file can stay in storage if removal fails
+      await supabase.storage.from("branding").remove([path]).catch(() => {});
+    }
+    if (kind === "cover") {
+      setCoverUrl(null);
+      setSettings((s) => (s ? { ...s, cover_image_path: null } : s));
+    } else {
+      setLogoUrl(null);
+      setSettings((s) => (s ? { ...s, logo_path: null } : s));
+    }
+    toast("התמונה הוסרה", "success");
+  }
+
+  function onBrandingFile(kind: "cover" | "logo", e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("יש לבחור קובץ תמונה", "error");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast("התמונה גדולה מדי (מקסימום 5MB)", "error");
+      return;
+    }
+    uploadBrandingImage(kind, file);
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -123,8 +207,11 @@ export function PreferencesPage() {
       vat_number: (fd.get("vat_number") as string) || null,
       business_address: (fd.get("business_address") as string) || null,
       business_phone: (fd.get("business_phone") as string) || null,
+      business_email: (fd.get("business_email") as string) || null,
       accountant_email: (fd.get("accountant_email") as string) || null,
       owner_name: (fd.get("owner_name") as string) || null,
+      cover_image_path: settings?.cover_image_path || null,
+      logo_path: settings?.logo_path || null,
     };
 
     setSettings(payload);
@@ -194,7 +281,65 @@ export function PreferencesPage() {
               <Input label='מספר עוסק מורשה / ח.פ' name="vat_number" defaultValue={settings?.vat_number || ""} />
               <Input label="טלפון" name="business_phone" defaultValue={settings?.business_phone || ""} />
             </div>
+            <Input label="אימייל העסק" name="business_email" type="email" defaultValue={settings?.business_email || ""} placeholder='להצגה בראש המסמכים' />
             <Input label="כתובת" name="business_address" defaultValue={settings?.business_address || ""} />
+          </div>
+        </Card>
+
+        {/* Document branding */}
+        <Card className="p-6">
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-1 border-b pb-2">
+            <ImageUp size={20} className="text-blue-500" />
+            מיתוג מסמכים
+          </h2>
+          <p className="text-xs text-slate-400 mb-4">
+            תמונת השער מוצגת בראש כל מסמך, והלוגו מוצג בצדו השמאלי של הכותרת.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+              <span className="block text-sm font-medium text-slate-700 mb-1">תמונת שער</span>
+              {coverUrl ? (
+                <img src={coverUrl} alt="תמונת שער" className="w-full h-24 object-cover rounded-lg border border-slate-200" />
+              ) : (
+                <div className="w-full h-24 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400">
+                  לא הועלתה תמונה
+                </div>
+              )}
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" variant="secondary" type="button" loading={uploadingBranding} onClick={() => coverInputRef.current?.click()}>
+                  <ImageUp size={14} /> העלאה
+                </Button>
+                {coverUrl && (
+                  <Button size="sm" variant="danger" type="button" onClick={() => removeBrandingImage("cover")}>
+                    <Trash2 size={14} /> הסרה
+                  </Button>
+                )}
+              </div>
+              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onBrandingFile("cover", e)} />
+            </div>
+            <div>
+              <span className="block text-sm font-medium text-slate-700 mb-1">לוגו</span>
+              {logoUrl ? (
+                <div className="w-full h-24 rounded-lg border border-slate-200 bg-white flex items-center justify-center p-2">
+                  <img src={logoUrl} alt="לוגו" className="max-h-full max-w-full object-contain" />
+                </div>
+              ) : (
+                <div className="w-full h-24 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400">
+                  לא הועלה לוגו
+                </div>
+              )}
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" variant="secondary" type="button" loading={uploadingBranding} onClick={() => logoInputRef.current?.click()}>
+                  <ImageUp size={14} /> העלאה
+                </Button>
+                {logoUrl && (
+                  <Button size="sm" variant="danger" type="button" onClick={() => removeBrandingImage("logo")}>
+                    <Trash2 size={14} /> הסרה
+                  </Button>
+                )}
+              </div>
+              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onBrandingFile("logo", e)} />
+            </div>
           </div>
         </Card>
 

@@ -1,43 +1,43 @@
 import { generateId } from "@/components/shared/generate-id";
-import { DOC_TYPE_META } from "./invoice-types";
-import type { DocumentType, InvoiceItem, VatStatus } from "./invoice-types";
+import { DOC_CATEGORY, DOC_TYPE_META } from "./invoice-types";
+import type { DocumentType, InvoiceItem, InvoicePayment, VatStatus } from "./invoice-types";
 
-// Auto-incrementing document number: YYYY-NNNN (shared across all types)
-export function nextInvoiceNumber(existing: { invoice_number: string }[], now: Date): string {
-  return nextSequenceNumber(existing, now);
-}
-
-// Kept for API compatibility — all types share the numeric sequence.
-export function nextQuotationNumber(existing: { invoice_number: string }[], now: Date): string {
-  return nextSequenceNumber(existing, now);
-}
-
-// Kept for API compatibility — all types share the numeric sequence.
-export function nextDeliveryNoteNumber(existing: { invoice_number: string }[], now: Date): string {
-  return nextSequenceNumber(existing, now);
-}
-
-function nextSequenceNumber(existing: { invoice_number: string }[], now: Date): string {
-  const year = now.getFullYear();
-  const prefix = `${year}-`;
+// Numbering: {category}{seq4} — e.g. 70122 = category 7, document 0122.
+// Each category counts independently (first receipt = 60001, first tax invoice = 30001...).
+// Legacy YYYY-NNNN numbers never match the category pattern, so they are ignored
+// by the counter and left untouched.
+function nextSequenceNumber(type: DocumentType, existing: { invoice_number: string }[]): string {
+  const cat = DOC_CATEGORY[type];
+  const pattern = new RegExp(`^${cat}(\\d{4,})$`);
   let maxSeq = 0;
   for (const inv of existing) {
-    const num = inv.invoice_number;
-    if (num.startsWith(prefix)) {
-      const seq = parseInt(num.slice(prefix.length), 10);
+    const m = pattern.exec(inv.invoice_number);
+    if (m) {
+      const seq = parseInt(m[1], 10);
       if (!Number.isNaN(seq) && seq > maxSeq) maxSeq = seq;
     }
   }
-  return `${prefix}${String(maxSeq + 1).padStart(4, "0")}`;
+  return `${cat}${String(maxSeq + 1).padStart(4, "0")}`;
 }
 
-// Returns the next number for any document type (shared numeric sequence)
-export function nextNumberFor(
-  _type: DocumentType,
-  existing: { invoice_number: string }[],
-  now: Date,
-): string {
-  return nextInvoiceNumber(existing, now);
+// Returns the next number for a document type (per-category sequence).
+export function nextNumberFor(type: DocumentType, existing: { invoice_number: string }[]): string {
+  return nextSequenceNumber(type, existing);
+}
+
+// Kept for API compatibility — per-category sequences.
+export function nextInvoiceNumber(existing: { invoice_number: string }[]): string {
+  return nextNumberFor("tax_invoice", existing);
+}
+
+// Kept for API compatibility — per-category sequences.
+export function nextQuotationNumber(existing: { invoice_number: string }[]): string {
+  return nextNumberFor("quotation", existing);
+}
+
+// Kept for API compatibility — per-category sequences.
+export function nextDeliveryNoteNumber(existing: { invoice_number: string }[]): string {
+  return nextNumberFor("delivery_note", existing);
 }
 
 // Does issuing this document book income for this business status?
@@ -102,4 +102,17 @@ export function computeLineTotals(items: InvoiceItem[], defaultRate: number): In
 
 export function emptyItem(): InvoiceItem {
   return { id: generateId(), description: "", quantity: 1, unit_price: 0, vat_rate: null };
+}
+
+export function emptyPayment(date: string): InvoicePayment {
+  return {
+    id: generateId(),
+    method: "cash",
+    method_other: null,
+    date,
+    bank_name: null,
+    bank_branch: null,
+    bank_account: null,
+    amount: 0,
+  };
 }

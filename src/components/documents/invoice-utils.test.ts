@@ -1,54 +1,44 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  nextInvoiceNumber, nextQuotationNumber, nextDeliveryNoteNumber, computeTotals, computeLineTotals, effectiveLineVatRate, lineTotal, lineVatBreakdown, booksIncome, incomeSign,
+  nextNumberFor, nextInvoiceNumber, nextQuotationNumber, nextDeliveryNoteNumber, computeTotals, computeLineTotals, effectiveLineVatRate, lineTotal, lineVatBreakdown, booksIncome, incomeSign,
 } from "./invoice-utils";
 
-describe("nextInvoiceNumber", () => {
-  it("returns YYYY-0001 for an empty list", () => {
-    assert.equal(nextInvoiceNumber([], new Date("2026-08-10")), "2026-0001");
+describe("nextNumberFor (per-category sequence)", () => {
+  it("starts each category at its category digit + 0001", () => {
+    assert.equal(nextNumberFor("tax_invoice", []), "30001");
+    assert.equal(nextNumberFor("receipt", []), "60001");
+    assert.equal(nextNumberFor("tax_invoice_receipt", []), "50001");
+    assert.equal(nextNumberFor("delivery_note", []), "70001");
+    assert.equal(nextNumberFor("quotation", []), "10001");
+    assert.equal(nextNumberFor("transaction_account", []), "20001");
+    assert.equal(nextNumberFor("credit_invoice", []), "40001");
   });
 
-  it("increments the highest sequence for the current year", () => {
-    const existing = [{ invoice_number: "2026-0003" }, { invoice_number: "2026-0001" }, { invoice_number: "2026-0002" }];
-    assert.equal(nextInvoiceNumber(existing, new Date("2026-08-10")), "2026-0004");
+  it("counts each category independently", () => {
+    const existing = [{ invoice_number: "30007" }, { invoice_number: "60002" }, { invoice_number: "50001" }];
+    assert.equal(nextNumberFor("tax_invoice", existing), "30008");
+    assert.equal(nextNumberFor("receipt", existing), "60003");
+    assert.equal(nextNumberFor("tax_invoice_receipt", existing), "50002");
   });
 
-  it("ignores other years", () => {
-    const existing = [{ invoice_number: "2025-0010" }, { invoice_number: "2026-0002" }];
-    assert.equal(nextInvoiceNumber(existing, new Date("2026-08-10")), "2026-0003");
+  it("ignores legacy YYYY-NNNN numbers and other categories", () => {
+    const existing = [{ invoice_number: "2026-0005" }, { invoice_number: "40009" }, { invoice_number: "something" }];
+    assert.equal(nextNumberFor("tax_invoice", existing), "30001");
+    assert.equal(nextNumberFor("credit_invoice", existing), "40010");
   });
 
-  it("ignores malformed numbers", () => {
-    const existing = [{ invoice_number: "2026-abc" }, { invoice_number: "something" }];
-    assert.equal(nextInvoiceNumber(existing, new Date("2026-08-10")), "2026-0001");
-  });
-});
-
-describe("nextQuotationNumber (shared numeric sequence)", () => {
-  it("returns YYYY-0001 for an empty list", () => {
-    assert.equal(nextQuotationNumber([], new Date("2026-08-10")), "2026-0001");
-  });
-
-  it("increments the highest sequence for the current year", () => {
-    const existing = [{ invoice_number: "2026-0003" }, { invoice_number: "2026-0001" }];
-    assert.equal(nextQuotationNumber(existing, new Date("2026-08-10")), "2026-0004");
-  });
-
-  it("ignores other years and non-numeric suffixes", () => {
-    const existing = [{ invoice_number: "2025-0010" }, { invoice_number: "2026-0002" }];
-    assert.equal(nextQuotationNumber(existing, new Date("2026-08-10")), "2026-0003");
+  it("ignores malformed numbers and handles 5-digit sequences", () => {
+    const existing = [{ invoice_number: "7-005" }, { invoice_number: "7abc" }, { invoice_number: "712345" }];
+    assert.equal(nextNumberFor("delivery_note", existing), "712346");
   });
 });
 
-describe("nextDeliveryNoteNumber (shared numeric sequence)", () => {
-  it("returns YYYY-0001 for an empty list", () => {
-    assert.equal(nextDeliveryNoteNumber([], new Date("2026-08-10")), "2026-0001");
-  });
-
-  it("increments the highest sequence for the current year", () => {
-    const existing = [{ invoice_number: "2026-0002" }, { invoice_number: "2026-0001" }];
-    assert.equal(nextDeliveryNoteNumber(existing, new Date("2026-08-10")), "2026-0003");
+describe("legacy number helpers (per-category sequences)", () => {
+  it("nextInvoiceNumber / nextQuotationNumber / nextDeliveryNoteNumber use their category", () => {
+    assert.equal(nextInvoiceNumber([]), "30001");
+    assert.equal(nextQuotationNumber([{ invoice_number: "10012" }]), "10013");
+    assert.equal(nextDeliveryNoteNumber([{ invoice_number: "70099" }]), "70100");
   });
 });
 

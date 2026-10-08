@@ -26,7 +26,8 @@ function settings(overrides: Partial<TaxSettings> = {}): TaxSettings {
     tax_advances_year: new Date().getFullYear(),
     vat_status: "morashi", income_scheme: "standard", zeair_expense_rate: 0,
     business_name: null, vat_number: null, business_address: null,
-    business_phone: null, accountant_email: null, owner_name: null,
+    business_phone: null, business_email: null, accountant_email: null, owner_name: null,
+    cover_image_path: null, logo_path: null,
     ...overrides,
   };
 }

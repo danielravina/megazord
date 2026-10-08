@@ -20,7 +20,8 @@ const settings: TaxSettings = {
   income_tax_advance: 15, income_tax_billing_day: 15, bituah_leumi: 5, bituah_leumi_billing_day: 15,
   credit_points: 2.25, vat_status: "morashi", income_scheme: "standard", zeair_expense_rate: 0,
   business_name: null, vat_number: null, business_address: null,
-  business_phone: null, accountant_email: null, owner_name: null,
+  business_phone: null, business_email: null, accountant_email: null, owner_name: null,
+  cover_image_path: null, logo_path: null,
   tax_advances_paid: 0, tax_advances_year: new Date().getFullYear(),
 };
 

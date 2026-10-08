@@ -9,6 +9,7 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
     id: "inv1", user_id: "u", customer_id: "c1", project_id: null,
     invoice_number: "2026-0001", issue_date: "2026-08-10", due_date: null,
     items: [{ id: "i", description: "שירות", quantity: 1, unit_price: 100 }],
+    payments: [],
     amount: 118, vat_rate: 18, document_type: "tax_invoice",
     notes: null, created_at: "2026-08-10", customer_name: "לקוח",
     ...overrides,

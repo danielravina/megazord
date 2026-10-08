@@ -40,8 +40,12 @@ export interface TaxSettings {
   vat_number: string | null;
   business_address: string | null;
   business_phone: string | null;
+  business_email: string | null;
   accountant_email: string | null;
   owner_name: string | null;
+  // מיתוג מסמכים — נתיבי storage (דלי ציבורי), לא URL מלא
+  cover_image_path: string | null;
+  logo_path: string | null;
 }
 
 export interface Saving {

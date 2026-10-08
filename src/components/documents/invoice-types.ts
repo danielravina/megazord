@@ -7,6 +7,35 @@ export interface InvoiceItem {
   vat_rate?: number | null;
 }
 
+// ── תשלומים בקבלה ────────────────────────────────────────────────
+export type PaymentMethod = "cash" | "bit" | "bank_transfer" | "credit_card" | "cheque" | "other";
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "מזומן",
+  bit: "Bit",
+  bank_transfer: "העברה בנקאית",
+  credit_card: "כרטיס אשראי",
+  cheque: "צ'ק",
+  other: "אחר",
+};
+
+// שיטות תשלום שמציגות פרטי בנק (שם בנק / סניף / מס' חשבון)
+export function paymentUsesBank(method: PaymentMethod): boolean {
+  return method === "bank_transfer" || method === "cheque";
+}
+
+export interface InvoicePayment {
+  id: string;
+  method: PaymentMethod;
+  // חובה כאשר method = other (תיאור חופשי של אמצעי התשלום)
+  method_other?: string | null;
+  date: string; // YYYY-MM-DD
+  bank_name?: string | null;
+  bank_branch?: string | null;
+  bank_account?: string | null;
+  amount: number;
+}
+
 // סוגי מסמכים ללקוח: מצב המסמך (= מתי רושמים הכנסה) נגזר מהסוג + סוג העוסק.
 export type DocumentType =
   | "tax_invoice" // חשבונית מס
@@ -113,6 +142,18 @@ export function docTypesFor(vatStatus: VatStatus): DocumentType[] {
   return vatBehaviorStatus(vatStatus) === "patoor" ? DOC_TYPES_FOR_PATOOR : DOC_TYPES_FOR_MORASHI;
 }
 
+// ספרת קטגוריה למספור מסמכים (למשל 70122 = קטגוריה 7 + מספר 0122).
+// סדר מחזור החיים: הצעה → עסקה → מס → זיכוי → מס/קבלה → קבלה → משלוח.
+export const DOC_CATEGORY: Record<DocumentType, string> = {
+  quotation: "1",
+  transaction_account: "2",
+  tax_invoice: "3",
+  credit_invoice: "4",
+  tax_invoice_receipt: "5",
+  receipt: "6",
+  delivery_note: "7",
+};
+
 export interface Invoice {
   id: string;
   user_id: string;
@@ -122,6 +163,7 @@ export interface Invoice {
   issue_date: string;
   due_date: string | null;
   items: InvoiceItem[];
+  payments: InvoicePayment[];
   amount: number;
   vat_rate: number;
   document_type: DocumentType;
@@ -139,5 +181,6 @@ export interface InvoiceFormData {
   vat_rate: number;
   document_type: DocumentType;
   items: InvoiceItem[];
+  payments: InvoicePayment[];
   notes: string;
 }

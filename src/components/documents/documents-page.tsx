@@ -19,15 +19,17 @@ import {
   Receipt, Plus, Save, Trash2, Pencil, Eye, Send, Download,
   UserPlus, X, ArrowRight, ChevronDown,
 } from "lucide-react";
-import type { Invoice, InvoiceItem, InvoiceFormData, DocumentType, VatStatus } from "./invoice-types";
-import { DOC_TYPE_META, docTypesFor, isVatExempt } from "./invoice-types";
+import type { Invoice, InvoiceItem, InvoiceFormData, InvoicePayment, DocumentType, PaymentMethod, VatStatus } from "./invoice-types";
+import { DOC_TYPE_META, PAYMENT_METHOD_LABELS, docTypesFor, isVatExempt, paymentUsesBank } from "./invoice-types";
 import type { Customer } from "@/components/customers/customer-types";
 import type { TaxSettings } from "@/components/finance/finance-types";
-import { nextNumberFor, computeLineTotals, effectiveLineVatRate, lineVatBreakdown, emptyItem } from "./invoice-utils";
+import { nextNumberFor, computeLineTotals, effectiveLineVatRate, lineVatBreakdown, emptyItem, emptyPayment } from "./invoice-utils";
 import { embeddedName } from "@/components/projects/project-types";
 import { isValidEmail } from "@/components/shared/validate-email";
 import { WhatsAppIcon } from "@/components/shared/whatsapp-icon";
 import { buildInvoiceHtml, generateInvoicePdfBase64, generateInvoicePdfBlob } from "./invoice-pdf";
+import type { InvoiceBranding } from "./invoice-pdf";
+import { resolveBranding } from "./branding";
 
 interface ProjectOption {
   id: string;
@@ -52,6 +54,7 @@ export function DocumentsPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [taxSettings, setTaxSettings] = useState<TaxSettings | null>(null);
+  const [branding, setBranding] = useState<InvoiceBranding>({});
   const [loading, setLoading] = useState(true);
 
   const [saving, setSaving] = useState(false);
@@ -82,6 +85,7 @@ export function DocumentsPage() {
     setCustomers(custRes.data || []);
     setProjects((projRes.data || []).map((p) => ({ id: p.id, customer_id: p.customer_id, location: p.location, quote_price: p.quote_price, closing_price: p.closing_price, customer_name: embeddedName(p.customers) })));
     setTaxSettings((taxRes.data as TaxSettings) || null);
+    setBranding(await resolveBranding(supabase, (taxRes.data as TaxSettings) || null));
     setLoading(false);
   }
 
@@ -106,15 +110,18 @@ export function DocumentsPage() {
       item.description = prefill.item_description || "";
       item.unit_price = prefill.unit_price ?? 0;
     }
+    const issueDate = new Date().toISOString().split("T")[0];
+    const isReceiptLike = type === "receipt" || type === "tax_invoice_receipt";
     setForm({
       customer_id: prefill?.customer_id || "",
       project_id: prefill?.project_id || "",
-      invoice_number: nextNumberFor(type, documents, new Date()),
-      issue_date: new Date().toISOString().split("T")[0],
+      invoice_number: nextNumberFor(type, documents),
+      issue_date: issueDate,
       due_date: "",
       vat_rate: defaultRate,
       document_type: type,
       items: [item],
+      payments: isReceiptLike ? [emptyPayment(issueDate)] : [],
       notes: "",
     });
     setNewCustOpen(false);
@@ -131,6 +138,7 @@ export function DocumentsPage() {
       vat_rate: doc.vat_rate,
       document_type: doc.document_type,
       items: doc.items.length ? doc.items : [emptyItem()],
+      payments: doc.payments || [],
       notes: doc.notes || "",
     });
     setNewCustOpen(false);
@@ -234,10 +242,11 @@ export function DocumentsPage() {
     const payload = {
       customer_id: form.customer_id,
       project_id: form.project_id || null,
-      invoice_number: form.invoice_number.trim() || nextNumberFor(form.document_type, documents, new Date()),
+      invoice_number: form.invoice_number.trim() || nextNumberFor(form.document_type, documents),
       issue_date: form.issue_date,
       due_date: form.due_date || null,
       items: filledItems,
+      payments: form.payments,
       amount: Math.round(totals.total * 100) / 100,
       vat_rate: rate,
       document_type: form.document_type,
@@ -308,7 +317,7 @@ export function DocumentsPage() {
         return;
       }
       const label = docLabel(sendConfirm);
-      const html = buildInvoiceHtml(sendConfirm, customer, taxSettings);
+      const html = buildInvoiceHtml(sendConfirm, customer, taxSettings, "700px", branding);
       const base64 = await generateInvoicePdfBase64(html);
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/send-invoice`, {
         method: "POST",
@@ -348,7 +357,7 @@ export function DocumentsPage() {
     }
     try {
       const customer = customers.find((c) => c.id === doc.customer_id) || null;
-      const html = buildInvoiceHtml(doc, customer, taxSettings);
+      const html = buildInvoiceHtml(doc, customer, taxSettings, "700px", branding);
       const blob = await generateInvoicePdfBlob(html);
       const file = new File([blob], docFileName(doc), { type: "application/pdf" });
 
@@ -368,6 +377,38 @@ export function DocumentsPage() {
 
   function updateItem(id: string, patch: Partial<InvoiceItem>) {
     setForm((f) => (f ? { ...f, items: f.items.map((it) => (it.id === id ? { ...it, ...patch } : it)) } : f));
+  }
+
+  // ── Receipt payments editor ──────────────────────────────────────
+  const showPaymentsEditor = !!form && (form.document_type === "receipt" || form.document_type === "tax_invoice_receipt");
+  const paymentsTotal = showPaymentsEditor ? form!.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0) : 0;
+
+  function updatePayment(id: string, patch: Partial<InvoicePayment>) {
+    setForm((f) => (f ? { ...f, payments: f.payments.map((p) => (p.id === id ? { ...p, ...patch } : p)) } : f));
+  }
+
+  function addPayment() {
+    setForm((f) => {
+      if (!f) return f;
+      const allocated = f.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const docTotal = computeLineTotals(f.items, isVatExempt(vatStatus) ? 0 : f.vat_rate).total;
+      const remaining = Math.max(0, Math.round((docTotal - allocated) * 100) / 100);
+      const payment: InvoicePayment = {
+        id: generateId(),
+        method: "cash",
+        method_other: null,
+        date: f.issue_date,
+        bank_name: null,
+        bank_branch: null,
+        bank_account: null,
+        amount: remaining,
+      };
+      return { ...f, payments: [...f.payments, payment] };
+    });
+  }
+
+  function removePayment(id: string) {
+    setForm((f) => (f ? { ...f, payments: f.payments.filter((p) => p.id !== id) } : f));
   }
 
   // ── Loading state ────────────────────────────────────────────────
@@ -427,7 +468,7 @@ export function DocumentsPage() {
       );
     }
     const previewCustomer = customers.find((c) => c.id === doc.customer_id) || null;
-    const previewHtml = buildInvoiceHtml(doc, previewCustomer, taxSettings, "100%");
+    const previewHtml = buildInvoiceHtml(doc, previewCustomer, taxSettings, "100%", branding);
 
     return (
       <div className="max-w-5xl mx-auto">
@@ -454,7 +495,7 @@ export function DocumentsPage() {
               <Pencil size={14} /> ערוך
             </Button>
             <Button variant="secondary" onClick={async () => {
-              const html = buildInvoiceHtml(doc, previewCustomer, taxSettings);
+              const html = buildInvoiceHtml(doc, previewCustomer, taxSettings, "700px", branding);
               const html2pdf = (await import("html2pdf.js")).default;
               const el = document.createElement("div");
               el.innerHTML = html;
@@ -721,6 +762,58 @@ export function DocumentsPage() {
                 </div>
               )}
             </div>
+
+            {showPaymentsEditor && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">תשלומים</label>
+                <div className="space-y-3">
+                  {form.payments.map((p) => (
+                    <div key={p.id} className="border border-slate-200 rounded-xl p-3 space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <Select
+                          label="אמצעי תשלום"
+                          value={p.method}
+                          onChange={(e) => updatePayment(p.id, { method: e.target.value as PaymentMethod })}
+                          options={Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => ({ value, label }))}
+                        />
+                        <Input label="תאריך" type="date" value={p.date} onChange={(e) => updatePayment(p.id, { date: e.target.value })} />
+                        <Input label="סכום" type="number" min="0" step="0.01" value={p.amount} onChange={(e) => updatePayment(p.id, { amount: parseFloat(e.target.value) || 0 })} />
+                      </div>
+                      {p.method === "other" && (
+                        <Input
+                          label="פירוט אמצעי התשלום"
+                          value={p.method_other || ""}
+                          onChange={(e) => updatePayment(p.id, { method_other: e.target.value })}
+                          placeholder="פרט את אמצעי התשלום"
+                        />
+                      )}
+                      {paymentUsesBank(p.method) && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <Input label="בנק" value={p.bank_name || ""} onChange={(e) => updatePayment(p.id, { bank_name: e.target.value })} />
+                          <Input label="סניף" value={p.bank_branch || ""} onChange={(e) => updatePayment(p.id, { bank_branch: e.target.value })} />
+                          <Input label="מס' חשבון" value={p.bank_account || ""} onChange={(e) => updatePayment(p.id, { bank_account: e.target.value })} />
+                        </div>
+                      )}
+                      <div className="flex justify-end">
+                        <button type="button" onClick={() => removePayment(p.id)} className="text-slate-400 hover:text-red-500" title="מחק תשלום">
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" variant="secondary" type="button" className="mt-2" onClick={addPayment}>
+                  <Plus size={14} /> הוסף תשלום
+                </Button>
+                {form.payments.length > 0 && (
+                  <div className="flex justify-end mt-2 text-sm">
+                    <span className="text-slate-600">
+                      סה&quot;כ שולם: <strong className="text-slate-800">{formatCurrency(paymentsTotal)}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <Input label="הערות" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
 
