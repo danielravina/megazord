@@ -166,7 +166,10 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
     requestIdRef.current = requestId;
 
     try {
-      const path = `${user.id}/${Date.now()}_${file.name}`;
+      // Storage keys must be ASCII — use our own generated name instead of the
+      // user's file name (the doc title comes from OCR, not the file name).
+      const ext = file.name.match(/\.[A-Za-z0-9]+$/)?.[0] || "";
+      const path = `${user.id}/${Date.now()}_scan${ext}`;
       logEvent("info", "scan_upload_start", { requestId, fileName: file.name, fileSizeKb: Math.round(file.size / 1024), fileType: file.type || null, path });
 
       const { error: uploadError } = await supabase.storage.from("documents").upload(path, file);
