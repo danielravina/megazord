@@ -1,22 +1,22 @@
 import { test, expect } from "@playwright/test";
 
 test("documents page loads with heading", async ({ page }) => {
-  await page.goto("/scans/");
+  await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-  await expect(page.locator("main h1")).toContainText("המסמכים שלי");
+  await expect(page.locator("main h1")).toContainText("המסמכים העסקיים");
 });
 
 test("documents page shows folders on main view", async ({ page }) => {
-  await page.goto("/scans/");
+  await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   await expect(page.locator("h3:has-text('תיקיות')")).toBeVisible();
-  await expect(page.locator("h4:has-text('בנק')")).toBeVisible({ timeout: 5000 });
-  await expect(page.locator("h4:has-text('מע\"מ')")).toBeVisible();
+  await expect(page.locator("h4:has-text('תעודת עוסק')")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("h4:has-text('אישור ניהול חשבון בנק')")).toBeVisible();
 });
 
 test("documents page has search input", async ({ page }) => {
-  await page.goto("/scans/");
+  await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
   await expect(page.locator("input[placeholder='חיפוש מסמכים או תגיות...']")).toBeVisible();
 });
@@ -28,14 +28,14 @@ test("scan document button exists on dashboard", async ({ page }) => {
 });
 
 test("folders show document counts", async ({ page }) => {
-  await page.goto("/scans/");
+  await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   await expect(page.locator("text=/\\d+ מסמכים/").first()).toBeVisible({ timeout: 5000 });
 });
 
 test("can add a folder", async ({ page }) => {
-  await page.goto("/scans/");
+  await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   await page.locator("button:has-text('תיקייה חדשה')").first().click();
@@ -43,10 +43,10 @@ test("can add a folder", async ({ page }) => {
 });
 
 test("can enter a folder and go back", async ({ page }) => {
-  await page.goto("/scans/");
+  await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  await page.locator("h4:has-text('בנק')").dblclick();
+  await page.locator("h4:has-text('תעודת עוסק')").dblclick();
   await expect(page.locator("text=כל התיקיות")).toBeVisible({ timeout: 5000 });
 
   await page.locator("text=כל התיקיות").click();

@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,13 +9,26 @@ import {
   Settings, PanelLeftClose, PanelLeftOpen, Building,
 } from "lucide-react";
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  children?: { href: string; label: string; icon: typeof LayoutDashboard }[];
+}
+
+const navItems: NavItem[] = [
   { href: "/dashboard/", label: "לוח בקרה", icon: LayoutDashboard },
-  { href: "/projects/", label: "פרויקטים", icon: FolderKanban },
+  {
+    href: "/projects/",
+    label: "פרויקטים",
+    icon: FolderKanban,
+    children: [
+      { href: "/reports/", label: "דו״חות", icon: FileText },
+      { href: "/documents/", label: "מסמכים", icon: Receipt },
+    ],
+  },
   { href: "/customers/", label: "לקוחות", icon: Users },
   { href: "/suppliers/", label: "ספקים", icon: Building },
-  { href: "/documents/", label: "דו״חות", icon: FileText },
-  { href: "/scans/", label: "מסמכים", icon: Receipt },
   { href: "/finance/", label: "ניהול כספים", icon: Wallet },
   { href: "/calendar/", label: "יומן", icon: Calendar },
   { href: "/todos/", label: "פתקים", icon: ClipboardList },
@@ -47,8 +61,8 @@ export function Sidebar({
           const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
+            <Fragment key={item.href}>
             <Link
-              key={item.href}
               href={item.href}
               onClick={onClose}
               className={`flex items-center gap-3 px-[19px] py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
@@ -64,6 +78,30 @@ export function Sidebar({
                 {item.label}
               </span>
             </Link>
+            {item.children?.map((child) => {
+              const childActive = pathname.startsWith(child.href);
+              const ChildIcon = child.icon;
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  onClick={onClose}
+                  className={`flex items-center gap-3 pr-10 pl-[19px] py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                    childActive
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <ChildIcon size={14} className="shrink-0" />
+                  <span className={`leading-[18px] max-lg:inline ${
+                    pinned ? "inline" : "hidden lg:group-hover:inline"
+                  }`}>
+                    {child.label}
+                  </span>
+                </Link>
+              );
+            })}
+            </Fragment>
           );
         })}
       </nav>

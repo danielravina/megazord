@@ -14,19 +14,19 @@ async function createCustomer(page: Page, name: string) {
 }
 
 test("documents page loads with heading", async ({ page }) => {
-  await page.goto("/documents/");
+  await page.goto("/reports/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
   await expect(page.locator("main h1")).toContainText("דו״חות");
 });
 
 test("can create a tax invoice which books income immediately", async ({ page }) => {
-  await page.goto("/documents/");
+  await page.goto("/reports/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   const custName = `בדיקת E2E - חשבונית ${Date.now()}`;
   await createCustomer(page, custName);
 
-  await page.goto("/documents/");
+  await page.goto("/reports/");
   await page.locator("button:has-text('מסמך חדש')").click();
   await page.getByRole("button", { name: "חשבונית מס", exact: true }).click();
   await expect(page.locator("label:has-text('לקוח *')")).toBeVisible({ timeout: 5000 });
@@ -43,7 +43,7 @@ test("can create a tax invoice which books income immediately", async ({ page })
 
   // After creation we land on the full-page preview (?view=<id>)
   await expect(page.locator("button:has-text('הורד PDF')")).toBeVisible({ timeout: 10000 });
-  await page.goto("/documents/");
+  await page.goto("/reports/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   const row = page.locator(`tr:has-text('${custName}')`).first();
@@ -59,13 +59,13 @@ test("can create a tax invoice which books income immediately", async ({ page })
 });
 
 test("can create a quotation which does NOT book income", async ({ page }) => {
-  await page.goto("/documents/");
+  await page.goto("/reports/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   const custName = `בדיקת E2E - הצעה ${Date.now()}`;
   await createCustomer(page, custName);
 
-  await page.goto("/documents/");
+  await page.goto("/reports/");
   await page.locator("button:has-text('מסמך חדש')").click();
   await page.getByRole("button", { name: "הצעת מחיר", exact: true }).click();
   await expect(page.locator("label:has-text('לקוח *')")).toBeVisible({ timeout: 5000 });
@@ -75,7 +75,7 @@ test("can create a quotation which does NOT book income", async ({ page }) => {
   await page.locator("table input[placeholder='מחיר ליחידה']").first().fill("500");
   await page.locator("button:has-text('צור מסמך')").click();
   await expect(page.locator("button:has-text('הורד PDF')")).toBeVisible({ timeout: 10000 });
-  await page.goto("/documents/");
+  await page.goto("/reports/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   const quoteNumber = (await page.locator(`tr:has-text('${custName}') td`).first().textContent())!.trim();

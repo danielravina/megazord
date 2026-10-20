@@ -84,16 +84,16 @@ function FolderTile({
     <div
       onClick={onSelect}
       onDoubleClick={onOpen}
-      className={`group relative rounded-lg border shadow-sm transition-all cursor-default flex flex-col items-center justify-center px-2 py-4 ${selected ? "border-blue-500 bg-blue-50" : "bg-white border-slate-200 hover:shadow-md hover:border-slate-300"}`}
+      className={`group relative rounded-lg border shadow-sm transition-all cursor-default flex flex-col items-center justify-center px-3 py-6 ${selected ? "border-blue-500 bg-blue-50" : "bg-white border-slate-200 hover:shadow-md hover:border-slate-300"}`}
     >
-      <div className="relative w-12 h-10 mb-2 shrink-0">
-        <div className={`absolute top-0 right-0 w-6 h-2.5 ${color} rounded-t-md rounded-bl-[3px]`}></div>
-        <div className={`absolute top-[5px] inset-x-0 bottom-0 ${color} rounded-md flex items-center justify-center`}>
-          <Icon size={13} className="opacity-30" />
+      <div className="relative w-20 h-16 mb-3 shrink-0">
+        <div className={`absolute top-0 right-0 w-10 h-4 ${color} rounded-t-lg rounded-bl-[5px]`}></div>
+        <div className={`absolute top-[7px] inset-x-0 bottom-0 ${color} rounded-lg flex items-center justify-center`}>
+          <Icon size={22} className="opacity-30" />
         </div>
       </div>
-      <h4 className="text-xs font-bold text-slate-700 truncate max-w-full mb-0.5">{name}</h4>
-      <span className="text-[10px] text-slate-400">{count} מסמכים</span>
+      <h4 className="text-sm font-bold text-slate-700 truncate max-w-full mb-1">{name}</h4>
+      <span className="text-xs text-slate-400">{count} מסמכים</span>
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -124,12 +124,12 @@ function FolderRow({
     <div
       onClick={onSelect}
       onDoubleClick={onOpen}
-      className={`group flex items-center gap-3 px-4 py-3 cursor-default transition-colors ${selected ? "bg-blue-100" : "hover:bg-slate-50"}`}
+      className={`group flex items-center gap-4 px-4 py-4 cursor-default transition-colors ${selected ? "bg-blue-100" : "hover:bg-slate-50"}`}
     >
-      <div className="relative w-10 h-8 shrink-0">
-        <div className={`absolute top-0 right-0 w-5 h-2 ${color} rounded-t-md rounded-bl-[2px]`}></div>
-        <div className={`absolute top-[4px] inset-x-0 bottom-0 ${color} rounded-md flex items-center justify-center`}>
-          <Icon size={11} className="opacity-30" />
+      <div className="relative w-14 h-11 shrink-0">
+        <div className={`absolute top-0 right-0 w-7 h-3 ${color} rounded-t-lg rounded-bl-[3px]`}></div>
+        <div className={`absolute top-[5px] inset-x-0 bottom-0 ${color} rounded-lg flex items-center justify-center`}>
+          <Icon size={16} className="opacity-30" />
         </div>
       </div>
       <div className="flex-1 min-w-0">
@@ -520,7 +520,7 @@ export function ScansPage() {
               {activeFolderName}
             </span>
           ) : (
-            "המסמכים שלי"
+            "המסמכים העסקיים"
           )}
         </h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -558,7 +558,7 @@ export function ScansPage() {
         </div>
       )}
       {supplierParam && (
-        <button onClick={() => router.push("/scans/")} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
+        <button onClick={() => router.push("/documents/")} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
           <X size={12} /> מסמכי {supplierBusiness?.name || "הספק"} — חזרה לכל המסמכים
         </button>
       )}

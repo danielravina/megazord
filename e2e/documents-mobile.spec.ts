@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.use({ viewport: { width: 390, height: 844 } });
 
 test("document form is usable on mobile (stacked cards, no squeeze)", async ({ page }) => {
-  await page.goto("/documents/?new=1&document_type=tax_invoice");
+  await page.goto("/reports/?new=1&document_type=tax_invoice");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   const form = page.locator("form");

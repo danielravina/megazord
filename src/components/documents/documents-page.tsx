@@ -179,8 +179,8 @@ export function DocumentsPage() {
               document_type: convType ?? undefined,
             };
       initNew(prefill); // eslint-disable-line react-hooks/set-state-in-effect
-      if (newProjectId) router.replace("/documents/?new=1", { scroll: false });
-      else if (convCustomer) router.replace("/documents/?new=1", { scroll: false });
+      if (newProjectId) router.replace("/reports/?new=1", { scroll: false });
+      else if (convCustomer) router.replace("/reports/?new=1", { scroll: false });
     }
   }, [loading, editId, isNew, newProjectId]);
 
@@ -221,7 +221,7 @@ export function DocumentsPage() {
   function openFromTransactionAccount(doc: Invoice) {
     const target: DocumentType = isVatExempt(vatStatus) ? "receipt" : "tax_invoice";
     const firstItem = (doc.items || [])[0];
-    router.push(`/documents/?new=1&document_type=${target}&customer=${doc.customer_id}&project=${doc.project_id || ""}&desc=${encodeURIComponent(firstItem?.description || "")}&price=${firstItem?.unit_price ?? 0}`);
+    router.push(`/reports/?new=1&document_type=${target}&customer=${doc.customer_id}&project=${doc.project_id || ""}&desc=${encodeURIComponent(firstItem?.description || "")}&price=${firstItem?.unit_price ?? 0}`);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -261,7 +261,7 @@ export function DocumentsPage() {
       } else {
         toast("המסמך עודכן", "success");
         await loadAll();
-        router.push(`/documents/?view=${editingId}`);
+        router.push(`/reports/?view=${editingId}`);
       }
     } else {
       const newId = generateId();
@@ -279,7 +279,7 @@ export function DocumentsPage() {
           "success",
         );
         await loadAll();
-        router.push(`/documents/?view=${newId}`);
+        router.push(`/reports/?view=${newId}`);
       }
     }
   }
@@ -291,7 +291,7 @@ export function DocumentsPage() {
       toast("שגיאה במחיקה", "error");
     } else {
       toast("המסמך נמחק", "success");
-      router.push("/documents/");
+      router.push("/reports/");
     }
   }
 
@@ -461,7 +461,7 @@ export function DocumentsPage() {
               description="המסמך נמחק או שאינו זמין"
             />
             <div className="mt-4 text-center">
-              <Button onClick={() => router.push("/documents/")}>חזרה לדו״חות</Button>
+              <Button onClick={() => router.push("/reports/")}>חזרה לדו״חות</Button>
             </div>
           </Card>
         </div>
@@ -474,7 +474,7 @@ export function DocumentsPage() {
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/documents/")} className="text-slate-400 hover:text-blue-600" title="חזור">
+            <button onClick={() => router.push("/reports/")} className="text-slate-400 hover:text-blue-600" title="חזור">
               <ArrowRight size={20} />
             </button>
             <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -491,7 +491,7 @@ export function DocumentsPage() {
         {/* Action buttons */}
         <div className="flex flex-wrap items-center justify-between gap-2 mt-6 border-t pt-4">
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => router.push(`/documents/?edit=${doc.id}`)}>
+            <Button variant="secondary" onClick={() => router.push(`/reports/?edit=${doc.id}`)}>
               <Pencil size={14} /> ערוך
             </Button>
             <Button variant="secondary" onClick={async () => {
@@ -581,7 +581,7 @@ export function DocumentsPage() {
     return (
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.push("/documents/")} className="text-slate-400 hover:text-blue-600" title="חזור">
+          <button onClick={() => router.push("/reports/")} className="text-slate-400 hover:text-blue-600" title="חזור">
             <ArrowRight size={20} />
           </button>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -819,7 +819,7 @@ export function DocumentsPage() {
             <Input label="הערות" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-200">
-              <Button variant="ghost" type="button" onClick={() => router.push("/documents/")}>ביטול</Button>
+              <Button variant="ghost" type="button" onClick={() => router.push("/reports/")}>ביטול</Button>
               <Button loading={saving} type="submit"><Save size={14} /> {editingId ? "שמור שינויים" : "צור מסמך"}</Button>
             </div>
           </form>
@@ -856,7 +856,7 @@ export function DocumentsPage() {
             <div>
               <MenuLabel>סוג מסמך</MenuLabel>
               {allowedTypes.map((t) => (
-                <MenuItem key={t} onClick={() => { router.push(`/documents/?new=1&document_type=${t}`); close(); }}>
+                <MenuItem key={t} onClick={() => { router.push(`/reports/?new=1&document_type=${t}`); close(); }}>
                   {DOC_TYPE_META[t].label}
                 </MenuItem>
               ))}
@@ -909,14 +909,14 @@ export function DocumentsPage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {filteredDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => router.push(`/documents/?view=${doc.id}`)}>
+                  <tr key={doc.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => router.push(`/reports/?view=${doc.id}`)}>
                     <td className="px-4 py-3 text-sm font-bold">{doc.invoice_number}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{doc.customer_name || "-"}</td>
                     <td className="px-4 py-3 text-sm text-slate-500">{doc.issue_date.split("-").reverse().join("/")}</td>
                     <td className="px-4 py-3 text-sm font-bold text-emerald-600">{formatCurrency(doc.amount)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={(e) => { e.stopPropagation(); router.push(`/documents/?view=${doc.id}`); }} className="text-slate-400 hover:text-blue-600" title="תצוגה">
+                        <button onClick={(e) => { e.stopPropagation(); router.push(`/reports/?view=${doc.id}`); }} className="text-slate-400 hover:text-blue-600" title="תצוגה">
                           <Eye size={16} />
                         </button>
                         {doc.document_type === "transaction_account" && (
@@ -924,7 +924,7 @@ export function DocumentsPage() {
                             <Send size={16} />
                           </button>
                         )}
-                        <button onClick={(e) => { e.stopPropagation(); router.push(`/documents/?edit=${doc.id}`); }} className="text-slate-400 hover:text-blue-600" title="ערוך">
+                        <button onClick={(e) => { e.stopPropagation(); router.push(`/reports/?edit=${doc.id}`); }} className="text-slate-400 hover:text-blue-600" title="ערוך">
                           <Pencil size={16} />
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); handleDelete(doc); }} className="text-slate-400 hover:text-red-500" title="מחק">

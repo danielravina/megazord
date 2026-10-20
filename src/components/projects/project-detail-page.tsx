@@ -373,7 +373,7 @@ export function ProjectDetailPage() {
           <div className="flex flex-wrap gap-2 justify-between pt-4 border-t">
             <Button loading={saving} type="submit"><Save size={14} /> שמור שינויים</Button>
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" type="button" onClick={() => router.push(`/documents/?newDocument=${projectId}`)}>
+              <Button variant="secondary" type="button" onClick={() => router.push(`/reports/?newDocument=${projectId}`)}>
                 <Receipt size={14} /> צור חשבונית
               </Button>
               <Button variant="danger" type="button" onClick={handleDelete}><Trash2 size={14} /> מחק</Button>
@@ -391,7 +391,7 @@ export function ProjectDetailPage() {
             <Badge variant="blue">{docs.length}</Badge>
           </h2>
           <Link
-            href={`/scans/`}
+            href={`/documents/`}
             className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
           >
             <Plus size={14} />

@@ -78,7 +78,7 @@ serve(async (req: Request) => {
 - docType: One of the receipt/vendor document types: "tax_invoice" (חשבונית מס), "transaction_account" (חשבונית עסקה / דרישת תשלום), "tax_invoice_receipt" (חשבונית מס/קבלה), "credit_invoice" (חשבונית מס זיכוי), "receipt" (קבלה), "quotation" (הצעת מחיר), "delivery_note" (תעודת משלוח), or "other"
 - dateOnDoc: Date in YYYY-MM-DD format, or ""
 - totalAmount: Final total as number, or null
-- folderSuggestion: "Bank" | "VAT" | "Income Tax" | "National Insurance" | "Accountant" | "Suppliers" | "Employees" | "Other"
+- folderSuggestion: One of the following Hebrew folder names exactly: "תעודת עוסק", "אישור ניהול ספרים", "אישור מס במקור", "ת.ז", "רישיון נהיגה", "דרכון", "אישור ניהול חשבון בנק", "ביטוחים", "חוזים מול נותני שירות/ספקים", "רישיונות עסק", "רישיון רכב"
 - isInvestment: true or false
 - businessName: IMPORTANT: The name of the company/business that ISSUED this document. Look at the top of the document near the logo. Example: "חברת חשמל", "All Product", "דורל". Never leave empty if visible.
 - businessVat: The VAT / עוסק מורשה / ח.פ number. Usually "עוסק מורשה: XXXXXXXXX" or "ח.פ: XXXXXX". Empty if not found.

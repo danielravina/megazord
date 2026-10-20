@@ -261,7 +261,7 @@ export function SupplierProfilePage() {
       {/* Document history */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 className="text-lg font-bold text-slate-800">מסמכים של הספק</h2>
-        <Button onClick={() => router.push(`/scans/?supplier=${supplier.id}`)}><Plus size={14} /> הוסף מסמך</Button>
+        <Button onClick={() => router.push(`/documents/?supplier=${supplier.id}`)}><Plus size={14} /> הוסף מסמך</Button>
       </div>
 
       {documents.length === 0 ? (
@@ -285,7 +285,7 @@ export function SupplierProfilePage() {
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {documents.map((d) => (
-                  <tr key={d.id} onClick={() => router.push(`/scans/?supplier=${supplier.id}&document=${d.id}`)} className="cursor-pointer hover:bg-slate-50">
+                  <tr key={d.id} onClick={() => router.push(`/documents/?supplier=${supplier.id}&document=${d.id}`)} className="cursor-pointer hover:bg-slate-50">
                     <td className="px-4 py-3 text-sm font-medium">{d.title}</td>
                     <td className="px-4 py-3 text-sm text-slate-500">{DOC_TYPE_LABEL[d.doc_type] || d.doc_type}</td>
                     <td className="px-4 py-3 text-sm text-slate-500">{formatDate(d.date_on_doc || d.date.split("T")[0])}</td>
