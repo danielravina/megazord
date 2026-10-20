@@ -23,7 +23,11 @@ export function DoughnutChartWidget({ data, tile }: Props) {
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[120px] text-slate-400 text-sm">
         {tile.title && <div className="text-xs font-bold text-slate-500 mb-1">{tile.title}</div>}
-        אין נתונים להצגה
+        <div className="text-center leading-snug">
+          אין נתונים בטווח הזה
+          <br />
+          <span className="text-xs">הוסיפו הכנסה ראשונה — סריקה אחת פותחת הכל</span>
+        </div>
       </div>
     );
   }

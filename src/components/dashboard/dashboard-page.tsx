@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { useDashboardData } from "@/components/dashboard/data-sources/use-dashboard-data";
@@ -13,7 +14,27 @@ import type {
   WidgetType,
   TimeRange,
 } from "@/components/dashboard/dashboard-types";
-import { RefreshCw, Settings, FileText } from "lucide-react";
+import { RefreshCw, Settings, FileText, X, ChevronLeft } from "lucide-react";
+
+const WELCOME_DISMISS_KEY = "atzmai-welcome-dismissed";
+
+const START_STEPS = [
+  {
+    label: "סרקו קבלה ראשונה",
+    hint: "ה-AI קולט סכומים ותאריכים אוטומטית",
+    href: "/scans/",
+  },
+  {
+    label: "הוסיפו לקוח",
+    hint: "לניהול קשרים והצעות מחיר",
+    href: "/customers/",
+  },
+  {
+    label: "פתחו פרויקט",
+    hint: "אפיון ומעקב התקדמות",
+    href: "/projects/",
+  },
+];
 
 export function DashboardPage() {
   const { rawData, refresh, isRefreshing, dataLoading } = useDashboardData();
@@ -22,6 +43,24 @@ export function DashboardPage() {
   const [customizing, setCustomizing] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [showReport, setShowReport] = useState(false);
+
+  // קללת פתיחה: מוצגת למשתמש עד שמופיע נתון עסקי ראשון (הכנסה/הוצאה/מסמך/לקוח/פרויקט)
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem(WELCOME_DISMISS_KEY) === "1",
+  );
+  const showWelcome =
+    !dataLoading &&
+    !welcomeDismissed &&
+    rawData.incomes.length === 0 &&
+    rawData.expenses.length === 0 &&
+    rawData.documents.length === 0 &&
+    rawData.projects.length === 0 &&
+    rawData.savings.length === 0;
+
+  function dismissWelcome() {
+    localStorage.setItem(WELCOME_DISMISS_KEY, "1");
+    setWelcomeDismissed(true);
+  }
 
   const handleChangeType = (id: string, type: WidgetType) => {
     updateTile(id, { type });
@@ -102,6 +141,42 @@ export function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      {showWelcome && (
+        <div className="relative bg-gradient-to-l from-blue-50 via-sky-50 to-white border border-blue-100 rounded-2xl p-5 sm:p-6">
+          <button
+            onClick={dismissWelcome}
+            className="absolute top-3 left-3 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors"
+            aria-label="סגור"
+          >
+            <X size={16} />
+          </button>
+          <h3 className="text-lg font-bold text-slate-800">
+            ברוכים הבאים לעצמאי
+          </h3>
+          <p className="text-sm text-slate-500 mt-0.5 mb-4">
+            הדשבורד יתמלא אוטומטית ברגע שיהיו נתונים. שלוש דקות התחלה:
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            {START_STEPS.map((step, i) => (
+              <Link
+                key={step.href}
+                href={step.href}
+                className="flex-1 flex items-center gap-3 bg-white rounded-xl border border-slate-200 px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all group"
+              >
+                <span className="w-7 h-7 rounded-lg bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                  {i + 1}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-slate-700">{step.label}</span>
+                  <span className="block text-xs text-slate-400 truncate">{step.hint}</span>
+                </span>
+                <ChevronLeft size={16} className="text-slate-300 ml-auto shrink-0 group-hover:text-blue-500 transition-colors" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <DashboardGrid
         tiles={layout}

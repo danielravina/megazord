@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  Building, Wallet, User, ChevronLeft, ChevronRight,
+  Building, User, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import type { TaxSettings } from "@/components/finance/finance-types";
 
@@ -22,17 +22,10 @@ interface FormValues {
   business_email: string;
   vat_status: VatStatus;
   zeair_expense_rate: string;
-  vat_rate: string;
-  vat_frequency: string;
-  vat_billing_day: string;
-  bituah_leumi: string;
-  income_tax_advance: string;
-  credit_points: string;
 }
 
-const STEP_TITLES = ['פרטי העסק', 'סוג עוסק', 'הגדרות מיסים'] as const;
-// המשתנה נשמר להשוואה מול ברירות המחדל במסך ההגדרות המלא
-const STEP_ICONS = [User, Building, Wallet] as const;
+const STEP_TITLES = ["פרטי העסק", "סוג עוסק"] as const;
+const STEP_ICONS = [User, Building] as const;
 
 const DEFAULTS: FormValues = {
   owner_name: "",
@@ -40,12 +33,6 @@ const DEFAULTS: FormValues = {
   business_email: "",
   vat_status: "morashi",
   zeair_expense_rate: "",
-  vat_rate: "18",
-  vat_frequency: "bimonthly",
-  vat_billing_day: "15",
-  bituah_leumi: "5",
-  income_tax_advance: "0",
-  credit_points: "2.25",
 };
 
 export function OnboardingWizard() {
@@ -94,12 +81,6 @@ export function OnboardingWizard() {
       vat_status: values.vat_status,
       income_scheme: values.vat_status === "zeair" ? "zeair" : "standard",
       zeair_expense_rate: numOr(values.zeair_expense_rate, 0),
-      vat_rate: numOr(values.vat_rate, 18),
-      vat_frequency: values.vat_frequency,
-      vat_billing_day: numOr(values.vat_billing_day, 15),
-      bituah_leumi: numOr(values.bituah_leumi, 5),
-      income_tax_advance: numOr(values.income_tax_advance, 0),
-      credit_points: numOr(values.credit_points, 2.25),
     };
   }
 
@@ -232,73 +213,6 @@ export function OnboardingWizard() {
                   placeholder="לדוגמה 10"
                 />
               )}
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label='שיעור מע"מ (%)'
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={values.vat_rate}
-                  onChange={(e) => set("vat_rate", e.target.value)}
-                />
-                <Select
-                  label="תדירות דיווח מע״מ"
-                  value={values.vat_frequency}
-                  onChange={(e) => set("vat_frequency", e.target.value)}
-                  options={[
-                    { value: "bimonthly", label: "דו-חודשי" },
-                    { value: "monthly", label: "חודשי" },
-                  ]}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="יום חיוב מע״מ"
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={values.vat_billing_day}
-                  onChange={(e) => set("vat_billing_day", e.target.value)}
-                />
-                <Input
-                  label="ביטוח לאומי (%)"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={values.bituah_leumi}
-                  onChange={(e) => set("bituah_leumi", e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="מקדמות מס הכנסה (%)"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={values.income_tax_advance}
-                  onChange={(e) => set("income_tax_advance", e.target.value)}
-                />
-                <Input
-                  label="נקודות זכות"
-                  type="number"
-                  min="0"
-                  max="20"
-                  step="0.25"
-                  value={values.credit_points}
-                  onChange={(e) => set("credit_points", e.target.value)}
-                />
-              </div>
-              <p className="text-xs text-slate-400">
-                הפרטים נאספים אוטומטית מההגדרות — ניתן לשנות בכל רגע בדף ההגדרות.
-              </p>
             </div>
           )}
 
