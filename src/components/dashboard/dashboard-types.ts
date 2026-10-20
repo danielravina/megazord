@@ -1,4 +1,5 @@
 import type { Income, Expense, TaxSettings, Saving } from "@/components/finance/finance-types";
+import type { Invoice } from "@/components/documents/invoice-types";
 import type { Project } from "@/components/projects/project-types";
 
 export type WidgetType = "hero" | "table" | "bar" | "timeline" | "doughnut" | "calculator" | "clock" | "weather" | "calendar" | "waterfall";
@@ -140,6 +141,7 @@ export interface DashboardRawData {
   savings: Saving[];
   taxSettings: TaxSettings | null;
   projects: Project[];
+  invoices: Invoice[];
   documents: DocRaw[];
   todos: Todo[];
   events: CalendarEvent[];
@@ -152,6 +154,7 @@ export function emptyRawData(): DashboardRawData {
     savings: [],
     taxSettings: null,
     projects: [],
+    invoices: [],
     documents: [],
     todos: [],
     events: [],

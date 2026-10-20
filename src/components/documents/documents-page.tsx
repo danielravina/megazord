@@ -79,7 +79,7 @@ export function DocumentsPage() {
       supabase.from("projects").select("id, customer_id, location, quote_price, closing_price, customers(name)").eq("user_id", user!.id).order("start_date", { ascending: false }),
       supabase.from("tax_settings").select("*").eq("user_id", user!.id).maybeSingle(),
     ]);
-    if (invRes.error) toast("שגיאה בטעינת המסמכים", "error");
+    if (invRes.error) toast("שגיאה בטעינת הדו״חות", "error");
     if (custRes.error) toast("שגיאה בטעינת לקוחות", "error");
     setDocuments((invRes.data || []).map((r) => ({ ...r, customer_name: embeddedName(r.customers) })));
     setCustomers(custRes.data || []);
@@ -461,7 +461,7 @@ export function DocumentsPage() {
               description="המסמך נמחק או שאינו זמין"
             />
             <div className="mt-4 text-center">
-              <Button onClick={() => router.push("/documents/")}>חזרה למסמכים</Button>
+              <Button onClick={() => router.push("/documents/")}>חזרה לדו״חות</Button>
             </div>
           </Card>
         </div>
@@ -841,7 +841,7 @@ export function DocumentsPage() {
       <div className="flex flex-wrap justify-between items-center gap-2 mb-6">
         <div className="flex items-center gap-3">
           <Receipt size={24} className="text-blue-500" />
-          <h1 className="text-2xl font-bold text-slate-800">מסמכים</h1>
+          <h1 className="text-2xl font-bold text-slate-800">דו״חות</h1>
           <Badge variant="blue">{documents.length}</Badge>
         </div>
         <Dropdown

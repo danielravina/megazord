@@ -477,7 +477,6 @@ function buildLayout() {
     user_id: target.id,
     vat_rate: 18,
     vat_frequency: "bimonthly",
-    vat_billing_day: 15,
     income_tax_advance: 15,
     bituah_leumi: 5,
     credit_points: 2.25,

@@ -21,8 +21,9 @@ import type { UserFolder } from "@/components/scans/folders";
 import type { Project, ProjectRow } from "@/components/projects/project-types";
 import { normalizeProject } from "@/components/projects/project-types";
 import {
-  FileText, Search, Folder, Trash2, X, Check, Plus,
+  FileText, Search, Folder, Trash2, X, Check, Plus, List, LayoutGrid, ChevronLeft,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 interface Document {
   id: string;
@@ -65,6 +66,192 @@ function scanState(docType: string): "paid" | "future" | "none" {
   return "none";
 }
 
+// אריח תיקייה בסטייל Drive: ריבוע עם צורת תיקייה (בליטה + גוף צבעוני)
+// לחיצה = בחירה, לחיצה כפולה = פתיחה (כמו ב-Drive)
+function FolderTile({
+  name, color, icon: Icon, count, selected, onSelect, onOpen, onDelete,
+}: {
+  name: string;
+  color: string;
+  icon: LucideIcon;
+  count: number;
+  selected: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      onDoubleClick={onOpen}
+      className={`group relative rounded-lg border shadow-sm transition-all cursor-default flex flex-col items-center justify-center px-2 py-4 ${selected ? "border-blue-500 bg-blue-50" : "bg-white border-slate-200 hover:shadow-md hover:border-slate-300"}`}
+    >
+      <div className="relative w-12 h-10 mb-2 shrink-0">
+        <div className={`absolute top-0 right-0 w-6 h-2.5 ${color} rounded-t-md rounded-bl-[3px]`}></div>
+        <div className={`absolute top-[5px] inset-x-0 bottom-0 ${color} rounded-md flex items-center justify-center`}>
+          <Icon size={13} className="opacity-30" />
+        </div>
+      </div>
+      <h4 className="text-xs font-bold text-slate-700 truncate max-w-full mb-0.5">{name}</h4>
+      <span className="text-[10px] text-slate-400">{count} מסמכים</span>
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          title="מחיקת תיקייה"
+          className="absolute top-1.5 left-1.5 p-1.5 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// שורת תיקייה בתצוגת רשימה
+function FolderRow({
+  name, color, icon: Icon, count, selected, onSelect, onOpen, onDelete,
+}: {
+  name: string;
+  color: string;
+  icon: LucideIcon;
+  count: number;
+  selected: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      onDoubleClick={onOpen}
+      className={`group flex items-center gap-3 px-4 py-3 cursor-default transition-colors ${selected ? "bg-blue-100" : "hover:bg-slate-50"}`}
+    >
+      <div className="relative w-10 h-8 shrink-0">
+        <div className={`absolute top-0 right-0 w-5 h-2 ${color} rounded-t-md rounded-bl-[2px]`}></div>
+        <div className={`absolute top-[4px] inset-x-0 bottom-0 ${color} rounded-md flex items-center justify-center`}>
+          <Icon size={11} className="opacity-30" />
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
+        <p className="text-[11px] text-slate-400">תיקייה · {count} מסמכים</p>
+      </div>
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          title="מחיקת תיקייה"
+          className="p-1.5 rounded-md text-slate-300 hover:text-red-600 hover:bg-red-50 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
+      <ChevronLeft size={16} className="text-slate-300 shrink-0" />
+    </div>
+  );
+}
+
+// אריח קובץ בתצוגת טאיילים
+function FileTile({
+  doc, displayUrls, selected, onSelect, onOpen, showFolder,
+}: {
+  doc: Document;
+  displayUrls: Record<string, string>;
+  selected: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+  showFolder: boolean;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      onDoubleClick={onOpen}
+      className="text-right group cursor-default"
+    >
+      <div className={`relative aspect-square overflow-hidden transition-all p-2.5 rounded-lg border shadow-sm group-hover:shadow-md ${selected ? "border-blue-500 bg-blue-50" : "bg-slate-100 border-slate-200 group-hover:border-slate-300"}`}>
+        <div className="w-full h-full rounded-md overflow-hidden bg-white border border-slate-100 shadow-sm">
+          {doc.image_url ? (/\.pdf$/i.test(doc.image_url) ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-400">
+              <FileText size={30} />
+              <span className="text-[10px] font-bold tracking-widest">PDF</span>
+            </div>
+          ) : (
+            <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover object-top" />
+          )) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-300">
+              <FileText size={30} />
+            </div>
+          )}
+        </div>
+      </div>
+      <h3 className={`text-sm truncate mt-2 ${selected ? "font-semibold text-blue-700" : "font-semibold text-slate-800"}`}>{doc.title}</h3>
+      <p className="text-[11px] text-slate-400 truncate">
+        {formatDate(doc.date_on_doc || doc.date.split("T")[0])}
+        {` · ${DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type}`}
+        {showFolder ? ` · ${folderDisplayName(doc.folder)}` : ""}
+      </p>
+      {doc.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {doc.tags.slice(0, 2).map((tag) => (
+            <span key={tag} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium border border-blue-100">{tag}</span>
+          ))}
+          {doc.tags.length > 2 && <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md border border-slate-200">+{doc.tags.length - 2}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// שורת קובץ בתצוגת רשימה
+function FileRow({
+  doc, displayUrls, selected, onSelect, onOpen, showFolder,
+}: {
+  doc: Document;
+  displayUrls: Record<string, string>;
+  selected: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+  showFolder: boolean;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      onDoubleClick={onOpen}
+      className={`flex items-center gap-3 px-4 py-2.5 cursor-default transition-colors ${selected ? "bg-blue-100" : "hover:bg-slate-50"}`}
+    >
+      <div className="w-10 h-12 rounded-lg overflow-hidden shrink-0 border border-slate-200 bg-slate-100 p-1">
+        <div className="w-full h-full rounded-md overflow-hidden bg-white border border-slate-100">
+          {doc.image_url ? (/\.pdf$/i.test(doc.image_url) ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 text-slate-400">
+              <FileText size={13} />
+              <span className="text-[6px] font-bold tracking-widest">PDF</span>
+            </div>
+          ) : (
+            <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover object-top" />
+          )) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-300">
+              <FileText size={13} />
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-semibold text-slate-800 truncate">{doc.title}</h3>
+        <p className="text-[11px] text-slate-400 truncate">
+          {formatDate(doc.date_on_doc || doc.date.split("T")[0])}
+          {` · ${DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type}`}
+        </p>
+      </div>
+      {showFolder && doc.folder && (
+        <span className="hidden sm:flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg shrink-0 max-w-[140px]">
+          <Folder size={11} className="shrink-0" />
+          <span className="truncate">{folderDisplayName(doc.folder)}</span>
+        </span>
+      )}
+      <ChevronLeft size={16} className="text-slate-300 shrink-0" />
+    </div>
+  );
+}
+
 export function ScansPage() {
   const { supabase, user } = useAuth();
   const { toast } = useToast();
@@ -86,6 +273,18 @@ export function ScansPage() {
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [addFolderOpen, setAddFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  // בחירה בסטייל Drive: לחיצה בוחרת, לחיצה כפולה פותחת. במסכי מגע — לחיצה אחת פותחת
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const touchMode = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+
+  function selectOrOpen(id: string, open: () => void) {
+    if (touchMode) {
+      open();
+      return;
+    }
+    setSelectedId(id);
+  }
 
   const [displayUrls, setDisplayUrls] = useState<Record<string, string>>({});
 
@@ -246,8 +445,8 @@ export function ScansPage() {
   }
 
   async function deleteFolder(folder: UserFolder) {
-    if (!confirm(`האם למחוק את התיקייה "${folder.name}"? המסמכים שבה יישארו ללא תיקייה.`)) return;
-    // המסמכים שבתיקייה — מחזירים לראשי
+    if (!confirm(`האם למחוק את התיקייה "${folder.name}"? המסמכים שבה יועברו לראשי.`)) return;
+    // המסמכים שבתיקייה — משוחררים כקבצים ללא תיקייה, מוצגים בראשי העמוד
     await supabase.from("documents").update({ folder: null }).eq("user_id", user!.id).eq("folder", folder.name);
     await supabase.from("folders").delete().eq("id", folder.id);
     setUserFolders((prev) => prev.filter((f) => f.id !== folder.id));
@@ -277,24 +476,30 @@ export function ScansPage() {
   const supplierBusiness = supplierParam ? businesses.find((b) => b.id === supplierParam) : null;
   // כשהחיפוש פעיל בראשי — מסתירים את התיקיות ומציגים תוצאות בלבד
   const showFolders = !activeFolder && !search && !supplierParam;
+  // במסך הראשי (ללא חיפוש) לא מוצגת רשימת מסמכים — הכל תיקיות או קבצים בתוך תיקייה
+  const showFiles = activeFolder || !!search || supplierParam;
+  // הקבצים שנוספו לאחרונה (לפי תאריך הוספה)
+  const recentDocs = [...docs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
   if (loading && docs.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <Skeleton className="w-48 h-8" />
           <Skeleton className="w-32 h-9" />
         </div>
-        <Skeleton className="w-full h-11 rounded-xl mb-4" />
-        <Skeleton className="w-full h-32 rounded-2xl mb-4" />
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-white p-3 rounded-2xl shadow-sm border flex gap-4">
-              <Skeleton className="w-20 h-24 rounded-xl shrink-0" />
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
-                <SkeletonText className="w-2/3" />
-                <SkeletonText className="w-1/3" />
-              </div>
+        <Skeleton className="w-full sm:max-w-md h-11 rounded-xl mb-6" />
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-square rounded-lg" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="aspect-square rounded-lg" />
+              <SkeletonText className="w-3/4" />
+              <SkeletonText className="w-1/2" />
             </div>
           ))}
         </div>
@@ -305,7 +510,7 @@ export function ScansPage() {
   const docCount = (folderId: string) => docs.filter((d) => d.folder === folderId).length;
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <FileText size={24} className="text-blue-500" />
@@ -315,11 +520,27 @@ export function ScansPage() {
               {activeFolderName}
             </span>
           ) : (
-            "הסריקות שלי"
+            "המסמכים שלי"
           )}
         </h1>
         <div className="flex flex-wrap items-center gap-2">
           <DocumentScanner onScanned={() => { loadDocs(); if (activeFolder === null) loadFolders(); }} primary />
+          <div className="flex bg-slate-100 p-1 rounded-lg" title="מצב תצוגה">
+            <button
+              onClick={() => setView("list")}
+              title="תצוגת רשימה"
+              className={`p-1.5 rounded-md ${view === "list" ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              <List size={16} />
+            </button>
+            <button
+              onClick={() => setView("grid")}
+              title="תצוגת אריחים"
+              className={`p-1.5 rounded-md ${view === "grid" ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              <LayoutGrid size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -338,7 +559,7 @@ export function ScansPage() {
       )}
       {supplierParam && (
         <button onClick={() => router.push("/scans/")} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
-          <X size={12} /> מסמכי {supplierBusiness?.name || "הספק"} — חזרה לכל הסריקות
+          <X size={12} /> מסמכי {supplierBusiness?.name || "הספק"} — חזרה לכל המסמכים
         </button>
       )}
 
@@ -353,115 +574,123 @@ export function ScansPage() {
 
       {/* תיקיות — מוצגות בעמוד הראשי (מוסתרות במסך תיקייה, בחיפוש ובסינון ספק) */}
       {showFolders && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-bold text-slate-500 uppercase">תיקיות</h3>
-            <button
-              onClick={() => { setNewFolderName(""); setAddFolderOpen(true); }}
-              className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-            >
-              <Plus size={12} /> תיקייה חדשה
-            </button>
+            <Button variant="secondary" size="sm" onClick={() => { setNewFolderName(""); setAddFolderOpen(true); }}>
+              <Plus size={14} /> תיקייה חדשה
+            </Button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {userFolders.map((f) => (
-              <Card
-                key={f.id}
-                hover
-                className="p-4 flex flex-col items-center justify-center text-center relative group"
-                onClick={() => { setActiveFolder(f.name); setSearch(""); }}
-              >
-                <div className={`${userFolderColor(f.name)} w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-xl`}>
-                  <Folder size={20} />
-                </div>
-                <h4 className="font-bold text-sm mb-1">{f.name}</h4>
-                <span className="text-xs text-slate-400">{docCount(f.name)} מסמכים</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteFolder(f); }}
-                  title="מחיקת תיקייה"
-                  className="absolute top-2 left-2 p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </Card>
-            ))}
-            {PREMADE_FOLDERS.map((f) => {
-              const Icon = f.icon;
-              return (
-                <Card
+          {view === "grid" ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+              {userFolders.map((f) => (
+                <FolderTile
                   key={f.id}
-                  hover
-                  className="p-4 flex flex-col items-center justify-center text-center"
-                  onClick={() => { setActiveFolder(f.id); setSearch(""); }}
-                >
-                  <div className={`${f.color} w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-xl`}>
-                    <Icon size={20} />
-                  </div>
-                  <h4 className="font-bold text-sm mb-1">{f.name}</h4>
-                  <span className="text-xs text-slate-400">{docCount(f.id)} מסמכים</span>
-                </Card>
-              );
-            })}
-          </div>
+                  name={f.name}
+                  color={userFolderColor(f.name)}
+                  icon={Folder}
+                  count={docCount(f.name)}
+                  selected={selectedId === f.id}
+                  onSelect={() => selectOrOpen(f.id, () => setActiveFolder(f.name))}
+                  onOpen={() => { setActiveFolder(f.name); setSearch(""); setSelectedId(null); }}
+                  onDelete={() => deleteFolder(f)}
+                />
+              ))}
+              {PREMADE_FOLDERS.map((f) => (
+                <FolderTile
+                  key={f.id}
+                  name={f.name}
+                  color={f.color}
+                  icon={f.icon}
+                  count={docCount(f.id)}
+                  selected={selectedId === f.id}
+                  onSelect={() => selectOrOpen(f.id, () => setActiveFolder(f.id))}
+                  onOpen={() => { setActiveFolder(f.id); setSearch(""); setSelectedId(null); }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-100 bg-white overflow-hidden divide-y divide-slate-100 shadow-sm">
+              {userFolders.map((f) => (
+                <FolderRow
+                  key={f.id}
+                  name={f.name}
+                  color={userFolderColor(f.name)}
+                  icon={Folder}
+                  count={docCount(f.name)}
+                  selected={selectedId === f.id}
+                  onSelect={() => selectOrOpen(f.id, () => setActiveFolder(f.name))}
+                  onOpen={() => { setActiveFolder(f.name); setSearch(""); setSelectedId(null); }}
+                  onDelete={() => deleteFolder(f)}
+                />
+              ))}
+              {PREMADE_FOLDERS.map((f) => (
+                <FolderRow
+                  key={f.id}
+                  name={f.name}
+                  color={f.color}
+                  icon={f.icon}
+                  count={docCount(f.id)}
+                  selected={selectedId === f.id}
+                  onSelect={() => selectOrOpen(f.id, () => setActiveFolder(f.id))}
+                  onOpen={() => { setActiveFolder(f.id); setSearch(""); setSelectedId(null); }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* מסמכים */}
-      {filteredDocs.length === 0 ? (
-        !docs.length && !activeFolder && !supplierParam ? (
-          <Card className="p-12">
-            <EmptyState
-              icon={<FileText size={40} className="text-blue-300" />}
-              title="אין מסמכים עדיין"
-              description="סרוק מסמך כדי להוסיף מסמך חדש"
-            />
-          </Card>
-        ) : activeFolder && !search ? (
-          <Card className="p-10">
+      {/* קבצים אחרונים בראשי — הנסרקו/נוספו לאחרונה */}
+      {showFolders && recentDocs.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">קבצים אחרונים</h3>
+          {view === "grid" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              {recentDocs.map((doc) => (
+                <FileTile key={doc.id} doc={doc} displayUrls={displayUrls} showFolder selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-100 bg-white overflow-hidden divide-y divide-slate-100 shadow-sm">
+              {recentDocs.map((doc) => (
+                <FileRow key={doc.id} doc={doc} displayUrls={displayUrls} showFolder selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* קבצים בתיקייה / בחיפוש / בסינון ספק */}
+      {showFiles && (filteredDocs.length === 0 ? (
+        <Card className="p-10">
+          {activeFolder && !search ? (
             <EmptyState
               icon={<Folder size={36} className="text-blue-300" />}
               title="התיקייה ריקה"
               description="הוסף מסמך לתיקייה דרך מסך עריכת המסמך"
             />
-          </Card>
-        ) : null
-      ) : (
-        <div>
-          {showFolders && (
-            <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">מסמכים</h3>
+          ) : (
+            <EmptyState
+              icon={<Search size={32} className="text-blue-300" />}
+              title="לא נמצאו מסמכים"
+              description="נסה חיפוש אחר"
+            />
           )}
-          <div className="space-y-3 mb-24">
-            {filteredDocs.map((doc) => (
-              <div key={doc.id} onClick={() => setViewId(doc.id)} className="bg-white p-3 rounded-2xl shadow-sm border flex gap-4 cursor-pointer hover:shadow-md transition-shadow">
-                <div className="w-20 h-24 bg-slate-100 rounded-xl overflow-hidden shrink-0 border">
-                  {doc.image_url && (/\.pdf$/i.test(doc.image_url) ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-400">
-                      <FileText size={22} />
-                      <span className="text-[9px]">PDF</span>
-                    </div>
-                  ) : (
-                    <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover" />
-                  ))}
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <h3 className="font-semibold truncate mb-1">{doc.title}</h3>
-                  <p className="text-xs text-slate-400 mb-2">
-                    {formatDate(doc.date_on_doc || doc.date.split("T")[0])}
-                    {activeFolder ? "" : doc.folder ? ` · ${folderDisplayName(doc.folder)}` : ""}
-                    {` · ${DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type}`}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {doc.tags.slice(0, 2).map((tag) => (
-                      <span key={tag} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium border border-blue-100">{tag}</span>
-                    ))}
-                    {doc.tags.length > 2 && <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md border">+{doc.tags.length - 2}</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        </Card>
+      ) : view === "grid" ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-24">
+          {filteredDocs.map((doc) => (
+            <FileTile key={doc.id} doc={doc} displayUrls={displayUrls} showFolder={!activeFolder} selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} />
+          ))}
         </div>
-      )}
+      ) : (
+        <div className="rounded-lg border border-slate-100 bg-white overflow-hidden divide-y divide-slate-100 mb-24">
+          {filteredDocs.map((doc) => (
+            <FileRow key={doc.id} doc={doc} displayUrls={displayUrls} showFolder={!activeFolder} selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} />
+          ))}
+        </div>
+      ))}
 
       {/* Add Folder Modal */}
       <Modal
@@ -556,7 +785,7 @@ export function ScansPage() {
                     </div>
                   )}
                   {viewing.extracted_text && (
-                    <div className="bg-slate-50 p-4 rounded-xl border">
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                       <button
                         onClick={() => setShowExtracted(!showExtracted)}
                         className="w-full flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase"
@@ -576,7 +805,7 @@ export function ScansPage() {
               )}
             </div>
             {viewing.image_url && (
-              <div className="md:w-1/2 shrink-0 bg-slate-100 border flex items-center justify-center h-64 md:h-full overflow-hidden">
+              <div className="md:w-1/2 shrink-0 bg-slate-100 border border-slate-200 flex items-center justify-center h-64 md:h-full overflow-hidden">
                 {/\.pdf$/i.test(viewing.image_url) ? (
                   <iframe src={displayUrls[viewing.image_url] || viewing.image_url} title="קובץ PDF" className="w-full h-full" />
                 ) : (

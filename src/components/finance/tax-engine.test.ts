@@ -19,7 +19,7 @@ const saving = (amount: number): Saving => ({
 
 function settings(overrides: Partial<TaxSettings> = {}): TaxSettings {
   return {
-    user_id: "u", vat_rate: 18, vat_frequency: "bimonthly", vat_billing_day: 15,
+    user_id: "u", vat_rate: 18, vat_frequency: "bimonthly",
     income_tax_advance: 0, bituah_leumi: 0,
     credit_points: 2.25,
     tax_advances_paid: 0,
@@ -45,6 +45,13 @@ describe("totalVat", () => {
     // vatFromGross(118,18)=18 ; vatFromGross(117,17)=17
     assert.equal(totalVat(rows, 18), 35);
   });
+
+  it("prefers the exact vat_amount over re-deriving from gross", () => {
+    // Mixed-rate document: gross 236 (188 net @18% + 118 exempt credit — VAT 34
+    // on the doc, NOT 36 that pure vatFromGross at the doc rate would give).
+    const rows = [{ ...income(236, 18), vat_amount: 34 }];
+    assert.equal(totalVat(rows, 18), 34);
+  });
 });
 
 describe("calculateTaxes — VAT", () => {
@@ -56,6 +63,14 @@ describe("calculateTaxes — VAT", () => {
   it("returns zero vat for patoor / 0 rate", () => {
     const r = calculateTaxes([income(1000, 0)], [], [], settings({ vat_rate: 0, vat_status: "patoor" }));
     assert.equal(r.vat, 0);
+  });
+
+  it("forces vat 0 for patoor / zeair even when the saved rate is 18", () => {
+    for (const status of ["patoor", "zeair"] as const) {
+      const r = calculateTaxes([income(1180, 18)], [], [], settings({ vat_rate: 18, vat_status: status }));
+      assert.equal(r.vat, 0);
+      assert.equal(r.grossWithoutVat, 1180);
+    }
   });
 });
 

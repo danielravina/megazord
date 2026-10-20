@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test("documents page loads with heading", async ({ page }) => {
   await page.goto("/scans/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-  await expect(page.locator("main h1")).toContainText("הסריקות שלי");
+  await expect(page.locator("main h1")).toContainText("המסמכים שלי");
 });
 
 test("documents page shows folders on main view", async ({ page }) => {
@@ -38,7 +38,7 @@ test("can add a folder", async ({ page }) => {
   await page.goto("/scans/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  await page.locator("button:has-text('תיקייה חדשה')").click();
+  await page.locator("button:has-text('תיקייה חדשה')").first().click();
   await expect(page.locator("h2:has-text('תיקייה חדשה'), h3:has-text('תיקייה חדשה')").first()).toBeVisible({ timeout: 5000 });
 });
 
@@ -46,7 +46,7 @@ test("can enter a folder and go back", async ({ page }) => {
   await page.goto("/scans/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
-  await page.locator("h4:has-text('בנק')").click();
+  await page.locator("h4:has-text('בנק')").dblclick();
   await expect(page.locator("text=כל התיקיות")).toBeVisible({ timeout: 5000 });
 
   await page.locator("text=כל התיקיות").click();

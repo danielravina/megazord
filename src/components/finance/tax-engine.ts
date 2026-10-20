@@ -7,9 +7,16 @@ export function vatFromGross(amount: number, rate: number): number {
   return amount - amount / (1 + r);
 }
 
-// VAT summed per income row, using each row's rate (if set) or the global default
+// VAT for one income row. Prefers the exact amount computed from the
+// document's own line breakdown (ledger), falling back to gross × rate.
+export function rowVat(i: Income, defaultRate: number): number {
+  if (i.vat_amount != null) return Number(i.vat_amount);
+  return vatFromGross(Number(i.amount), i.vat_rate ?? defaultRate);
+}
+
+// VAT summed per income row
 export function totalVat(incomes: Income[], defaultRate: number): number {
-  return incomes.reduce((s, i) => s + vatFromGross(Number(i.amount), i.vat_rate ?? defaultRate), 0);
+  return incomes.reduce((s, i) => s + rowVat(i, defaultRate), 0);
 }
 
 // Deductible expenses for income tax:
@@ -45,9 +52,11 @@ export function calculateTaxes(
   const totalIncome = incomes.reduce((s, i) => s + Number(i.amount), 0);
 
   const vatRate = settings?.vat_rate ?? VAT_DEFAULT;
-  const vat = totalVat(incomes, vatRate);
+  // עוסק פטור / עוסק זעיר אינו גובה מע"מ — סטטוס העוסק גובר על שיעור שנשמר
+  const isVatExempt = settings?.vat_status === "patoor" || settings?.vat_status === "zeair";
+  const collectedVat = isVatExempt ? 0 : totalVat(incomes, vatRate);
 
-  const grossWithoutVat = totalIncome - vat;
+  const grossWithoutVat = totalIncome - collectedVat;
 
   const dedExpenses = deductibleExpenses(grossWithoutVat, expenses, savings, settings);
 
@@ -66,11 +75,11 @@ export function calculateTaxes(
   const taxAdvancesPaid = effectiveTaxAdvances(settings);
   const balanceDue = taxAfterCredits - taxAdvancesPaid;
 
-  const totalTax = vat + btlAdv + taxAfterCredits;
+  const totalTax = collectedVat + btlAdv + taxAfterCredits;
   const netIncome = totalIncome - totalTax - dedExpenses;
 
   return {
-    vat: Math.round(vat),
+    vat: Math.round(collectedVat),
     incomeTax: Math.round(incomeTax),
     bituahLeumi: Math.round(btlAdv),
     creditValue: Math.round(annualCredit),

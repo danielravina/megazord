@@ -16,7 +16,7 @@ async function createCustomer(page: Page, name: string) {
 test("documents page loads with heading", async ({ page }) => {
   await page.goto("/documents/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
-  await expect(page.locator("main h1")).toContainText("מסמכים");
+  await expect(page.locator("main h1")).toContainText("דו״חות");
 });
 
 test("can create a tax invoice which books income immediately", async ({ page }) => {

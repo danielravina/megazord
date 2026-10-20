@@ -14,8 +14,6 @@ import { Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown";
 import { generateId } from "@/components/shared/generate-id";
 import { PREMADE_FOLDERS } from "@/components/scans/folders";
 import type { UserFolder } from "@/components/scans/folders";
-import type { Project, ProjectRow } from "@/components/projects/project-types";
-import { normalizeProject } from "@/components/projects/project-types";
 import { ScanLine, Camera, Upload } from "lucide-react";
 
 interface Business {
@@ -79,8 +77,6 @@ interface TempDoc {
   folder: string;
   isInvestment: boolean;
   direction: string;
-  projectId: string;
-  newProjectName: string;
   businessId: string;
   businessVat: string;
   newBusinessName: string;
@@ -89,8 +85,7 @@ interface TempDoc {
 const EMPTY_TEMP: TempDoc = {
   imageUrl: "", previewUrl: "", title: "", tags: [], extractedText: "", docType: "other",
   dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false,
-  direction: "expense", projectId: "", newProjectName: "",
-  businessId: "", businessVat: "", newBusinessName: "",
+  direction: "expense", businessId: "", businessVat: "", newBusinessName: "",
 };
 
 export function DocumentScanner({ onScanned, primary = false }: Props) {
@@ -101,14 +96,12 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
   const requestIdRef = useRef<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [userFolders, setUserFolders] = useState<UserFolder[]>([]);
   const [tempDoc, setTempDoc] = useState<TempDoc>(EMPTY_TEMP);
 
   useEffect(() => {
     if (!user) return;
-    loadProjects();
     loadBusinesses();
     loadFolders();
   }, [user]);
@@ -116,11 +109,6 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
   async function loadFolders() {
     const { data } = await supabase.from("folders").select("id, name").eq("user_id", user!.id).order("created_at");
     setUserFolders(data || []);
-  }
-
-  async function loadProjects() {
-    const { data } = await supabase.from("projects").select("id, customer_id, customers(name)").eq("user_id", user!.id);
-    setProjects(((data || []) as ProjectRow[]).map(normalizeProject));
   }
 
   async function loadBusinesses() {
@@ -235,7 +223,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
         extractedText: ocr.extractedText || "", docType: ocr.docType || "other",
         dateOnDoc: ocr.dateOnDoc || "", totalAmount: ocr.totalAmount?.toString() || "",
         folder: ocr.folderSuggestion || "", isInvestment: ocr.isInvestment || false,
-        direction: "expense", projectId: "", newProjectName: "",
+        direction: "expense",
         businessId: bizId, businessVat: bizVat, newBusinessName: "",
       });
       setConfirmOpen(true);
@@ -256,28 +244,6 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
   async function saveDocument() {
     if (!user) return;
     const requestId = requestIdRef.current || "";
-    let finalProjectId = tempDoc.projectId;
-
-    if (tempDoc.projectId === "new" && tempDoc.newProjectName.trim()) {
-      const newId = generateId();
-      const custId = generateId();
-      const { error: custError } = await supabase.from("customers").insert({
-        id: custId, user_id: user.id, name: tempDoc.newProjectName.trim(),
-      });
-      if (custError) {
-        logEvent("error", "scan_save_error", { requestId, table: "customers", message: custError.message });
-        toast("שגיאה ביצירת הלקוח", "error");
-        return;
-      }
-      const { error: projError } = await supabase.from("projects").insert({ id: newId, user_id: user.id, customer_id: custId });
-      if (projError) {
-        logEvent("error", "scan_save_error", { requestId, table: "projects", message: projError.message });
-        toast("שגיאה ביצירת הפרויקט", "error");
-        return;
-      }
-      finalProjectId = newId;
-      loadProjects();
-    }
 
     let finalBusinessId = tempDoc.businessId;
     if (tempDoc.businessId === "new" && tempDoc.newBusinessName.trim()) {
@@ -313,7 +279,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       extracted_text: tempDoc.extractedText, doc_type: tempDoc.docType,
       date_on_doc: tempDoc.dateOnDoc || null,
       total_amount: parseFloat(tempDoc.totalAmount) || null,
-      project_id: finalProjectId || null,
+      project_id: null,
       folder: tempDoc.folder || null,
       is_investment: tempDoc.isInvestment,
       direction: tempDoc.direction,
@@ -409,10 +375,17 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       >
         <div className="flex flex-col md:flex-row gap-0 h-full">
           <div className="flex-1 space-y-4 min-w-0 overflow-y-auto p-1">
-            <Select label="שיוך לפרויקט" options={[
-              { value: "", label: "ללא פרויקט" },
-              ...projects.map((p) => ({ value: p.id, label: p.customer_name || "ללא שם" })),
-            ]} value={tempDoc.projectId} onChange={(e) => setTempDoc({ ...tempDoc, projectId: e.target.value })} />
+            <Select label="תיקייה" options={[
+              { value: "", label: "ללא תיקייה" },
+              ...PREMADE_FOLDERS.map((f) => ({ value: f.id, label: f.name })),
+              ...userFolders.map((f) => ({ value: f.name, label: f.name })),
+            ]} value={tempDoc.folder} onChange={(e) => setTempDoc({ ...tempDoc, folder: e.target.value })} />
+            <Input label="כותרת המסמך" value={tempDoc.title} onChange={(e) => setTempDoc({ ...tempDoc, title: e.target.value })} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select label="סוג מסמך" options={DOC_TYPES} value={tempDoc.docType} onChange={(e) => setTempDoc({ ...tempDoc, docType: e.target.value })} />
+              <Input label="סכום (₪)" type="number" step="0.01" value={tempDoc.totalAmount} onChange={(e) => setTempDoc({ ...tempDoc, totalAmount: e.target.value })} />
+            </div>
+            <Input label="תאריך במסמך" type="date" value={tempDoc.dateOnDoc} onChange={(e) => setTempDoc({ ...tempDoc, dateOnDoc: e.target.value })} />
             <Select label="ספק" options={[
               { value: "", label: "ללא ספק" },
               ...businesses.map((b) => ({ value: b.id, label: b.name })),
@@ -421,17 +394,6 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
             {tempDoc.businessId === "new" && (
               <Input label="שם הספק" value={tempDoc.newBusinessName} onChange={(e) => setTempDoc({ ...tempDoc, newBusinessName: e.target.value })} />
             )}
-            <Input label="כותרת המסמך" value={tempDoc.title} onChange={(e) => setTempDoc({ ...tempDoc, title: e.target.value })} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select label="סוג מסמך" options={DOC_TYPES} value={tempDoc.docType} onChange={(e) => setTempDoc({ ...tempDoc, docType: e.target.value })} />
-              <Input label="סכום (₪)" type="number" step="0.01" value={tempDoc.totalAmount} onChange={(e) => setTempDoc({ ...tempDoc, totalAmount: e.target.value })} />
-            </div>
-            <Input label="תאריך במסמך" type="date" value={tempDoc.dateOnDoc} onChange={(e) => setTempDoc({ ...tempDoc, dateOnDoc: e.target.value })} />
-            <Select label="תיקייה" options={[
-              { value: "", label: "ללא תיקייה" },
-              ...PREMADE_FOLDERS.map((f) => ({ value: f.id, label: f.name })),
-              ...userFolders.map((f) => ({ value: f.name, label: f.name })),
-            ]} value={tempDoc.folder} onChange={(e) => setTempDoc({ ...tempDoc, folder: e.target.value })} />
             <Select label="הוצאה / הכנסה" options={[
               { value: "expense", label: "הוצאה" },
               { value: "income", label: "הכנסה" },

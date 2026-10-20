@@ -84,6 +84,7 @@ export function useDashboardData() {
           savings: (sav.data || []) as DashboardRawData["savings"],
           taxSettings: (tax.data || null) as DashboardRawData["taxSettings"],
           projects: ((proj.data || []) as ProjectRow[]).map(normalizeProject) as DashboardRawData["projects"],
+          invoices: (inv.data || []) as unknown as DashboardRawData["invoices"],
           documents: (docs.data || []) as DashboardRawData["documents"],
           todos: (todos.data || []) as DashboardRawData["todos"],
           events: (events.data || []) as DashboardRawData["events"],

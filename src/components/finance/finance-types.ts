@@ -7,6 +7,8 @@ export interface Income {
   type: string;
   project_id?: string | null;
   vat_rate?: number | null;
+  // מע"מ מדויק על הסכום (מחושב לפי שורות מעשך). null = נגזר מהסכום בריכז
+  vat_amount?: number | null;
   created_at: string;
 }
 
@@ -25,7 +27,6 @@ export interface TaxSettings {
   user_id: string;
   vat_rate: number;
   vat_frequency: string;
-  vat_billing_day: number;
   income_tax_advance: number;
   bituah_leumi: number;
   credit_points: number;

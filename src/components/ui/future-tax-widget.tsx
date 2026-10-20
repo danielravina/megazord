@@ -4,13 +4,10 @@ import { Scale, ChevronRight } from "lucide-react";
 import { formatCurrencyShort } from "@/components/shared/format-currency";
 import type { TaxSettings } from "@/components/finance/finance-types";
 
-function getNextBillingDay(day: number, monthsFromNow = 0): string {
+function getNextDueDate(): string {
   const today = new Date();
-  const target = new Date(today.getFullYear(), today.getMonth() + monthsFromNow, 1);
-  const maxDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-  const safeDay = Math.min(day, maxDay);
-  const date = new Date(target.getFullYear(), target.getMonth(), safeDay);
-  if (monthsFromNow === 0 && today.getDate() >= safeDay) {
+  const date = new Date(today.getFullYear(), today.getMonth(), 15);
+  if (today.getDate() >= 15) {
     date.setMonth(date.getMonth() + 1);
   }
   return date.toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
@@ -46,7 +43,7 @@ export function FutureTaxWidget({ settings, estimatedIncome }: Props) {
     payments.push({
       label: vatFreq === "bimonthly" ? 'מע"מ (דו-חודשי)' : 'מע"מ',
       amount: Math.round(estimatedVat * (vatFreq === "bimonthly" ? 2 : 1)),
-      due: getNextBillingDay(settings?.vat_billing_day ?? 15),
+      due: getNextDueDate(),
       color: "text-blue-600 bg-blue-50",
     });
   }
@@ -55,7 +52,7 @@ export function FutureTaxWidget({ settings, estimatedIncome }: Props) {
     payments.push({
       label: "מקדמות מס הכנסה",
       amount: Math.round(estimatedIncTax * (vatFreq === "bimonthly" ? 2 : 1)),
-      due: getNextBillingDay(15),
+      due: getNextDueDate(),
       color: "text-orange-600 bg-orange-50",
     });
   }
@@ -64,7 +61,7 @@ export function FutureTaxWidget({ settings, estimatedIncome }: Props) {
     payments.push({
       label: "ביטוח לאומי",
       amount: Math.round(estimatedBL),
-      due: getNextBillingDay(15),
+      due: getNextDueDate(),
       color: "text-purple-600 bg-purple-50",
     });
   }

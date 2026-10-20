@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { useDashboardData } from "@/components/dashboard/data-sources/use-dashboard-data";
+import { useAuth } from "@/components/layout/auth-provider";
 import { useDashboardLayout } from "@/components/dashboard/dashboard-storage";
 import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
 import { AddTilePicker } from "@/components/dashboard/add-tile-picker";
@@ -37,6 +38,7 @@ const START_STEPS = [
 ];
 
 export function DashboardPage() {
+  const { supabase } = useAuth();
   const { rawData, refresh, isRefreshing, dataLoading } = useDashboardData();
   const { layout, loading: layoutLoading, removeTile, updateTile, addTile, reorderTiles } =
     useDashboardLayout();
@@ -204,14 +206,10 @@ export function DashboardPage() {
         incomes={rawData.incomes}
         expenses={rawData.expenses}
         savings={rawData.savings}
+        invoices={rawData.invoices}
+        documents={rawData.documents}
         taxSettings={rawData.taxSettings}
-        businessName={rawData.taxSettings?.business_name || ""}
-        vatNumber={rawData.taxSettings?.vat_number || ""}
-        businessAddress={rawData.taxSettings?.business_address || ""}
-        businessPhone={rawData.taxSettings?.business_phone || ""}
-        accountantEmail={rawData.taxSettings?.accountant_email || ""}
-        supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL || ""}
-        supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}
+        supabase={supabase}
       />
     </div>
   );

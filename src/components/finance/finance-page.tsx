@@ -48,12 +48,10 @@ const SAVING_TYPES = [
   { value: "אחר", label: "אחר" },
 ];
 
-function getNextBillingDay(day: number): string {
+function getNextDueDate(): string {
   const today = new Date();
-  const maxDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const safeDay = Math.min(day, maxDay);
-  const target = new Date(today.getFullYear(), today.getMonth(), safeDay);
-  if (today.getDate() >= safeDay) {
+  const target = new Date(today.getFullYear(), today.getMonth(), 15);
+  if (today.getDate() >= 15) {
     target.setMonth(target.getMonth() + 1);
   }
   return target.toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
@@ -71,6 +69,8 @@ export function FinancePage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [savings, setSavings] = useState<Saving[]>([]);
   const [taxSettings, setTaxSettings] = useState<TaxSettings | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [documents, setDocuments] = useState<ScanEvidence[]>([]);
   const [showReport, setShowReport] = useState(false);
 
   // Form states (savings only — income/expense are derived from evidence)
@@ -120,7 +120,7 @@ export function FinancePage() {
       ]);
       if (cancelled) return;
       if (invRes.error) toast("שגיאה בטעינת המסמכים", "error");
-      if (docRes.error) toast("שגיאה בטעינת הסריקות", "error");
+      if (docRes.error) toast("שגיאה בטעינת המסמכים", "error");
       if (savRes.error) toast("שגיאה בטעינת חסכונות", "error");
       if (taxRes.error && taxRes.error.code !== "PGRST116") toast("שגיאה בטעינת הגדרות מס", "error");
       const vatStatus = (taxRes.data as TaxSettings | null)?.vat_status ?? "morashi";
@@ -133,6 +133,8 @@ export function FinancePage() {
       setExpenses(derivedEx);
       setSavings(savRes.data || []);
       setTaxSettings(taxRes.data || null);
+      setInvoices((invRes.data || []) as unknown as Invoice[]);
+      setDocuments((docRes.data || []) as unknown as ScanEvidence[]);
       setLoading(false);
     }
     load();
@@ -299,9 +301,9 @@ export function FinancePage() {
                   <h3 className="text-lg font-bold mb-4 border-b pb-2">חלוקת חבויות מס</h3>
                   <div className="space-y-3">
                     {[
-                      { label: 'מע"מ (מגולם)', due: getNextBillingDay(taxSettings?.vat_billing_day ?? 15), val: taxCalc.vat },
-                      { label: "מס הכנסה (אומדן)", due: getNextBillingDay(15), val: taxCalc.incomeTax },
-                      { label: "ביטוח לאומי", due: getNextBillingDay(15), val: taxCalc.bituahLeumi },
+                      { label: 'מע"מ (מגולם)', due: getNextDueDate(), val: taxCalc.vat },
+                      { label: "מס הכנסה (אומדן)", due: getNextDueDate(), val: taxCalc.incomeTax },
+                      { label: "ביטוח לאומי", due: getNextDueDate(), val: taxCalc.bituahLeumi },
                       { label: "מקדמות ששולמו", val: taxCalc.taxAdvancesPaid },
                     ].map((row) => (
                       <div key={row.label} className="flex justify-between items-center">
@@ -462,14 +464,10 @@ export function FinancePage() {
         incomes={incomes}
         expenses={expenses}
         savings={savings}
+        invoices={invoices}
+        documents={documents}
         taxSettings={taxSettings}
-        businessName={taxSettings?.business_name || ""}
-        vatNumber={taxSettings?.vat_number || ""}
-        businessAddress={taxSettings?.business_address || ""}
-        businessPhone={taxSettings?.business_phone || ""}
-        accountantEmail={taxSettings?.accountant_email || ""}
-        supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL || ""}
-        supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}
+        supabase={supabase}
       />
     </div>
   );

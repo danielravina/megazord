@@ -31,6 +31,7 @@ describe("buildLedger — issued documents", () => {
     assert.equal(incomes.length, 1);
     assert.equal(incomes[0].amount, 118);
     assert.equal(incomes[0].vat_rate, 18);
+    assert.equal(incomes[0].vat_amount, 18);
   });
 
   it("books income for combined tax_invoice_receipt (morashi)", () => {
@@ -42,6 +43,26 @@ describe("buildLedger — issued documents", () => {
     const { incomes } = buildLedger([invoice({ document_type: "credit_invoice", amount: 118 })], [], "morashi");
     assert.equal(incomes.length, 1);
     assert.equal(incomes[0].amount, -118);
+  });
+
+  it("stamps the exact per-line vat_amount", () => {
+    // Doc default 18% but one line is exempt: items 100@18% (+18) + 118@0 (+0)
+    // → gross 336, actual VAT 18 — not 51.2 that gross×18% would give.
+    const item = (id: string, unit: number, vat_rate?: number) => ({ id, description: "שורה", quantity: 1, unit_price: unit, vat_rate });
+    const inv = invoice({
+      invoice_number: "30002",
+      items: [item("a", 100, 18), item("b", 118, 0)],
+      amount: 336, vat_rate: 18,
+    });
+    const { incomes } = buildLedger([inv], [], "morashi");
+    assert.equal(incomes.length, 1);
+    assert.equal(incomes[0].amount, 336);
+    assert.equal(incomes[0].vat_amount, 18);
+  });
+
+  it("stamps NEGATIVE vat_amount for credit invoices", () => {
+    const { incomes } = buildLedger([invoice({ document_type: "credit_invoice", amount: 118 })], [], "morashi");
+    assert.equal(incomes[0].vat_amount, -18);
   });
 
   it("does NOT book income for receipt (morashi)", () => {

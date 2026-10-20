@@ -14,7 +14,7 @@ import type { TaxSettings } from "@/components/finance/finance-types";
 const FIELD_NAMES = [
   "owner_name", "business_name", "vat_number", "business_phone", "business_address",
   "accountant_email", "vat_status", "zeair_expense_rate",
-  "vat_rate", "vat_frequency", "vat_billing_day",
+  "vat_rate", "vat_frequency",
   "income_tax_advance",
   "bituah_leumi", "credit_points",
   "tax_advances_paid", "tax_advances_year",
@@ -34,7 +34,6 @@ function getInitialValues(settings: TaxSettings | null): Record<string, string> 
     zeair_expense_rate: String(settings?.zeair_expense_rate ?? ""),
     vat_rate: String(settings?.vat_rate ?? 18),
     vat_frequency: settings?.vat_frequency || "bimonthly",
-    vat_billing_day: String(settings?.vat_billing_day ?? 15),
     income_tax_advance: String(settings?.income_tax_advance ?? 0),
     bituah_leumi: String(settings?.bituah_leumi ?? 5),
     credit_points: String(settings?.credit_points ?? 2.25),
@@ -190,7 +189,6 @@ export function PreferencesPage() {
       user_id: user.id,
       vat_rate: parseFloat((fd.get("vat_rate") as string) || "") || 18,
       vat_frequency: (fd.get("vat_frequency") as string) || "bimonthly",
-      vat_billing_day: parseInt((fd.get("vat_billing_day") as string) || "", 10) || 15,
       income_tax_advance: parseFloat((fd.get("income_tax_advance") as string) || "") || 0,
       bituah_leumi: parseFloat((fd.get("bituah_leumi") as string) || "") || 5,
       credit_points: parseFloat((fd.get("credit_points") as string) || "") || 2.25,
@@ -312,7 +310,7 @@ export function PreferencesPage() {
               </div>
             ) : (
               <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                מסלול ניהול הוצאות: <strong>רגיל</strong> — הוצאות בפועל מתועדות מראיות (סריקות).
+                מסלול ניהול הוצאות: <strong>רגיל</strong> — הוצאות בפועל מתועדות מראיות (מסמכים).
               </p>
             )}
           </div>
@@ -393,15 +391,14 @@ export function PreferencesPage() {
           </div>
         </Card>
 
-        {/* Tax Settings & Billing Days */}
+        {/* Tax Settings */}
         <Card className="p-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
             <Building size={20} className="text-blue-500" />
-            הגדרות מיסים ומועדי חיוב
+            הגדרות מיסים
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label='שיעור מע"מ (%)' name="vat_rate" type="number" min="0" max="100" step="0.1" defaultValue={settings?.vat_rate ?? 18} />
-            <Input label="יום חיוב מע״מ" name="vat_billing_day" type="number" min="1" max="31" defaultValue={settings?.vat_billing_day ?? 15} />
             <Select
               label="תדירות דיווח מע״מ"
               name="vat_frequency"

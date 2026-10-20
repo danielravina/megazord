@@ -27,7 +27,7 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   "לקוחות": Users,
   "פרויקטים": FolderKanban,
   "מסמכים": Receipt,
-  "סריקות": FileText,
+  "דו״חות": FileText,
   "משימות": ClipboardList,
   "אירועים": CalendarDays,
   "ספקים": Building,

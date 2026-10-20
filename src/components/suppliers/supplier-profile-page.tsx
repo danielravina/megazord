@@ -260,7 +260,7 @@ export function SupplierProfilePage() {
 
       {/* Document history */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 className="text-lg font-bold text-slate-800">מסמכים וסריקות של הספק</h2>
+        <h2 className="text-lg font-bold text-slate-800">מסמכים של הספק</h2>
         <Button onClick={() => router.push(`/scans/?supplier=${supplier.id}`)}><Plus size={14} /> הוסף מסמך</Button>
       </div>
 

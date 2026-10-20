@@ -64,8 +64,8 @@ src/components/
 ├── calendar/        CalendarPage
 ├── calculator/      CalculatorPage, vat-calc, tax-calc, pricing-calc, calculator-utils
 ├── projects/        ProjectsPage, ProjectDetailPage, project-types
-├── finance/         FinancePage, tax-engine, finance-types
-├── documents/       DocumentsPage, monthly-export
+├── finance/         FinancePage, tax-engine, ledger, finance-types
+├── documents/       DocumentsPage
 ├── suppliers/       SuppliersPage, SupplierProfilePage, SupplierFormModal, supplier-types, supplier-expenses
 ├── scans/           ScansPage, DocumentScanner, monthly-export, monthly-report-utils
 ├── customers/       CustomersPage, CustomerDetailPage

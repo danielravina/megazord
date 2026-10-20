@@ -1,7 +1,7 @@
 import type { Income, Expense } from "./finance-types";
 import type { Invoice, VatStatus } from "@/components/documents/invoice-types";
 import { DOC_TYPE_META } from "@/components/documents/invoice-types";
-import { booksIncome, incomeSign } from "@/components/documents/invoice-utils";
+import { booksIncome, computeLineTotals, incomeSign } from "@/components/documents/invoice-utils";
 
 export interface ScanEvidence {
   id: string;
@@ -40,8 +40,12 @@ export function buildLedger(
   for (const inv of invoices) {
     const type = (inv.document_type || "tax_invoice") as Invoice["document_type"];
     if (!booksIncome(type, vatStatus)) continue;
-    const sign = incomeSign(type);
     const date = inv.issue_date || new Date(inv.created_at).toISOString().split("T")[0];
+    // VAT exactly as shown on the document — per-line rates (exempt lines at 0),
+    // not re-derived from the gross total. Credit invoices are negative.
+    const sign = incomeSign(type);
+    const vat =
+      (computeLineTotals(inv.items || [], Number(inv.vat_rate) || 0).vat || 0) * sign;
     incomes.push({
       id: inv.id,
       user_id: inv.user_id,
@@ -51,6 +55,7 @@ export function buildLedger(
       type: "שוטף",
       project_id: inv.project_id || null,
       vat_rate: inv.vat_rate,
+      vat_amount: Math.round(vat * 100) / 100,
       created_at: inv.created_at,
     });
   }

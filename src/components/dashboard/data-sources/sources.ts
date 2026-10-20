@@ -317,13 +317,10 @@ function taxUpcomingView(raw: DashboardRawData, view: WidgetType): WidgetData {
   const estBL = Math.round(grossWithoutVat * (blRate / 100));
   const vatFreq = s?.vat_frequency || "bimonthly";
 
-  function getNextBillingDay(day: number): string {
+  function getNextDueDate(): string {
     const today = new Date();
-    const target = new Date(today.getFullYear(), today.getMonth(), 1);
-    const maxDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-    const safeDay = Math.min(day, maxDay);
-    const date = new Date(target.getFullYear(), target.getMonth(), safeDay);
-    if (today.getDate() >= safeDay) date.setMonth(date.getMonth() + 1);
+    const date = new Date(today.getFullYear(), today.getMonth(), 15);
+    if (today.getDate() >= 15) date.setMonth(date.getMonth() + 1);
     return date.toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "2-digit" });
   }
 
@@ -332,21 +329,21 @@ function taxUpcomingView(raw: DashboardRawData, view: WidgetType): WidgetData {
     entries.push({
       label: vatFreq === "bimonthly" ? 'מע"מ (דו-חודשי)' : 'מע"מ',
       amount: estVat * (vatFreq === "bimonthly" ? 2 : 1),
-      date: getNextBillingDay(s?.vat_billing_day ?? 15),
+      date: getNextDueDate(),
     });
   }
   if (estIncTax > 0) {
     entries.push({
       label: "מקדמות מס הכנסה",
       amount: Math.round(estIncTax * (vatFreq === "bimonthly" ? 2 : 1)),
-      date: getNextBillingDay(15),
+      date: getNextDueDate(),
     });
   }
   if (estBL > 0) {
     entries.push({
       label: "ביטוח לאומי",
       amount: estBL,
-      date: getNextBillingDay(15),
+      date: getNextDueDate(),
     });
   }
 
