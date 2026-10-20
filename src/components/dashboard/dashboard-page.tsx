@@ -15,7 +15,7 @@ import type {
   WidgetType,
   TimeRange,
 } from "@/components/dashboard/dashboard-types";
-import { RefreshCw, Settings, FileText, X, ChevronLeft } from "lucide-react";
+import { RefreshCw, Settings, FileText, X, ChevronLeft, Plus } from "lucide-react";
 
 const WELCOME_DISMISS_KEY = "atzmai-welcome-dismissed";
 
@@ -23,7 +23,7 @@ const START_STEPS = [
   {
     label: "סרקו קבלה ראשונה",
     hint: "ה-AI קולט סכומים ותאריכים אוטומטית",
-    href: "/scans/",
+    href: "/documents/",
   },
   {
     label: "הוסיפו לקוח",
@@ -131,6 +131,15 @@ export function DashboardPage() {
             דוח חודשי
           </Button>
           <Button
+            variant="secondary"
+            size="sm"
+            className="max-md:hidden"
+            onClick={() => setShowPicker(true)}
+          >
+            <Plus size={14} />
+            הוסף
+          </Button>
+          <Button
             variant={customizing ? "primary" : "secondary"}
             size="sm"
             className="max-md:hidden"
@@ -191,7 +200,6 @@ export function DashboardPage() {
         onChangeType={handleChangeType}
         onChangeSource={handleChangeSource}
         onChangeTimeRange={handleChangeTimeRange}
-        onShowPicker={() => setShowPicker(true)}
       />
 
       <AddTilePicker

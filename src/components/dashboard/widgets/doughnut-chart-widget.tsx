@@ -19,25 +19,17 @@ interface Props {
 export function DoughnutChartWidget({ data, tile }: Props) {
   const d = data as DoughnutData | null;
 
-  if (!d || !Array.isArray(d.labels) || !Array.isArray(d.segments) || d.segments.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[120px] text-slate-400 text-sm">
-        {tile.title && <div className="text-xs font-bold text-slate-500 mb-1">{tile.title}</div>}
-        <div className="text-center leading-snug">
-          אין נתונים בטווח הזה
-          <br />
-          <span className="text-xs">הוסיפו הכנסה ראשונה — סריקה אחת פותחת הכל</span>
-        </div>
-      </div>
-    );
-  }
+  const labels = d && Array.isArray(d.labels) ? d.labels : [];
+  const segments = d && Array.isArray(d.segments) ? d.segments : [];
+
+  const isEmpty = segments.length === 0;
 
   const chartData = {
-    labels: d.labels,
+    labels: isEmpty ? [] : labels,
     datasets: [
       {
-        data: d.segments.map((s) => s.value),
-        backgroundColor: d.segments.map((s) => s.color),
+        data: isEmpty ? [1] : segments.map((s) => s.value),
+        backgroundColor: isEmpty ? ["#e2e8f0"] : segments.map((s) => s.color),
         borderWidth: 0,
       },
     ],
@@ -62,8 +54,16 @@ export function DoughnutChartWidget({ data, tile }: Props) {
   return (
     <div className="flex flex-col h-full">
       {tile.title && <div className="text-xs font-bold text-slate-500 mb-1">{tile.title}</div>}
-      <div className="flex-1 min-h-0" style={{ minHeight: 150 }}>
+      <div className="relative flex-1 min-h-0" style={{ minHeight: 150 }}>
         <Doughnut data={chartData} options={options} />
+        {isEmpty && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <div className="text-center leading-snug">
+              <div className="text-sm text-slate-400">אין נתונים בטווח הזה</div>
+              <div className="text-xs text-slate-400 mt-1">הוסיפו הכנסה ראשונה — סריקה אחת פותחת הכל</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -384,7 +384,7 @@ export function DashboardTileComponent({
         {loading && !isStatic ? (
           <TileSkeleton type={tile.type} />
         ) : (
-          <WidgetComponent data={data} tile={tile} />
+          <WidgetComponent data={data} tile={tile} customizing={customizing} />
         )}
       </div>
 

@@ -14,7 +14,13 @@ import { WeatherWidget } from "./weather-widget";
 import { CalendarWidget } from "./calendar-widget";
 import { WaterfallWidget } from "./waterfall-widget";
 
-export const widgetRegistry: Record<WidgetType, React.ComponentType<{ data: unknown; tile: { id: string; type: string; span: number; title?: string } }>> = {
+export interface WidgetComponentProps {
+  data: unknown;
+  tile: { id: string; type: string; span: number; title?: string };
+  customizing?: boolean;
+}
+
+export const widgetRegistry: Record<WidgetType, React.ComponentType<WidgetComponentProps>> = {
   hero: HeroWidget,
   table: TableWidget,
   bar: BarChartWidget,

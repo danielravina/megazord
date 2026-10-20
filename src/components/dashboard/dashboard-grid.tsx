@@ -15,7 +15,6 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus } from "lucide-react";
 import type {
   DashboardTile as DashboardTileType,
   WidgetType,
@@ -38,7 +37,6 @@ interface GridProps {
   onChangeType: (id: string, type: WidgetType) => void;
   onChangeSource: (id: string, source: string) => void;
   onChangeTimeRange: (id: string, range: TimeRange) => void;
-  onShowPicker: () => void;
 }
 
 function tileWrapperStyle(tile: DashboardTileType, draftWidth?: number): React.CSSProperties {
@@ -90,7 +88,6 @@ export function DashboardGrid({
   onChangeType,
   onChangeSource,
   onChangeTimeRange,
-  onShowPicker,
 }: GridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -169,25 +166,16 @@ export function DashboardGrid({
               );
             }
 
-            return (
-              <div
-                key={tile.id}
-                className={TILE_CLASS}
-                style={tileWrapperStyle(tile, draftWidths[tile.id])}
-              >
-                {content}
-              </div>
-            );
-          })}
-
-          {customizing && (
-            <button
-              onClick={onShowPicker}
-              className="flex-1 min-w-72 min-h-[100px] rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
-            >
-              <Plus size={24} className="text-slate-400" />
-            </button>
-          )}
+              return (
+                <div
+                  key={tile.id}
+                  className={TILE_CLASS}
+                  style={tileWrapperStyle(tile, draftWidths[tile.id])}
+                >
+                  {content}
+                </div>
+              );
+            })}
         </div>
       </SortableContext>
     </DndContext>

@@ -11,7 +11,7 @@ import { migrateSourceKey } from "@/components/dashboard/data-sources/sources";
 export function useDashboardLayout() {
   const { supabase, user } = useAuth();
   const [layout, setLayout] = useState<DashboardTile[]>(getDefaultLayout());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const loaded = useRef(false);
   const touched = useRef(false);
 
@@ -31,20 +31,22 @@ export function useDashboardLayout() {
 
         // If the user already made an edit before this fetch resolved, don't
         // clobber their in-memory layout with the (stale) persisted state.
-        if (touched.current) return;
-
-        if (data?.layout && Array.isArray(data.layout) && data.layout.length > 0) {
-          const migrated = (data.layout as DashboardTile[]).map((t) => ({
-            ...t,
-            width:
-              t.width ??
-              (t.span && t.span > 1 ? t.span / 4 : undefined),
-            dataSource: t.dataSource ? migrateSourceKey(t.dataSource) : t.dataSource,
-          }));
-          setLayout(migrated);
+        if (!touched.current) {
+          if (data?.layout && Array.isArray(data.layout) && data.layout.length > 0) {
+            const migrated = (data.layout as DashboardTile[]).map((t) => ({
+              ...t,
+              width:
+                t.width ??
+                (t.span && t.span > 1 ? t.span / 4 : undefined),
+              dataSource: t.dataSource ? migrateSourceKey(t.dataSource) : t.dataSource,
+            }));
+            setLayout(migrated);
+          }
         }
       } catch {
         /* keep defaults */
+      } finally {
+        setLoading(false);
       }
     }
 
