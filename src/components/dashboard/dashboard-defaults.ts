@@ -1,10 +1,22 @@
 import { generateId } from "@/components/shared/generate-id";
 import type { DashboardTile } from "@/components/dashboard/dashboard-types";
 
-// פריסת פתיחה: KPI אחד + וידג׳טים אינטראקטיביים תמיד חיים (מחשבון/מזג אוויר/שעון),
-// גרף אחד וטבלה. מטרתה להיראות "עשירה" גם כשאין עדיין נתונים עסקיים.
+// פריסת פתיחה: מזג אוויר ושעון בראש (חיים תמיד), אחריהם KPI אחד, וידג׳ט אינטראקטיבי,
+// גרף וטבלה. מטרתה להיראות "עשירה" גם כשאין עדיין נתונים עסקיים.
 export function getDefaultLayout(): DashboardTile[] {
   return [
+    {
+      id: generateId(),
+      type: "weather",
+      dataSource: "weather",
+      span: 1,
+    },
+    {
+      id: generateId(),
+      type: "clock",
+      dataSource: "clock",
+      span: 1,
+    },
     {
       id: generateId(),
       type: "hero",
@@ -28,20 +40,8 @@ export function getDefaultLayout(): DashboardTile[] {
     },
     {
       id: generateId(),
-      type: "weather",
-      dataSource: "weather",
-      span: 1,
-    },
-    {
-      id: generateId(),
       type: "calculator",
       dataSource: "calculator",
-      span: 1,
-    },
-    {
-      id: generateId(),
-      type: "clock",
-      dataSource: "clock",
       span: 1,
     },
     {
