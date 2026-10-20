@@ -16,12 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/components/shared/format-date";
 import { formatCurrency } from "@/components/shared/format-currency";
 import { DocumentScanner } from "@/components/scans/document-scanner";
+import { PREMADE_FOLDERS, userFolderColor, folderDisplayName } from "@/components/scans/folders";
+import type { UserFolder } from "@/components/scans/folders";
 import type { Project, ProjectRow } from "@/components/projects/project-types";
 import { normalizeProject } from "@/components/projects/project-types";
 import {
-  FileText, Search, Folder, Trash2, X, Check,
-  Building, Shield, User, Truck, Users,
-  FileSpreadsheet,
+  FileText, Search, Folder, Trash2, X, Check, Plus,
 } from "lucide-react";
 
 interface Document {
@@ -41,17 +41,6 @@ interface Document {
   business_id: string | null;
   date: string;
 }
-
-const FOLDERS = [
-  { id: "Bank", name: "בנק", icon: Building, color: "bg-blue-100 text-blue-600" },
-  { id: "VAT", name: 'מע"מ', icon: FileSpreadsheet, color: "bg-emerald-100 text-emerald-600" },
-  { id: "Income Tax", name: "מס הכנסה", icon: FileText, color: "bg-orange-100 text-orange-600" },
-  { id: "National Insurance", name: "ביטוח לאומי", icon: Shield, color: "bg-purple-100 text-purple-600" },
-  { id: "Accountant", name: "רואה חשבון", icon: User, color: "bg-slate-100 text-slate-600" },
-  { id: "Suppliers", name: "ספקים", icon: Truck, color: "bg-amber-100 text-amber-600" },
-  { id: "Employees", name: "עובדים", icon: Users, color: "bg-pink-100 text-pink-600" },
-  { id: "Other", name: "אחר", icon: Folder, color: "bg-gray-100 text-gray-600" },
-] as const;
 
 const DOC_TYPES = [
   { value: "tax_invoice", label: "חשבונית מס" },
@@ -84,6 +73,7 @@ export function ScansPage() {
   const documentParam = searchParams.get("document");
   const supplierParam = searchParams.get("supplier");
   const [docs, setDocs] = useState<Document[]>([]);
+  const [userFolders, setUserFolders] = useState<UserFolder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [businesses, setBusinesses] = useState<{ id: string; name: string; vat_number: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,8 +82,10 @@ export function ScansPage() {
   const [showExtracted, setShowExtracted] = useState(false);
   const [viewEdit, setViewEdit] = useState({ title: "", docType: "other", dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false, tags: "", projectId: "", businessId: "", direction: "expense" });
   const [search, setSearch] = useState("");
-  const [currentView, setCurrentView] = useState<"list" | "folders">("list");
-  const [folderFilter, setFolderFilter] = useState<string | null>(null);
+  // תיקייה פעילה (id של תיקייה מובנית או שם של תיקיית משתמש). null = ראשי
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  const [addFolderOpen, setAddFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
 
   const [displayUrls, setDisplayUrls] = useState<Record<string, string>>({});
 
@@ -123,7 +115,7 @@ export function ScansPage() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([loadDocs(), loadProjects(), loadBusinesses()]).finally(() => setLoading(false));
+    Promise.all([loadDocs(), loadFolders(), loadProjects(), loadBusinesses()]).finally(() => setLoading(false));
   }, [user]);
 
   // Open the detail view directly when navigating with ?document=<id> (e.g. from global search)
@@ -152,6 +144,11 @@ export function ScansPage() {
   async function loadDocs() {
     const { data } = await supabase.from("documents").select("*").eq("user_id", user!.id).order("date_on_doc", { ascending: false, nullsFirst: false }).order("date", { ascending: false });
     setDocs(data || []);
+  }
+
+  async function loadFolders() {
+    const { data } = await supabase.from("folders").select("id, name").eq("user_id", user!.id).order("created_at");
+    setUserFolders(data || []);
   }
 
   async function loadProjects() {
@@ -229,9 +226,45 @@ export function ScansPage() {
     }
   }
 
+  async function addFolder() {
+    const name = newFolderName.trim();
+    if (!user || !name) return;
+    const premadeNames = PREMADE_FOLDERS.map((f) => f.name);
+    if (premadeNames.includes(name) || userFolders.some((f) => f.name === name)) {
+      toast("קיימת כבר תיקייה בשם זה", "error");
+      return;
+    }
+    const { data, error } = await supabase.from("folders").insert({ user_id: user.id, name }).select("id, name").single();
+    if (error || !data) {
+      toast("שגיאה ביצירת התיקייה", "error");
+      return;
+    }
+    setUserFolders((prev) => [...prev, data]);
+    setAddFolderOpen(false);
+    setNewFolderName("");
+    toast("התיקייה נוצרה", "success");
+  }
+
+  async function deleteFolder(folder: UserFolder) {
+    if (!confirm(`האם למחוק את התיקייה "${folder.name}"? המסמכים שבה יישארו ללא תיקייה.`)) return;
+    // המסמכים שבתיקייה — מחזירים לראשי
+    await supabase.from("documents").update({ folder: null }).eq("user_id", user!.id).eq("folder", folder.name);
+    await supabase.from("folders").delete().eq("id", folder.id);
+    setUserFolders((prev) => prev.filter((f) => f.id !== folder.id));
+    setDocs((prev) => prev.map((d) => (d.folder === folder.name ? { ...d, folder: null } : d)));
+    if (activeFolder === folder.name) setActiveFolder(null);
+    toast("התיקייה נמחקה", "success");
+  }
+
+  const folderOptions = [
+    { value: "", label: "ללא" },
+    ...PREMADE_FOLDERS.map((f) => ({ value: f.id, label: f.name })),
+    ...userFolders.map((f) => ({ value: f.name, label: f.name })),
+  ];
+
   const filteredDocs = docs.filter((d) => {
     if (supplierParam && d.business_id !== supplierParam) return false;
-    if (folderFilter && d.folder !== folderFilter) return false;
+    if (activeFolder && d.folder !== activeFolder) return false;
     const q = search.toLowerCase();
     if (!q) return true;
     return d.title.toLowerCase().includes(q) ||
@@ -240,6 +273,10 @@ export function ScansPage() {
   });
 
   const viewing = docs.find((d) => d.id === viewId);
+  const activeFolderName = activeFolder ? folderDisplayName(activeFolder) : null;
+  const supplierBusiness = supplierParam ? businesses.find((b) => b.id === supplierParam) : null;
+  // כשהחיפוש פעיל בראשי — מסתירים את התיקיות ומציגים תוצאות בלבד
+  const showFolders = !activeFolder && !search && !supplierParam;
 
   if (loading && docs.length === 0) {
     return (
@@ -249,17 +286,14 @@ export function ScansPage() {
           <Skeleton className="w-32 h-9" />
         </div>
         <Skeleton className="w-full h-11 rounded-xl mb-4" />
+        <Skeleton className="w-full h-32 rounded-2xl mb-4" />
         <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="bg-white p-3 rounded-2xl shadow-sm border flex gap-4">
               <Skeleton className="w-20 h-24 rounded-xl shrink-0" />
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
                 <SkeletonText className="w-2/3" />
                 <SkeletonText className="w-1/3" />
-                <div className="flex gap-1.5 mt-1">
-                  <Skeleton className="h-4 w-16 rounded-md" />
-                  <Skeleton className="h-4 w-12 rounded-md" />
-                </div>
               </div>
             </div>
           ))}
@@ -268,106 +302,189 @@ export function ScansPage() {
     );
   }
 
+  const docCount = (folderId: string) => docs.filter((d) => d.folder === folderId).length;
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <FileText size={24} className="text-blue-500" />
-          הסריקות שלי
+          {activeFolderName ? (
+            <span className="flex items-center gap-2">
+              <Folder size={24} className="text-blue-500" />
+              {activeFolderName}
+            </span>
+          ) : (
+            "הסריקות שלי"
+          )}
         </h1>
         <div className="flex flex-wrap items-center gap-2">
-          <DocumentScanner onScanned={loadDocs} primary />
-          <div className="flex bg-slate-100 p-1 rounded-lg">
-            <button onClick={() => { setCurrentView("list"); setFolderFilter(null); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "list" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>רשימה</button>
-            <button onClick={() => setCurrentView("folders")} className={`px-3 py-1.5 text-xs font-bold rounded-md ${currentView === "folders" ? "bg-white shadow-sm text-blue-600" : "text-slate-500"}`}>תיקיות</button>
-          </div>
+          <DocumentScanner onScanned={() => { loadDocs(); if (activeFolder === null) loadFolders(); }} primary />
         </div>
       </div>
+
+      {/* ניווט: עמוד ראשי / תיקייה/ספק */}
+      {activeFolder && (
+        <div className="flex items-center gap-2 mb-4 text-sm">
+          <button
+            onClick={() => setActiveFolder(null)}
+            className="flex items-center gap-1 text-blue-600 font-medium hover:underline"
+          >
+            <Folder size={14} /> כל התיקיות
+          </button>
+          <span className="text-slate-300">/</span>
+          <span className="font-bold text-slate-700">{activeFolderName}</span>
+        </div>
+      )}
+      {supplierParam && (
+        <button onClick={() => router.push("/scans/")} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
+          <X size={12} /> מסמכי {supplierBusiness?.name || "הספק"} — חזרה לכל הסריקות
+        </button>
+      )}
 
       <div className="relative mb-4">
         <Search size={16} className="absolute right-3 top-3 text-slate-400" />
         <input
           type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="חיפוש מסמכים או תגיות..." dir="rtl"
+          placeholder={activeFolder ? `חיפוש בתיקייה ${activeFolderName}...` : "חיפוש מסמכים או תגיות..."} dir="rtl"
           className="w-full bg-slate-100 rounded-xl py-2.5 pr-10 pl-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
         />
       </div>
 
-      {currentView === "folders" ? (
-        <div className="grid grid-cols-2 gap-3">
-          {FOLDERS.map((f) => {
-            const count = docs.filter((d) => d.folder === f.id).length;
-            const Icon = f.icon;
-            return (
+      {/* תיקיות — מוצגות בעמוד הראשי (מוסתרות במסך תיקייה, בחיפוש ובסינון ספק) */}
+      {showFolders && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-bold text-slate-500 uppercase">תיקיות</h3>
+            <button
+              onClick={() => { setNewFolderName(""); setAddFolderOpen(true); }}
+              className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+            >
+              <Plus size={12} /> תיקייה חדשה
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {userFolders.map((f) => (
               <Card
                 key={f.id}
                 hover
-                className="p-4 flex flex-col items-center justify-center text-center"
-                onClick={() => { setFolderFilter(f.id); setCurrentView("list"); }}
+                className="p-4 flex flex-col items-center justify-center text-center relative group"
+                onClick={() => { setActiveFolder(f.name); setSearch(""); }}
               >
-                <div className={`${f.color} w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-xl`}>
-                  <Icon size={20} />
+                <div className={`${userFolderColor(f.name)} w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-xl`}>
+                  <Folder size={20} />
                 </div>
                 <h4 className="font-bold text-sm mb-1">{f.name}</h4>
-                <span className="text-xs text-slate-400">{count} מסמכים</span>
+                <span className="text-xs text-slate-400">{docCount(f.name)} מסמכים</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteFolder(f); }}
+                  title="מחיקת תיקייה"
+                  className="absolute top-2 left-2 p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 size={14} />
+                </button>
               </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <>
-          {supplierParam && (
-            <button onClick={() => router.push("/scans/")} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
-              <X size={12} /> מסמכי {businesses.find((b) => b.id === supplierParam)?.name || "הספק"} — חזרה לכל הסריקות
-            </button>
-          )}
-          {folderFilter && (
-            <button onClick={() => setFolderFilter(null)} className="text-blue-600 text-xs font-medium mb-3 flex items-center gap-1">
-              <X size={12} /> חזרה לכל הסריקות
-            </button>
-          )}
-
-          {filteredDocs.length === 0 ? (
-            <Card className="p-12">
-              <EmptyState
-                icon={<FileText size={40} className="text-blue-300" />}
-                title="אין מסמכים עדיין"
-                description="סרוק מסמך כדי להוסיף מסמך חדש"
-              />
-            </Card>
-          ) : (
-            <div className="space-y-3 mb-24">
-              {filteredDocs.map((doc) => (
-                <div key={doc.id} onClick={() => setViewId(doc.id)} className="bg-white p-3 rounded-2xl shadow-sm border flex gap-4 cursor-pointer hover:shadow-md transition-shadow">
-                  <div className="w-20 h-24 bg-slate-100 rounded-xl overflow-hidden shrink-0 border">
-                    {doc.image_url && (/\.pdf$/i.test(doc.image_url) ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-400">
-                        <FileText size={22} />
-                        <span className="text-[9px]">PDF</span>
-                      </div>
-                    ) : (
-                      <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover" />
-                    ))}
+            ))}
+            {PREMADE_FOLDERS.map((f) => {
+              const Icon = f.icon;
+              return (
+                <Card
+                  key={f.id}
+                  hover
+                  className="p-4 flex flex-col items-center justify-center text-center"
+                  onClick={() => { setActiveFolder(f.id); setSearch(""); }}
+                >
+                  <div className={`${f.color} w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-xl`}>
+                    <Icon size={20} />
                   </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <h3 className="font-semibold truncate mb-1">{doc.title}</h3>
-                    <p className="text-xs text-slate-400 mb-2">
-                      {formatDate(doc.date_on_doc || doc.date.split("T")[0])}
-                      {DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {doc.tags.slice(0, 2).map((tag) => (
-                        <span key={tag} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium border border-blue-100">{tag}</span>
-                      ))}
-                      {doc.tags.length > 2 && <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md border">+{doc.tags.length - 2}</span>}
+                  <h4 className="font-bold text-sm mb-1">{f.name}</h4>
+                  <span className="text-xs text-slate-400">{docCount(f.id)} מסמכים</span>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* מסמכים */}
+      {filteredDocs.length === 0 ? (
+        !docs.length && !activeFolder && !supplierParam ? (
+          <Card className="p-12">
+            <EmptyState
+              icon={<FileText size={40} className="text-blue-300" />}
+              title="אין מסמכים עדיין"
+              description="סרוק מסמך כדי להוסיף מסמך חדש"
+            />
+          </Card>
+        ) : activeFolder && !search ? (
+          <Card className="p-10">
+            <EmptyState
+              icon={<Folder size={36} className="text-blue-300" />}
+              title="התיקייה ריקה"
+              description="הוסף מסמך לתיקייה דרך מסך עריכת המסמך"
+            />
+          </Card>
+        ) : null
+      ) : (
+        <div>
+          {showFolders && (
+            <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">מסמכים</h3>
+          )}
+          <div className="space-y-3 mb-24">
+            {filteredDocs.map((doc) => (
+              <div key={doc.id} onClick={() => setViewId(doc.id)} className="bg-white p-3 rounded-2xl shadow-sm border flex gap-4 cursor-pointer hover:shadow-md transition-shadow">
+                <div className="w-20 h-24 bg-slate-100 rounded-xl overflow-hidden shrink-0 border">
+                  {doc.image_url && (/\.pdf$/i.test(doc.image_url) ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-slate-400">
+                      <FileText size={22} />
+                      <span className="text-[9px]">PDF</span>
                     </div>
+                  ) : (
+                    <img src={displayUrls[doc.image_url] || doc.image_url} alt="" className="w-full h-full object-cover" />
+                  ))}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <h3 className="font-semibold truncate mb-1">{doc.title}</h3>
+                  <p className="text-xs text-slate-400 mb-2">
+                    {formatDate(doc.date_on_doc || doc.date.split("T")[0])}
+                    {activeFolder ? "" : doc.folder ? ` · ${folderDisplayName(doc.folder)}` : ""}
+                    {` · ${DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type}`}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {doc.tags.slice(0, 2).map((tag) => (
+                      <span key={tag} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium border border-blue-100">{tag}</span>
+                    ))}
+                    {doc.tags.length > 2 && <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md border">+{doc.tags.length - 2}</span>}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
+
+      {/* Add Folder Modal */}
+      <Modal
+        open={addFolderOpen}
+        onClose={() => setAddFolderOpen(false)}
+        title="תיקייה חדשה"
+        size="sm"
+        footer={
+          <div className="flex gap-2 justify-between w-full">
+            <Button variant="ghost" onClick={() => setAddFolderOpen(false)}>ביטול</Button>
+            <Button onClick={addFolder} disabled={!newFolderName.trim()}>צור</Button>
+          </div>
+        }
+      >
+        <Input
+          label="שם התיקייה"
+          value={newFolderName}
+          onChange={(e) => setNewFolderName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addFolder()}
+          placeholder="למשל: חוזים"
+          autoFocus
+        />
+      </Modal>
 
       {/* Detail Modal */}
       <Modal
@@ -410,7 +527,7 @@ export function ScansPage() {
                     ...businesses.map((b) => ({ value: b.id, label: b.name })),
                     { value: "new", label: "+ הוסף ספק" },
                   ]} value={viewEdit.businessId} onChange={(e) => setViewEdit({ ...viewEdit, businessId: e.target.value })} />
-                  <Select label="תיקייה" options={[{ value: "", label: "ללא" }, ...FOLDERS.map((f) => ({ value: f.id, label: f.name }))]} value={viewEdit.folder} onChange={(e) => setViewEdit({ ...viewEdit, folder: e.target.value })} />
+                  <Select label="תיקייה" options={folderOptions} value={viewEdit.folder} onChange={(e) => setViewEdit({ ...viewEdit, folder: e.target.value })} />
                   <Select label="שיוך לפרויקט" options={[{ value: "", label: "ללא" }, ...projects.map((p) => ({ value: p.id, label: p.customer_name || "ללא שם" }))]} value={viewEdit.projectId} onChange={(e) => setViewEdit({ ...viewEdit, projectId: e.target.value })} />
                   <Select label="הוצאה / הכנסה" options={[
                     { value: "expense", label: "הוצאה" },
@@ -426,7 +543,7 @@ export function ScansPage() {
                     <div><span className="text-[10px] font-bold text-slate-500 uppercase">סוג</span><p className="text-sm font-medium">{DOC_TYPE_LABEL[viewing.doc_type] || viewing.doc_type}</p></div>
                     <div><span className="text-[10px] font-bold text-slate-500 uppercase">סכום</span><p className="text-sm font-medium">{viewing.total_amount ? formatCurrency(viewing.total_amount) : "-"}</p></div>
                     <div><span className="text-[10px] font-bold text-slate-500 uppercase">תאריך במסמך</span><p className="text-sm font-medium">{viewing.date_on_doc ? viewing.date_on_doc.split("-").reverse().join("/") : "-"}</p></div>
-                    <div><span className="text-[10px] font-bold text-slate-500 uppercase">תיקייה</span><p className="text-sm font-medium">{FOLDERS.find((f) => f.id === viewing.folder)?.name || "ללא"}</p></div>
+                    <div><span className="text-[10px] font-bold text-slate-500 uppercase">תיקייה</span><p className="text-sm font-medium">{folderDisplayName(viewing.folder)}</p></div>
                     <div><span className="text-[10px] font-bold text-slate-500 uppercase">ספק</span><p className="text-sm font-medium">{businesses.find((b) => b.id === viewing.business_id)?.name || "ללא"}</p></div>
                     <div><span className="text-[10px] font-bold text-slate-500 uppercase">פרויקט</span><p className="text-sm font-medium">{projects.find((p) => p.id === viewing.project_id)?.customer_name || "ללא"}</p></div>
                     <div><span className="text-[10px] font-bold text-slate-500 uppercase">סוג תנועה</span><p className="text-sm font-medium">{viewing.direction === "income" ? "הכנסה" : viewing.direction === "other" ? "אחר" : "הוצאה"}</p></div>

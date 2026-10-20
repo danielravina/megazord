@@ -17,7 +17,7 @@ const saving = (id: string, amount: number, date: string): Saving => ({
 
 const settings: TaxSettings = {
   user_id: "u", vat_rate: 18, vat_frequency: "bimonthly", vat_billing_day: 15,
-  income_tax_advance: 15, income_tax_billing_day: 15, bituah_leumi: 5, bituah_leumi_billing_day: 15,
+  income_tax_advance: 15, bituah_leumi: 5,
   credit_points: 2.25, vat_status: "morashi", income_scheme: "standard", zeair_expense_rate: 0,
   business_name: null, vat_number: null, business_address: null,
   business_phone: null, business_email: null, accountant_email: null, owner_name: null,

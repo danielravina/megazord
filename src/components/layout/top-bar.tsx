@@ -84,7 +84,7 @@ export function TopBar({ onToggleMenu, mobileOpen }: { onToggleMenu: () => void;
                   router.push("/preferences/");
                 }}
               >
-                העדפות
+                הגדרות
               </MenuItem>
               <div className="my-1 border-t border-slate-100" />
               <MenuItem icon={<LogOut size={14} />} onClick={() => handleSignOut()}>

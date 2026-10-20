@@ -18,7 +18,7 @@ const navItems = [
   { href: "/finance/", label: "ניהול כספים", icon: Wallet },
   { href: "/calendar/", label: "יומן", icon: Calendar },
   { href: "/todos/", label: "פתקים", icon: ClipboardList },
-  { href: "/preferences/", label: "העדפות", icon: Settings },
+  { href: "/preferences/", label: "הגדרות", icon: Settings },
 ];
 
 export function Sidebar({

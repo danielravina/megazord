@@ -31,7 +31,7 @@ interface FormValues {
 }
 
 const STEP_TITLES = ['פרטי העסק', 'סוג עוסק', 'הגדרות מיסים'] as const;
-// המשתנה נשמר להשוואה מול ברירות המחדל במסך העדפות המלא
+// המשתנה נשמר להשוואה מול ברירות המחדל במסך ההגדרות המלא
 const STEP_ICONS = [User, Building, Wallet] as const;
 
 const DEFAULTS: FormValues = {
@@ -127,7 +127,7 @@ export function OnboardingWizard() {
       toast("שגיאה בשמירה", "error");
       return;
     }
-    toast("ניתן להזין את ההעדפות בכל רגע דרך דף ההעדפות", "success");
+    toast("ניתן להזין את ההגדרות בכל רגע דרך דף ההגדרות", "success");
     router.replace("/dashboard/");
   }
 
@@ -297,7 +297,7 @@ export function OnboardingWizard() {
                 />
               </div>
               <p className="text-xs text-slate-400">
-                הפרטים נאספים אוטומטית מההגדרות — ניתן לשנות בכל רגע בדף ההעדפות.
+                הפרטים נאספים אוטומטית מההגדרות — ניתן לשנות בכל רגע בדף ההגדרות.
               </p>
             </div>
           )}
@@ -340,7 +340,7 @@ export function OnboardingWizard() {
         </Card>
 
         <p className="text-xs text-slate-400 text-center mt-4">
-          אפשר לדלג על כל שלב ולהשלים מאוחר יותר דרך דף ההעדפות.
+          אפשר לדלג על כל שלב ולהשלים מאוחר יותר דרך דף ההגדרות.
         </p>
       </div>
     </div>

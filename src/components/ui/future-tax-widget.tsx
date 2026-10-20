@@ -55,7 +55,7 @@ export function FutureTaxWidget({ settings, estimatedIncome }: Props) {
     payments.push({
       label: "מקדמות מס הכנסה",
       amount: Math.round(estimatedIncTax * (vatFreq === "bimonthly" ? 2 : 1)),
-      due: getNextBillingDay(settings?.income_tax_billing_day ?? 15),
+      due: getNextBillingDay(15),
       color: "text-orange-600 bg-orange-50",
     });
   }
@@ -64,7 +64,7 @@ export function FutureTaxWidget({ settings, estimatedIncome }: Props) {
     payments.push({
       label: "ביטוח לאומי",
       amount: Math.round(estimatedBL),
-      due: getNextBillingDay(settings?.bituah_leumi_billing_day ?? 15),
+      due: getNextBillingDay(15),
       color: "text-purple-600 bg-purple-50",
     });
   }

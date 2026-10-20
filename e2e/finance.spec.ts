@@ -39,7 +39,7 @@ test("finance dashboard tax card shows advances and final balance", async ({ pag
   await page.goto("/preferences/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
   await page.locator("input[name='tax_advances_paid']").fill("1500");
-  await page.locator("button:has-text('שמור העדפות')").click();
+  await page.locator("button:has-text('שמור הגדרות')").click();
   await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
 
   await page.goto("/finance/");
@@ -54,7 +54,7 @@ test("finance dashboard tax card shows advances and final balance", async ({ pag
   await page.goto("/preferences/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
   await page.locator("input[name='tax_advances_paid']").fill("0");
-  await page.locator("button:has-text('שמור העדפות')").click();
+  await page.locator("button:has-text('שמור הגדרות')").click();
   await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
 });
 
@@ -82,7 +82,7 @@ test("tax settings live in preferences", async ({ page }) => {
 
   await expect(page.locator("h2:has-text('הגדרות מיסים ומועדי חיוב')")).toBeVisible({ timeout: 5000 });
   await expect(page.locator("label:has-text('שיעור מע')")).toBeVisible();
-  await expect(page.locator("button:has-text('שמור העדפות')")).toBeVisible();
+  await expect(page.locator("button:has-text('שמור הגדרות')")).toBeVisible();
 });
 
 test("can switch to savings tab and see add form", async ({ page }) => {

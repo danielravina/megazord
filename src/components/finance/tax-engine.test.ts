@@ -20,7 +20,7 @@ const saving = (amount: number): Saving => ({
 function settings(overrides: Partial<TaxSettings> = {}): TaxSettings {
   return {
     user_id: "u", vat_rate: 18, vat_frequency: "bimonthly", vat_billing_day: 15,
-    income_tax_advance: 0, income_tax_billing_day: 15, bituah_leumi: 0, bituah_leumi_billing_day: 15,
+    income_tax_advance: 0, bituah_leumi: 0,
     credit_points: 2.25,
     tax_advances_paid: 0,
     tax_advances_year: new Date().getFullYear(),

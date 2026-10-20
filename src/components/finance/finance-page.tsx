@@ -300,8 +300,8 @@ export function FinancePage() {
                   <div className="space-y-3">
                     {[
                       { label: 'מע"מ (מגולם)', due: getNextBillingDay(taxSettings?.vat_billing_day ?? 15), val: taxCalc.vat },
-                      { label: "מס הכנסה (אומדן)", due: getNextBillingDay(taxSettings?.income_tax_billing_day ?? 15), val: taxCalc.incomeTax },
-                      { label: "ביטוח לאומי", due: getNextBillingDay(taxSettings?.bituah_leumi_billing_day ?? 15), val: taxCalc.bituahLeumi },
+                      { label: "מס הכנסה (אומדן)", due: getNextBillingDay(15), val: taxCalc.incomeTax },
+                      { label: "ביטוח לאומי", due: getNextBillingDay(15), val: taxCalc.bituahLeumi },
                       { label: "מקדמות ששולמו", val: taxCalc.taxAdvancesPaid },
                     ].map((row) => (
                       <div key={row.label} className="flex justify-between items-center">

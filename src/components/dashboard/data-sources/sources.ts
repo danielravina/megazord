@@ -339,14 +339,14 @@ function taxUpcomingView(raw: DashboardRawData, view: WidgetType): WidgetData {
     entries.push({
       label: "מקדמות מס הכנסה",
       amount: Math.round(estIncTax * (vatFreq === "bimonthly" ? 2 : 1)),
-      date: getNextBillingDay(s?.income_tax_billing_day ?? 15),
+      date: getNextBillingDay(15),
     });
   }
   if (estBL > 0) {
     entries.push({
       label: "ביטוח לאומי",
       amount: estBL,
-      date: getNextBillingDay(s?.bituah_leumi_billing_day ?? 15),
+      date: getNextBillingDay(15),
     });
   }
 

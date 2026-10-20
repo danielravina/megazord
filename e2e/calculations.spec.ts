@@ -183,7 +183,7 @@ test("tax advances paid field persists in preferences", async ({ page }) => {
 
   // Save a value, reload, verify persistence
   await advancesInput.fill("1500");
-  await page.locator("button:has-text('שמור העדפות')").click();
+  await page.locator("button:has-text('שמור הגדרות')").click();
   await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
 
   await page.reload();
@@ -195,6 +195,6 @@ test("tax advances paid field persists in preferences", async ({ page }) => {
 
   // Cleanup: restore to 0 so we don't pollute later assertions
   await page.locator("input[name='tax_advances_paid']").fill("0");
-  await page.locator("button:has-text('שמור העדפות')").click();
+  await page.locator("button:has-text('שמור הגדרות')").click();
   await expect(page.locator("text=ההגדרות נשמרו")).toBeVisible({ timeout: 10000 });
 });

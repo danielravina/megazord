@@ -27,9 +27,7 @@ export interface TaxSettings {
   vat_frequency: string;
   vat_billing_day: number;
   income_tax_advance: number;
-  income_tax_billing_day: number;
   bituah_leumi: number;
-  bituah_leumi_billing_day: number;
   credit_points: number;
   tax_advances_paid: number;
   tax_advances_year: number;
@@ -46,7 +44,7 @@ export interface TaxSettings {
   // מיתוג מסמכים — נתיבי storage (דלי ציבורי), לא URL מלא
   cover_image_path: string | null;
   logo_path: string | null;
-  // onboarding — מוגדר באשף הצירום או בעת שמירת העדפות (NULL = משתמש ותיק)
+  // onboarding — מוגדר באשף הצירום או בעת שמירת ההגדרות (NULL = משתמש ותיק)
   onboarding_completed?: boolean | null;
 }
 

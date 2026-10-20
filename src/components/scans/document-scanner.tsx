@@ -12,6 +12,8 @@ import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown";
 import { generateId } from "@/components/shared/generate-id";
+import { PREMADE_FOLDERS } from "@/components/scans/folders";
+import type { UserFolder } from "@/components/scans/folders";
 import type { Project, ProjectRow } from "@/components/projects/project-types";
 import { normalizeProject } from "@/components/projects/project-types";
 import { ScanLine, Camera, Upload } from "lucide-react";
@@ -60,17 +62,6 @@ const DOC_TYPES = [
   { value: "other", label: "אחר" },
 ];
 
-const FOLDERS = [
-  { id: "Bank", name: "בנק" },
-  { id: "VAT", name: 'מע"מ' },
-  { id: "Income Tax", name: "מס הכנסה" },
-  { id: "National Insurance", name: "ביטוח לאומי" },
-  { id: "Accountant", name: "רואה חשבון" },
-  { id: "Suppliers", name: "ספקים" },
-  { id: "Employees", name: "עובדים" },
-  { id: "Other", name: "אחר" },
-];
-
 interface Props {
   onScanned?: () => void;
   primary?: boolean;
@@ -112,13 +103,20 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [userFolders, setUserFolders] = useState<UserFolder[]>([]);
   const [tempDoc, setTempDoc] = useState<TempDoc>(EMPTY_TEMP);
 
   useEffect(() => {
     if (!user) return;
     loadProjects();
     loadBusinesses();
+    loadFolders();
   }, [user]);
+
+  async function loadFolders() {
+    const { data } = await supabase.from("folders").select("id, name").eq("user_id", user!.id).order("created_at");
+    setUserFolders(data || []);
+  }
 
   async function loadProjects() {
     const { data } = await supabase.from("projects").select("id, customer_id, customers(name)").eq("user_id", user!.id);
@@ -431,7 +429,8 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
             <Input label="תאריך במסמך" type="date" value={tempDoc.dateOnDoc} onChange={(e) => setTempDoc({ ...tempDoc, dateOnDoc: e.target.value })} />
             <Select label="תיקייה" options={[
               { value: "", label: "ללא תיקייה" },
-              ...FOLDERS.map((f) => ({ value: f.id, label: f.name })),
+              ...PREMADE_FOLDERS.map((f) => ({ value: f.id, label: f.name })),
+              ...userFolders.map((f) => ({ value: f.name, label: f.name })),
             ]} value={tempDoc.folder} onChange={(e) => setTempDoc({ ...tempDoc, folder: e.target.value })} />
             <Select label="הוצאה / הכנסה" options={[
               { value: "expense", label: "הוצאה" },

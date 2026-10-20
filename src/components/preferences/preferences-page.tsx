@@ -15,8 +15,8 @@ const FIELD_NAMES = [
   "owner_name", "business_name", "vat_number", "business_phone", "business_address",
   "accountant_email", "vat_status", "zeair_expense_rate",
   "vat_rate", "vat_frequency", "vat_billing_day",
-  "income_tax_advance", "income_tax_billing_day",
-  "bituah_leumi", "bituah_leumi_billing_day", "credit_points",
+  "income_tax_advance",
+  "bituah_leumi", "credit_points",
   "tax_advances_paid", "tax_advances_year",
 ];
 
@@ -36,9 +36,7 @@ function getInitialValues(settings: TaxSettings | null): Record<string, string> 
     vat_frequency: settings?.vat_frequency || "bimonthly",
     vat_billing_day: String(settings?.vat_billing_day ?? 15),
     income_tax_advance: String(settings?.income_tax_advance ?? 0),
-    income_tax_billing_day: String(settings?.income_tax_billing_day ?? 15),
     bituah_leumi: String(settings?.bituah_leumi ?? 5),
-    bituah_leumi_billing_day: String(settings?.bituah_leumi_billing_day ?? 15),
     credit_points: String(settings?.credit_points ?? 2.25),
     tax_advances_paid: String(settings?.tax_advances_paid ?? 0),
     tax_advances_year: String(settings?.tax_advances_year ?? new Date().getFullYear()),
@@ -194,9 +192,7 @@ export function PreferencesPage() {
       vat_frequency: (fd.get("vat_frequency") as string) || "bimonthly",
       vat_billing_day: parseInt((fd.get("vat_billing_day") as string) || "", 10) || 15,
       income_tax_advance: parseFloat((fd.get("income_tax_advance") as string) || "") || 0,
-      income_tax_billing_day: parseInt((fd.get("income_tax_billing_day") as string) || "", 10) || 15,
       bituah_leumi: parseFloat((fd.get("bituah_leumi") as string) || "") || 5,
-      bituah_leumi_billing_day: parseInt((fd.get("bituah_leumi_billing_day") as string) || "", 10) || 15,
       credit_points: parseFloat((fd.get("credit_points") as string) || "") || 2.25,
       tax_advances_paid: parseFloat((fd.get("tax_advances_paid") as string) || "") || 0,
       tax_advances_year: parseInt((fd.get("tax_advances_year") as string) || "", 10) || new Date().getFullYear(),
@@ -260,14 +256,68 @@ export function PreferencesPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Settings size={24} className="text-blue-500" />
-          <h1 className="text-2xl font-bold text-slate-800">העדפות</h1>
+          <h1 className="text-2xl font-bold text-slate-800">הגדרות</h1>
         </div>
         <Button type="submit" form="prefs-form" loading={saving} disabled={!dirty}>
-          <Save size={14} /> שמור העדפות
+          <Save size={14} /> שמור הגדרות
         </Button>
       </div>
 
       <form ref={formRef} id="prefs-form" onSubmit={handleSave} onChange={checkDirty} className="space-y-8">
+        {/* Business Status (עוסק) */}
+        <Card className="p-6">
+          <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
+            <Building size={20} className="text-blue-500" />
+            סוג עוסק
+          </h2>
+          <div className="space-y-4">
+            <Select
+              label="הרשמה במע״מ"
+              name="vat_status"
+              value={vatStatus}
+              onChange={(e) => {
+                const v = e.target.value as "morashi" | "patoor" | "zeair";
+                setVatStatus(v);
+                checkDirty();
+              }}
+              options={[
+                { value: "morashi", label: "עוסק מורשה (גובה מע״מ)" },
+                { value: "patoor", label: "עוסק פטור (ללא מע״מ)" },
+                { value: "zeair", label: "עוסק זעיר (פטור ממע״מ + הכרה אוטומטית באחוז הוצאות)" },
+              ]}
+            />
+            <p className="text-xs text-slate-400 -mt-2">
+              עוסק זעיר אינו גובה מע״מ וזוכה להכרה אוטומטית באחוז קבוע של הוצאות. תקרה משוערת לשנת 2026: כ-122,833 ש״ח לשנה.
+            </p>
+
+            {vatStatus === "zeair" ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600 bg-slate-50 border rounded-lg p-3">
+                  מסלול ניהול הוצאות: <strong>כרה אוטומטית באחוז הוצאות</strong> (עוסק זעיר)
+                </p>
+                <Input
+                  label='שיעור הוצאות מוכר (%)'
+                  name="zeair_expense_rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={zeairExpenseRate}
+                  onChange={(e) => {
+                    setZeairExpenseRate(e.target.value);
+                    checkDirty();
+                  }}
+                  placeholder="לדוגמה 10"
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                מסלול ניהול הוצאות: <strong>רגיל</strong> — הוצאות בפועל מתועדות מראיות (סריקות).
+              </p>
+            )}
+          </div>
+        </Card>
+
         {/* Business Profile */}
         <Card className="p-6">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b pb-2">
@@ -343,60 +393,6 @@ export function PreferencesPage() {
           </div>
         </Card>
 
-        {/* Business Status (עוסק) */}
-        <Card className="p-6">
-          <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
-            <Building size={20} className="text-blue-500" />
-            סוג עוסק
-          </h2>
-          <div className="space-y-4">
-            <Select
-              label="הרשמה במע״מ"
-              name="vat_status"
-              value={vatStatus}
-              onChange={(e) => {
-                const v = e.target.value as "morashi" | "patoor" | "zeair";
-                setVatStatus(v);
-                checkDirty();
-              }}
-              options={[
-                { value: "morashi", label: "עוסק מורשה (גובה מע״מ)" },
-                { value: "patoor", label: "עוסק פטור (ללא מע״מ)" },
-                { value: "zeair", label: "עוסק זעיר (פטור ממע״מ + הכרה אוטומטית באחוז הוצאות)" },
-              ]}
-            />
-            <p className="text-xs text-slate-400 -mt-2">
-              עוסק זעיר אינו גובה מע״מ וזוכה להכרה אוטומטית באחוז קבוע של הוצאות. תקרה משוערת לשנת 2026: כ-122,833 ש״ח לשנה.
-            </p>
-
-            {vatStatus === "zeair" ? (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600 bg-slate-50 border rounded-lg p-3">
-                  מסלול ניהול הוצאות: <strong>כרה אוטומטית באחוז הוצאות</strong> (עוסק זעיר)
-                </p>
-                <Input
-                  label='שיעור הוצאות מוכר (%)'
-                  name="zeair_expense_rate"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={zeairExpenseRate}
-                  onChange={(e) => {
-                    setZeairExpenseRate(e.target.value);
-                    checkDirty();
-                  }}
-                  placeholder="לדוגמה 10"
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                מסלול ניהול הוצאות: <strong>רגיל</strong> — הוצאות בפועל מתועדות מראיות (סריקות).
-              </p>
-            )}
-          </div>
-        </Card>
-
         {/* Tax Settings & Billing Days */}
         <Card className="p-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
@@ -418,9 +414,7 @@ export function PreferencesPage() {
             <p className="text-xs text-slate-400 -mt-2 sm:col-span-2">
               מקדמות ששולמו לא נספרות משנה קודמת — ניתן לאפס אותן עם המעבר לשנה חדשה.
             </p>
-            <Input label="יום חיוב מס הכנסה" name="income_tax_billing_day" type="number" min="1" max="31" defaultValue={settings?.income_tax_billing_day ?? 15} />
             <Input label="ביטוח לאומי (%)" name="bituah_leumi" type="number" min="0" max="100" step="0.1" defaultValue={settings?.bituah_leumi ?? 5} />
-            <Input label="יום חיוב ביטוח לאומי" name="bituah_leumi_billing_day" type="number" min="1" max="31" defaultValue={settings?.bituah_leumi_billing_day ?? 15} />
             <Input label="נקודות זכות" name="credit_points" type="number" min="0" max="20" step="0.25" defaultValue={settings?.credit_points ?? 2.25} />
           </div>
         </Card>
