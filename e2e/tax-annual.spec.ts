@@ -7,7 +7,7 @@ function parseCurrency(text: string): number {
 }
 
 async function authGuard(page: Page) {
-  await page.goto("/");
+  await page.goto("/dashboard/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 }
 

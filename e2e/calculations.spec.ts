@@ -108,7 +108,7 @@ test("dashboard net worth matches finance net income", async ({ page }) => {
   const financeNetIncome = parseCurrency(netIncomeText || "0");
 
   // Now go to dashboard
-  await page.goto("/");
+  await page.goto("/dashboard/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 
   // The profit:net hero tile with timeRange:this_month shows "רווח נטו"

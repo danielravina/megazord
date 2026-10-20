@@ -34,7 +34,7 @@ test("login redirects to dashboard on success", async ({ page }) => {
   await page.fill("#email", "danielravina@gmail.com");
   await page.fill("#password", "asdasdasd");
   await page.getByRole("button", { name: "התחבר" }).click();
-  await page.waitForURL("/", { timeout: 15000 });
+  await page.waitForURL("/dashboard/", { timeout: 15000 });
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 });
 

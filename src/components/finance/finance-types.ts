@@ -46,6 +46,8 @@ export interface TaxSettings {
   // מיתוג מסמכים — נתיבי storage (דלי ציבורי), לא URL מלא
   cover_image_path: string | null;
   logo_path: string | null;
+  // onboarding — מוגדר באשף הצירום או בעת שמירת העדפות (NULL = משתמש ותיק)
+  onboarding_completed?: boolean | null;
 }
 
 export interface Saving {

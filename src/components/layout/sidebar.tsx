@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "לוח בקרה", icon: LayoutDashboard },
+  { href: "/dashboard/", label: "לוח בקרה", icon: LayoutDashboard },
   { href: "/projects/", label: "פרויקטים", icon: FolderKanban },
   { href: "/customers/", label: "לקוחות", icon: Users },
   { href: "/suppliers/", label: "ספקים", icon: Building },
@@ -44,10 +44,7 @@ export function Sidebar({
     >
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-1">
         {navItems.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link

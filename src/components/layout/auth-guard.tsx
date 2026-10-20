@@ -6,8 +6,29 @@ import { useAuth } from "./auth-provider";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { supabase, user, loading } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (loading || !user) return;
+    let cancelled = false;
+    // אשף צירום: משתמשים שלא סיימו (onboarding_completed === false) או בלי פרטים — מועדים לאשף
+    supabase
+      .from("tax_settings")
+      .select("onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        // NULL = משתמש ותיק ששמר הגדרות לפני שהאשף הוסף — לא מועדים אותו להתחיל מחדש
+        if (!data || data.onboarding_completed === false) {
+          router.replace("/onboarding/");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user, supabase, router]);
 
   useEffect(() => {
     if (!loading && !user) {

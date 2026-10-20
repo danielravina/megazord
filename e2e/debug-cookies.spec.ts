@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("debug: cookie format", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard/");
   await page.waitForTimeout(2000);
   const cookies = await page.context().cookies();
   for (const c of cookies.filter((c) => c.name.includes("sb-"))) {
@@ -36,7 +36,7 @@ async function dumpDbRow(page: any, label: string) {
 }
 
 test("debug: dump user_dashboard", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/dashboard/");
   await expect(page.locator("[data-tile]").first()).toBeVisible({ timeout: 10000 });
   await page.waitForTimeout(1500);
   await dumpDbRow(page, "DB ROW:");

@@ -12,10 +12,11 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [confirmSent, setConfirmSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    router.replace("/");
+    router.replace("/dashboard/");
     return null;
   }
 
@@ -30,11 +31,11 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}/dashboard/`,
       },
     });
 
@@ -45,8 +46,13 @@ export default function RegisterPage() {
           : "שגיאה בהרשמה",
       );
       setLoading(false);
+    } else if (data.session) {
+      // הרשמה מוצלחת עם סשן — ישר לאשף הצירום
+      router.replace("/onboarding/");
     } else {
-      router.replace("/");
+      // נדרש אישור אימייל — הסשן ייווצר רק אחרי לחיצה על הקישור בדואר
+      setConfirmSent(true);
+      setLoading(false);
     }
   };
 
@@ -59,83 +65,94 @@ export default function RegisterPage() {
             <p className="text-sm text-slate-500 mt-1">הרשמה למערכת</p>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                אימייל
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm"
-                placeholder="your@email.com"
-                dir="ltr"
-              />
+          {confirmSent ? (
+            <div className="bg-blue-50 text-blue-700 text-sm p-3 rounded-lg text-center">
+              נשלח קישור אישור לכתובת שלך. אחרי האישור תתחבר למערכת ונשלים יחד את ההגדרות.
             </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                סיסמה
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm"
-                placeholder="••••••••"
-                dir="ltr"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-slate-700 mb-1"
-              >
-                אימות סיסמה
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm"
-                placeholder="••••••••"
-                dir="ltr"
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg text-center">
-                {error}
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  אימייל
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm"
+                  placeholder="your@email.com"
+                  dir="ltr"
+                />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "נרשם..." : "הרשמה"}
-            </button>
-          </form>
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  סיסמה
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm"
+                  placeholder="••••••••"
+                  dir="ltr"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-sm font-medium text-slate-700 mb-1"
+                >
+                  אימות סיסמה
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm"
+                  placeholder="••••••••"
+                  dir="ltr"
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg text-center">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "נרשם..." : "הרשמה"}
+              </button>
+            </form>
+          )}
 
           <p className="text-xs text-slate-400 text-center mt-6">
             כבר יש לך חשבון?{" "}
             <Link href="/login" className="text-blue-600 hover:underline">
               התחבר כאן
+            </Link>
+          </p>
+          <p className="text-xs text-slate-400 text-center mt-2">
+            <Link href="/" className="hover:underline">
+              חזרה לדף הראשי
             </Link>
           </p>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
 import Link from "next/link";
@@ -13,10 +13,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (user) {
-    router.replace("/");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      router.replace("/dashboard/");
+    }
+  }, [user, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +37,7 @@ export default function LoginPage() {
       );
       setLoading(false);
     } else {
-      router.replace("/");
+      router.replace("/dashboard/");
     }
   };
 
@@ -107,6 +108,12 @@ export default function LoginPage() {
             אין לך חשבון?{" "}
             <Link href="/register" className="text-blue-600 hover:underline">
               הרשם כאן
+            </Link>
+          </p>
+
+          <p className="text-xs text-slate-400 text-center mt-2">
+            <Link href="/" className="hover:underline">
+              חזרה לדף הראשי
             </Link>
           </p>
         </div>

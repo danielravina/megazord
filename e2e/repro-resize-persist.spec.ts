@@ -15,7 +15,7 @@ test("user flow on real account with save logging", async ({ page }) => {
     if (msg.text().includes("[DBG")) console.log("BROWSER:", msg.text());
   });
 
-  await page.goto("/");
+  await page.goto("/dashboard/");
   await expect(page.locator("[data-tile]").first()).toBeVisible({ timeout: 10000 });
   await page.waitForTimeout(2000);
   await dumpDom(page, "LOAD 1:");

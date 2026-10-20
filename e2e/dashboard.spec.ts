@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 async function authGuard(page: Page) {
-  await page.goto("/");
+  await page.goto("/dashboard/");
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
 }
 

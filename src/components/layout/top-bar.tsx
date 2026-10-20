@@ -42,7 +42,7 @@ export function TopBar({ onToggleMenu, mobileOpen }: { onToggleMenu: () => void;
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <Link
-          href="/"
+          href="/dashboard/"
           className="font-bold text-slate-800 text-base sm:text-lg truncate hover:opacity-75 transition-opacity min-w-0"
           title="לוח בקרה"
         >

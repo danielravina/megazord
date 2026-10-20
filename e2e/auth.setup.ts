@@ -12,7 +12,7 @@ setup("authenticate", async ({ page }) => {
   await page.locator("button[type='submit']").click();
 
   // Wait for navigation to dashboard
-  await page.waitForURL("/", { timeout: 15000 });
+  await page.waitForURL("/dashboard/", { timeout: 15000 });
 
   // Verify we got past auth guard (sidebar should be visible)
   await expect(page.locator("aside")).toBeVisible({ timeout: 10000 });
