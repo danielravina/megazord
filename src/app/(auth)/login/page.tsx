@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/layout/auth-provider";
+import { pushDebug } from "@/lib/supabase/auth-debug";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setError("");
     setGoogleLoading(true);
+    pushDebug("google-login-click", {});
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -41,6 +43,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    pushDebug("login-submit", {});
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -48,6 +51,7 @@ export default function LoginPage() {
     });
 
     if (error) {
+      pushDebug("login-result", { ok: false, status: error.status, message: String(error.message).slice(0, 120) });
       setError(
         error.message === "Invalid login credentials"
           ? "פרטי התחברות שגויים"
@@ -55,6 +59,7 @@ export default function LoginPage() {
       );
       setLoading(false);
     } else {
+      pushDebug("login-result", { ok: true });
       router.replace("/dashboard/");
     }
   };

@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { pushDebug } from "@/lib/supabase/auth-debug";
 
 type AuthContextType = {
   supabase: ReturnType<typeof createClient>;
@@ -13,6 +14,15 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function describeSession(session: Session | null) {
+  if (!session) return { has_session: false };
+  const now = Math.round(Date.now() / 1000);
+  return {
+    has_session: true,
+    expires_in_secs: typeof session.expires_at === "number" ? session.expires_at - now : null,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabase] = useState(() => createClient());
   const [session, setSession] = useState<Session | null>(null);
@@ -20,51 +30,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // אישור הרשמה במייל: באקספורט סטטי, קישור האימייל מגיע עם ?code= (PKCE)
-    // לדשבורד. אם נזיז את loading מיידית, AuthGuard יזמן ל-login לפני שההחלפה
-    // (exchangeCodeForSession) תספיק להסתיים והעלייה לאתר חדש תהרוס את הקוד.
-    // לכן: אם יש קוד בכתובת מוודאים את ההחלפה ראשית ורק אחר כך מוותרים על loading.
-    function isAuthCallbackUrl(): boolean {
-      const url = new URL(window.location.href);
-      if (url.searchParams.has("code")) return true;
-      return (
-        url.hash.includes("access_token") || url.hash.includes("error_code")
-      );
+    pushDebug("page-load", { url: window.location.pathname, visibility: document.visibilityState });
+
+    function onWindowError(err: ErrorEvent) {
+      pushDebug("window-error", { message: String(err.message).slice(0, 200), source: err.filename });
     }
-
-    function cleanCallbackUrl() {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("code");
-      window.history.replaceState(history.state, "", url.toString());
+    function onUnhandledRejection(e: PromiseRejectionEvent) {
+      pushDebug("unhandled-rejection", { reason: String(e.reason && e.reason.message ? e.reason.message : e.reason).slice(0, 200) });
     }
+    window.addEventListener("error", onWindowError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    const onVisibility = () => pushDebug("visibility-change", { state: document.visibilityState });
+    document.addEventListener("visibilitychange", onVisibility);
 
-    async function init() {
-      if (isAuthCallbackUrl()) {
-        try {
-          await supabase.auth.exchangeCodeForSession(window.location.href);
-        } catch {
-          // קוד משומש/פג תוקף — ניפטרים אם ההחלפה האוטומטית כבר הצליחה
-        }
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (isAuthCallbackUrl()) cleanCallbackUrl();
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    }
-
-    init();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      pushDebug("get-session", describeSession(session));
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      pushDebug(`auth:${event}`, describeSession(session));
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => {
+      window.removeEventListener("error", onWindowError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+      document.removeEventListener("visibilitychange", onVisibility);
+      subscription.unsubscribe();
+    };
   }, [supabase]);
 
   return (

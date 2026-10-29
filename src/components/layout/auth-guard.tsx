@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "./auth-provider";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
+import { pushDebug } from "@/lib/supabase/auth-debug";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { supabase, user, loading } = useAuth();
@@ -32,7 +33,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
+      pushDebug("guard-redirect", {
+        url: window.location.pathname,
+        loading,
+        has_user: !!user,
+      });
       router.replace("/login/");
+    } else if (!loading && user) {
+      pushDebug("guard-pass", { url: window.location.pathname });
     }
   }, [loading, user, router]);
 
