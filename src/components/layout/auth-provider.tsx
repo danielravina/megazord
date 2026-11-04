@@ -14,13 +14,32 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function decodeJwtClaims(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 function describeSession(session: Session | null) {
   if (!session) return { has_session: false };
   const now = Math.round(Date.now() / 1000);
-  return {
+  const data: Record<string, unknown> = {
     has_session: true,
     expires_in_secs: typeof session.expires_at === "number" ? session.expires_at - now : null,
   };
+  const claims = session.access_token ? decodeJwtClaims(session.access_token) : null;
+  if (claims && typeof claims.iat === "number") {
+    data.issued_secs_ago = now - claims.iat;
+    if (now - claims.iat > 30 || now - claims.iat < -30) {
+      data.clock_offset_vs_server = now - claims.iat;
+    }
+  }
+  return data;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

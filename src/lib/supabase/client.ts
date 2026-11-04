@@ -24,6 +24,28 @@ const authFetch: typeof fetch = async (url, init) => {
       server_time: serverTime,
     });
   }
+  if (isTokenCall && res.ok && grant) {
+    // The server supplies expires_at as an absolute epoch (server clock). A device
+    // whose clock is off sees every fresh session as already expired, which causes
+    // gotrue to refresh in a tight loop until the rate limit kills the session.
+    // expires_in is relative truth and skew-free: derive expiry from local time.
+    try {
+      const body = await res.clone().json();
+      if (typeof body?.expires_at === "number" && typeof body?.expires_in === "number") {
+        body.expires_at = Math.floor(Date.now() / 1000) + body.expires_in;
+        pushDebug("expires-at-normalized", { grant, local_expiry: body.expires_at });
+        const headers = new Headers(res.headers);
+        headers.delete("content-length");
+        return new Response(JSON.stringify(body), {
+          status: res.status,
+          statusText: res.statusText,
+          headers,
+        });
+      }
+    } catch {
+      /* fall through with the untouched response */
+    }
+  }
   if (
     res.status === 429 &&
     isTokenCall &&
