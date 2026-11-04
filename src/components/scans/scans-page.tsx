@@ -9,10 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/ui/modal";
-import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { formatDate } from "@/components/shared/format-date";
 import { formatCurrency } from "@/components/shared/format-currency";
 import { DocumentScanner } from "@/components/scans/document-scanner";
@@ -152,7 +151,7 @@ function FolderRow({
 
 // אריח קובץ בתצוגת טאיילים
 function FileTile({
-  doc, displayUrls, selected, onSelect, onOpen, showFolder,
+  doc, displayUrls, selected, onSelect, onOpen, showFolder, onTagClick,
 }: {
   doc: Document;
   displayUrls: Record<string, string>;
@@ -160,6 +159,7 @@ function FileTile({
   onSelect: () => void;
   onOpen: () => void;
   showFolder: boolean;
+  onTagClick?: (tag: string) => void;
 }) {
   return (
     <div
@@ -192,7 +192,14 @@ function FileTile({
       {doc.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1">
           {doc.tags.slice(0, 2).map((tag) => (
-            <span key={tag} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium border border-blue-100">{tag}</span>
+            <button
+              key={tag}
+              onClick={(e) => { e.stopPropagation(); onTagClick?.(tag); }}
+              title={`הצג מסמכים עם תגית "${tag}"`}
+              className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md font-medium border border-blue-100 hover:bg-blue-100 cursor-pointer"
+            >
+              {tag}
+            </button>
           ))}
           {doc.tags.length > 2 && <span className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-md border border-slate-200">+{doc.tags.length - 2}</span>}
         </div>
@@ -284,6 +291,14 @@ export function ScansPage() {
       return;
     }
     setSelectedId(id);
+  }
+
+  function searchByTag(tag: string) {
+    setViewId(null);
+    setSelectedId(null);
+    setActiveFolder(null);
+    setSearch(tag);
+    if (supplierParam) router.push("/documents/");
   }
 
   const [displayUrls, setDisplayUrls] = useState<Record<string, string>>({});
@@ -648,7 +663,7 @@ export function ScansPage() {
           {view === "grid" ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               {recentDocs.map((doc) => (
-                <FileTile key={doc.id} doc={doc} displayUrls={displayUrls} showFolder selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} />
+                <FileTile key={doc.id} doc={doc} displayUrls={displayUrls} showFolder selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} onTagClick={searchByTag} />
               ))}
             </div>
           ) : (
@@ -681,7 +696,7 @@ export function ScansPage() {
       ) : view === "grid" ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-24">
           {filteredDocs.map((doc) => (
-            <FileTile key={doc.id} doc={doc} displayUrls={displayUrls} showFolder={!activeFolder} selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} />
+            <FileTile key={doc.id} doc={doc} displayUrls={displayUrls} showFolder={!activeFolder} selected={selectedId === doc.id} onSelect={() => selectOrOpen(doc.id, () => setViewId(doc.id))} onOpen={() => { setViewId(doc.id); setSelectedId(doc.id); }} onTagClick={searchByTag} />
           ))}
         </div>
       ) : (
@@ -781,7 +796,16 @@ export function ScansPage() {
                   </div>
                   {viewing.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {viewing.tags.map((t) => <Badge key={t} variant="blue">{t}</Badge>)}
+                      {viewing.tags.map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => searchByTag(t)}
+                          title={`הצג מסמכים עם תגית "${t}"`}
+                          className="bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 px-3 py-1 rounded-full text-sm font-medium cursor-pointer"
+                        >
+                          {t}
+                        </button>
+                      ))}
                     </div>
                   )}
                   {viewing.extracted_text && (

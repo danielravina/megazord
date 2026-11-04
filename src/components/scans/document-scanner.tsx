@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown";
 import { generateId } from "@/components/shared/generate-id";
+import { embeddedName } from "@/components/projects/project-types";
 import { PREMADE_FOLDERS } from "@/components/scans/folders";
 import type { UserFolder } from "@/components/scans/folders";
 import { ScanLine, Camera, Upload } from "lucide-react";
@@ -77,15 +78,17 @@ interface TempDoc {
   folder: string;
   isInvestment: boolean;
   direction: string;
+  projectId: string;
   businessId: string;
   businessVat: string;
+  businessName: string;
   newBusinessName: string;
 }
 
 const EMPTY_TEMP: TempDoc = {
   imageUrl: "", previewUrl: "", title: "", tags: [], extractedText: "", docType: "other",
   dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false,
-  direction: "expense", businessId: "", businessVat: "", newBusinessName: "",
+  direction: "expense", projectId: "", businessId: "", businessVat: "", businessName: "", newBusinessName: "",
 };
 
 export function DocumentScanner({ onScanned, primary = false }: Props) {
@@ -97,6 +100,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
   const [processing, setProcessing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [userFolders, setUserFolders] = useState<UserFolder[]>([]);
   const [tempDoc, setTempDoc] = useState<TempDoc>(EMPTY_TEMP);
 
@@ -104,6 +108,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
     if (!user) return;
     loadBusinesses();
     loadFolders();
+    loadProjects();
   }, [user]);
 
   async function loadFolders() {
@@ -111,9 +116,54 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
     setUserFolders(data || []);
   }
 
+  async function loadProjects() {
+    const { data } = await supabase.from("projects").select("id, location, customers(name)").eq("user_id", user!.id).order("created_at", { ascending: false });
+    setProjects((data || []).map((p) => ({ id: p.id, name: (embeddedName(p.customers) || "ללא לקוח") + (p.location ? " - " + p.location : "") })));
+  }
+
   async function loadBusinesses() {
     const { data } = await supabase.from("businesses").select("id, name, vat_number").eq("user_id", user!.id);
     setBusinesses(data || []);
+  }
+
+  // Finds an existing supplier matching the OCR data (by VAT first, then by
+  // name), fills in any missing details on it, or creates a new one.
+  async function upsertSupplier(name: string, vat: string, address?: string | null, phone?: string | null): Promise<string> {
+    if (!user || (!name && !vat)) return "";
+
+    let existing: { id: string; name: string | null; vat_number: string | null; address: string | null; phone: string | null } | null = null;
+    if (vat) {
+      const res = await supabase.from("businesses").select("id, name, vat_number, address, phone")
+        .eq("user_id", user.id).eq("vat_number", vat).maybeSingle();
+      existing = res.data;
+    }
+    if (!existing && name) {
+      const res = await supabase.from("businesses").select("id, name, vat_number, address, phone")
+        .eq("user_id", user.id).ilike("name", name).maybeSingle();
+      existing = res.data;
+    }
+
+    if (existing) {
+      const patch: Record<string, string> = {};
+      if (name && !existing.name) patch.name = name;
+      if (vat && !existing.vat_number) patch.vat_number = vat;
+      if (address && !existing.address) patch.address = address;
+      if (phone && !existing.phone) patch.phone = phone;
+      if (Object.keys(patch).length) {
+        await supabase.from("businesses").update(patch).eq("id", existing.id);
+        await loadBusinesses();
+      }
+      return existing.id;
+    }
+
+    const newBizId = generateId();
+    const { error } = await supabase.from("businesses").insert({
+      id: newBizId, user_id: user.id, name: name || "עסק",
+      vat_number: vat || null, address: address || null, phone: phone || null,
+    });
+    if (error) return "";
+    await loadBusinesses();
+    return newBizId;
   }
 
   function fileToBase64(file: File): Promise<string> {
@@ -194,29 +244,8 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
         logEvent("info", "scan_ocr_success", { requestId, docType: ocr.docType, totalAmount: ocr.totalAmount ?? null, hasBusinessName: Boolean(ocr.businessName), hasBusinessVat: Boolean(ocr.businessVat) });
       }
 
-      // Immediately save business if VAT detected and not already exists
-      let bizId = "";
-      const bizName = ocr.businessName || "";
-      const bizVat = ocr.businessVat || "";
-      if (bizVat) {
-        const { data: existing } = await supabase.from("businesses")
-          .select("id").eq("user_id", user.id).eq("vat_number", bizVat).maybeSingle();
-        if (existing) {
-          bizId = existing.id;
-        } else {
-          const newBizId = generateId();
-          const { error: bizError } = await supabase.from("businesses").insert({
-            id: newBizId, user_id: user.id, name: bizName || "עסק",
-            vat_number: bizVat,
-            address: ocr.businessAddress || null,
-            phone: ocr.businessPhone || null,
-          });
-          if (!bizError) {
-            bizId = newBizId;
-            await loadBusinesses();
-          }
-        }
-      }
+      // Immediately save the supplier identified by the OCR (create or update)
+      const bizId = await upsertSupplier(ocr.businessName || "", ocr.businessVat || "", ocr.businessAddress || null, ocr.businessPhone || null);
 
       setTempDoc({
         imageUrl: path, previewUrl: signedUrl, title: ocr.title || file.name, tags: ocr.tags || ["כללי"],
@@ -224,7 +253,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
         dateOnDoc: ocr.dateOnDoc || "", totalAmount: ocr.totalAmount?.toString() || "",
         folder: ocr.folderSuggestion || "", isInvestment: ocr.isInvestment || false,
         direction: "expense",
-        businessId: bizId, businessVat: bizVat, newBusinessName: "",
+        projectId: "", businessId: bizId, businessVat: ocr.businessVat || "", businessName: ocr.businessName || "", newBusinessName: "",
       });
       setConfirmOpen(true);
     } catch (e) {
@@ -255,22 +284,13 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
         finalBusinessId = newBizId;
         loadBusinesses();
       }
-    } else if (!finalBusinessId && tempDoc.businessVat) {
-      const { data: existing } = await supabase.from("businesses")
-        .select("id").eq("user_id", user.id).eq("vat_number", tempDoc.businessVat).maybeSingle();
-      if (existing) {
-        finalBusinessId = existing.id;
-      } else {
-        const bizName = tempDoc.title || "עסק חדש";
-        const newBizId = generateId();
-        const { error: bizError } = await supabase.from("businesses").insert({
-          id: newBizId, user_id: user.id, name: bizName, vat_number: tempDoc.businessVat,
-        });
-        if (!bizError) {
-          finalBusinessId = newBizId;
-          loadBusinesses();
-        }
-      }
+    } else if (!finalBusinessId && (tempDoc.businessVat || tempDoc.businessName)) {
+      finalBusinessId = await upsertSupplier(
+        tempDoc.businessName,
+        tempDoc.businessVat,
+        null,
+        null,
+      );
     }
 
     const { error: insertError } = await supabase.from("documents").insert({
@@ -279,7 +299,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       extracted_text: tempDoc.extractedText, doc_type: tempDoc.docType,
       date_on_doc: tempDoc.dateOnDoc || null,
       total_amount: parseFloat(tempDoc.totalAmount) || null,
-      project_id: null,
+      project_id: tempDoc.projectId || null,
       folder: tempDoc.folder || null,
       is_investment: tempDoc.isInvestment,
       direction: tempDoc.direction,
@@ -394,6 +414,10 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
             {tempDoc.businessId === "new" && (
               <Input label="שם הספק" value={tempDoc.newBusinessName} onChange={(e) => setTempDoc({ ...tempDoc, newBusinessName: e.target.value })} />
             )}
+            <Select label="פרויקט" options={[
+              { value: "", label: "ללא פרויקט" },
+              ...projects.map((p) => ({ value: p.id, label: p.name })),
+            ]} value={tempDoc.projectId} onChange={(e) => setTempDoc({ ...tempDoc, projectId: e.target.value })} />
             <Select label="הוצאה / הכנסה" options={[
               { value: "expense", label: "הוצאה" },
               { value: "income", label: "הכנסה" },

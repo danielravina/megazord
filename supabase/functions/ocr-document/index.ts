@@ -73,7 +73,7 @@ serve(async (req: Request) => {
 
     const p = `Analyze this document image. Return a JSON object with these fields:
 - title: Short descriptive title in Hebrew
-- tags: Array of 2-4 relevant Hebrew tags
+- tags: Array of relevant Hebrew tags, as many as the document warrants. Include product or service names appearing on the document (in singular form, e.g. "סולם", "צבע") if there are any — do NOT invent any that are not on the document. Also add any other useful tags (categories, anything someone might later search for).
 - extractedText: ALL visible text from the document
 - docType: One of the receipt/vendor document types: "tax_invoice" (חשבונית מס), "transaction_account" (חשבונית עסקה / דרישת תשלום), "tax_invoice_receipt" (חשבונית מס/קבלה), "credit_invoice" (חשבונית מס זיכוי), "receipt" (קבלה), "quotation" (הצעת מחיר), "delivery_note" (תעודת משלוח), or "other"
 - dateOnDoc: Date in YYYY-MM-DD format, or ""
