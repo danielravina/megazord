@@ -15,12 +15,12 @@ import { Card } from "@/components/ui/card";
 import { formatDate } from "@/components/shared/format-date";
 import { formatCurrency } from "@/components/shared/format-currency";
 import { DocumentScanner } from "@/components/scans/document-scanner";
-import { PREMADE_FOLDERS, userFolderColor, folderDisplayName } from "@/components/scans/folders";
+import { PREMADE_FOLDERS, userFolderColor, folderDisplayName, PROJECTS_FOLDER_ID, isProjectFolder, projectFolderName, projectFolderLabel } from "@/components/scans/folders";
 import type { UserFolder } from "@/components/scans/folders";
 import type { Project, ProjectRow } from "@/components/projects/project-types";
 import { normalizeProject } from "@/components/projects/project-types";
 import {
-  FileText, Search, Folder, Trash2, X, Check, Plus, List, LayoutGrid, ChevronLeft,
+  FileText, Search, Folder, FolderKanban, Trash2, X, Check, Plus, List, LayoutGrid, ChevronLeft,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -382,7 +382,8 @@ export function ScansPage() {
       docType: viewing.doc_type,
       dateOnDoc: viewing.date_on_doc || "",
       totalAmount: viewing.total_amount?.toString() || "",
-      folder: viewing.folder || "",
+      // תיקיית פרויקט נגזרת מהפרויקט המשויך — לא נערכת ידנית
+      folder: isProjectFolder(viewing.folder) ? "" : viewing.folder || "",
       isInvestment: viewing.is_investment,
       tags: viewing.tags.join(", "),
       projectId: viewing.project_id || "",
@@ -392,14 +393,19 @@ export function ScansPage() {
     setEditingView(true);
   }
 
+  function projectLabel(p: Project): string {
+    return (p.customer_name || "ללא לקוח") + (p.location ? " - " + p.location : "");
+  }
+
   async function saveViewEdit() {
     if (!viewing || !user) return;
+    const proj = projects.find((p) => p.id === viewEdit.projectId);
     const { error } = await supabase.from("documents").update({
       title: viewEdit.title,
       doc_type: viewEdit.docType,
       date_on_doc: viewEdit.dateOnDoc || null,
       total_amount: parseFloat(viewEdit.totalAmount) || null,
-      folder: viewEdit.folder || null,
+      folder: viewEdit.projectId && proj ? projectFolderName(projectLabel(proj)) : viewEdit.folder || null,
       is_investment: viewEdit.isInvestment,
       tags: viewEdit.tags.split(",").map((t) => t.trim()).filter(Boolean),
       project_id: viewEdit.projectId || null,
@@ -478,7 +484,9 @@ export function ScansPage() {
 
   const filteredDocs = docs.filter((d) => {
     if (supplierParam && d.business_id !== supplierParam) return false;
-    if (activeFolder && d.folder !== activeFolder) return false;
+    if (activeFolder) {
+      if (activeFolder === PROJECTS_FOLDER_ID ? !isProjectFolder(d.folder) : d.folder !== activeFolder) return false;
+    }
     const q = search.toLowerCase();
     if (!q) return true;
     return d.title.toLowerCase().includes(q) ||
@@ -491,8 +499,9 @@ export function ScansPage() {
   const supplierBusiness = supplierParam ? businesses.find((b) => b.id === supplierParam) : null;
   // כשהחיפוש פעיל בראשי — מסתירים את התיקיות ומציגים תוצאות בלבד
   const showFolders = !activeFolder && !search && !supplierParam;
-  // במסך הראשי (ללא חיפוש) לא מוצגת רשימת מסמכים — הכל תיקיות או קבצים בתוך תיקייה
-  const showFiles = activeFolder || !!search || supplierParam;
+  // במסך הראשי (ללא חיפוש) לא מוצגת רשימת מסמכים — הכל תיקיות או קבצים בתוך תיקייה.
+  // בשורש "פרויקטים" מוצגות תתי-התיקיות בלבד (מסמכים מוצגים בבחירת פרויקט, או בחיפוש)
+  const showFiles = (activeFolder && (activeFolder !== PROJECTS_FOLDER_ID || !!search)) || !!search || supplierParam;
   // הקבצים שנוספו לאחרונה (לפי תאריך הוספה)
   const recentDocs = [...docs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
@@ -522,7 +531,9 @@ export function ScansPage() {
     );
   }
 
-  const docCount = (folderId: string) => docs.filter((d) => d.folder === folderId).length;
+  const docCount = (folderId: string) => docs.filter((d) => d.folder === folderId || (folderId === PROJECTS_FOLDER_ID && isProjectFolder(d.folder))).length;
+  // תתי-התיקיות של הפרויקטים (תיקייה אחת לכל פרויקט שיש בו מסמכים)
+  const projectSubfolders = Array.from(new Set(docs.map((d) => projectFolderLabel(d.folder)).filter(Boolean) as string[]));
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -569,6 +580,15 @@ export function ScansPage() {
             <Folder size={14} /> כל התיקיות
           </button>
           <span className="text-slate-300">/</span>
+          {isProjectFolder(activeFolder) && (
+            <button
+              onClick={() => setActiveFolder(PROJECTS_FOLDER_ID)}
+              className="flex items-center gap-1 text-blue-600 font-medium hover:underline"
+            >
+              <Folder size={14} /> {PROJECTS_FOLDER_ID}
+            </button>
+          )}
+          {isProjectFolder(activeFolder) && <span className="text-slate-300">/</span>}
           <span className="font-bold text-slate-700">{activeFolderName}</span>
         </div>
       )}
@@ -649,6 +669,43 @@ export function ScansPage() {
                   selected={selectedId === f.id}
                   onSelect={() => selectOrOpen(f.id, () => setActiveFolder(f.id))}
                   onOpen={() => { setActiveFolder(f.id); setSearch(""); setSelectedId(null); }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* תתי-תיקיות הפרויקטים — בהצגת תיקיית "פרויקטים" (תיקייה אחת לכל פרויקט שיש בו מסמכים) */}
+      {activeFolder === PROJECTS_FOLDER_ID && projectSubfolders.length > 0 && (
+        <div className="mb-8">
+          {view === "grid" ? (
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+              {projectSubfolders.map((label) => (
+                <FolderTile
+                  key={label}
+                  name={label}
+                  color={userFolderColor(label)}
+                  icon={FolderKanban}
+                  count={docs.filter((d) => d.folder === projectFolderName(label)).length}
+                  selected={selectedId === label}
+                  onSelect={() => selectOrOpen(label, () => setActiveFolder(projectFolderName(label)))}
+                  onOpen={() => { setActiveFolder(projectFolderName(label)); setSearch(""); setSelectedId(null); }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-100 bg-white overflow-hidden divide-y divide-slate-100 shadow-sm">
+              {projectSubfolders.map((label) => (
+                <FolderRow
+                  key={label}
+                  name={label}
+                  color={userFolderColor(label)}
+                  icon={FolderKanban}
+                  count={docs.filter((d) => d.folder === projectFolderName(label)).length}
+                  selected={selectedId === label}
+                  onSelect={() => selectOrOpen(label, () => setActiveFolder(projectFolderName(label)))}
+                  onOpen={() => { setActiveFolder(projectFolderName(label)); setSearch(""); setSelectedId(null); }}
                 />
               ))}
             </div>

@@ -1,6 +1,6 @@
 import {
   FileBadge, BookCheck, Stamp, IdCard, Car, Plane, Landmark,
-  ShieldCheck, Handshake, Store, CarFront,
+  ShieldCheck, Handshake, Store, CarFront, FolderKanban,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -11,8 +11,12 @@ export interface PremadeFolder {
   color: string;
 }
 
+// תיקיית הפרויקטים — תיקייה-אם שמכילה תתי-תיקיות עבור כל פרויקט (מסמכים נסרקים המשויכים לפרויקט נכנסים אליה)
+export const PROJECTS_FOLDER_ID = "פרויקטים";
+
 // תיקיות שמירת מסמכים עסקיים קבועות (ה-id זהה לשם — מזוהה לפי שם בעמודת folder)
 export const PREMADE_FOLDERS: PremadeFolder[] = [
+  { id: PROJECTS_FOLDER_ID, name: PROJECTS_FOLDER_ID, icon: FolderKanban, color: "bg-blue-100 text-blue-600" },
   { id: "תעודת עוסק", name: "תעודת עוסק", icon: FileBadge, color: "bg-blue-100 text-blue-600" },
   { id: "אישור ניהול ספרים", name: "אישור ניהול ספרים", icon: BookCheck, color: "bg-emerald-100 text-emerald-600" },
   { id: "אישור מס במקור", name: "אישור מס במקור", icon: Stamp, color: "bg-orange-100 text-orange-600" },
@@ -52,7 +56,23 @@ export function isPremade(folderId: string | null): boolean {
   return PREMADE_FOLDERS.some((f) => f.id === folderId);
 }
 
+// תתי-תיקיות הפרויקטים נשמרות כ-"פרויקטים/<שם הפרויקט>" בתוך documents.folder
+const PROJECTS_PREFIX = PROJECTS_FOLDER_ID + "/";
+
+export function projectFolderName(projectLabel: string): string {
+  return PROJECTS_PREFIX + projectLabel;
+}
+
+export function isProjectFolder(folder: string | null): boolean {
+  return !!folder && folder.startsWith(PROJECTS_PREFIX);
+}
+
+export function projectFolderLabel(folder: string | null): string | null {
+  return isProjectFolder(folder) ? folder!.slice(PROJECTS_PREFIX.length) : null;
+}
+
 export function folderDisplayName(folderId: string | null): string {
   if (!folderId) return "ללא";
+  if (isProjectFolder(folderId)) return projectFolderLabel(folderId) || PROJECTS_FOLDER_ID;
   return PREMADE_FOLDERS.find((f) => f.id === folderId)?.name || folderId;
 }

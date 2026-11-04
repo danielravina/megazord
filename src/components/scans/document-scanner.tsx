@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Dropdown, MenuItem, MenuLabel } from "@/components/ui/dropdown";
 import { generateId } from "@/components/shared/generate-id";
 import { embeddedName } from "@/components/projects/project-types";
-import { PREMADE_FOLDERS } from "@/components/scans/folders";
+import { PREMADE_FOLDERS, projectFolderName } from "@/components/scans/folders";
 import type { UserFolder } from "@/components/scans/folders";
 import { ScanLine, Camera, Upload } from "lucide-react";
 
@@ -300,7 +300,10 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       date_on_doc: tempDoc.dateOnDoc || null,
       total_amount: parseFloat(tempDoc.totalAmount) || null,
       project_id: tempDoc.projectId || null,
-      folder: tempDoc.folder || null,
+      // מסמך המשויך לפרויקט נשמר תחת תת-התיקייה של הפרויקט בתוך תיקיית "פרויקטים"
+      folder: tempDoc.projectId
+        ? projectFolderName(projects.find((p) => p.id === tempDoc.projectId)?.name || "פרויקט")
+        : tempDoc.folder || null,
       is_investment: tempDoc.isInvestment,
       direction: tempDoc.direction,
       business_id: finalBusinessId || null,

@@ -14,32 +14,13 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function decodeJwtClaims(token: string): Record<string, unknown> | null {
-  try {
-    const part = token.split(".")[1];
-    if (!part) return null;
-    const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
 function describeSession(session: Session | null) {
   if (!session) return { has_session: false };
   const now = Math.round(Date.now() / 1000);
-  const data: Record<string, unknown> = {
+  return {
     has_session: true,
     expires_in_secs: typeof session.expires_at === "number" ? session.expires_at - now : null,
   };
-  const claims = session.access_token ? decodeJwtClaims(session.access_token) : null;
-  if (claims && typeof claims.iat === "number") {
-    data.issued_secs_ago = now - claims.iat;
-    if (now - claims.iat > 30 || now - claims.iat < -30) {
-      data.clock_offset_vs_server = now - claims.iat;
-    }
-  }
-  return data;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -47,6 +28,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [clockSkewHint, setClockSkewHint] = useState(false);
+
+  const checkForClockSkew = (s: Session | null) => {
+    if (!s || typeof s.expires_at !== "number") return;
+    const left = s.expires_at - Math.round(Date.now() / 1000);
+    if (left >= 0 && left < 120) {
+      pushDebug("clock-skew-suspected", { expires_in_secs: left });
+      setClockSkewHint(true);
+    }
+  };
 
   useEffect(() => {
     pushDebug("page-load", { url: window.location.pathname, visibility: document.visibilityState });
@@ -64,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       pushDebug("get-session", describeSession(session));
+      checkForClockSkew(session);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -73,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       pushDebug(`auth:${event}`, describeSession(session));
+      checkForClockSkew(session);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -88,6 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ supabase, session, user, loading }}>
+      {clockSkewHint && (
+        <div className="fixed top-0 right-0 left-0 z-[100] bg-amber-100 border-b border-amber-300 text-amber-900 text-sm text-center py-2.5 px-4">
+          נראה שהשעון של המחשב שלך לא מדויק. סנכרן את השעה בהגדרות וינדוס ואז רענן את העמוד.
+        </div>
+      )}
       {children}
     </AuthContext.Provider>
   );
