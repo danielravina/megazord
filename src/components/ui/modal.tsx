@@ -10,6 +10,8 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   size?: "sm" | "md" | "lg" | "full";
+  // false = clicking the backdrop / Escape won't close the modal (the X button still does)
+  dismissible?: boolean;
 }
 
 const sizeStyles = {
@@ -26,12 +28,13 @@ export function Modal({
   children,
   footer,
   size = "md",
+  dismissible = true,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && dismissible) onClose();
     };
     if (open) {
       document.addEventListener("keydown", handleKey);
@@ -41,7 +44,7 @@ export function Modal({
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open) return null;
 
@@ -50,7 +53,7 @@ export function Modal({
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
       onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
+        if (dismissible && e.target === overlayRef.current) onClose();
       }}
     >
       <div

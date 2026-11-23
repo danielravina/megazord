@@ -17,7 +17,7 @@ import { formatCurrency } from "@/components/shared/format-currency";
 import { generateId } from "@/components/shared/generate-id";
 import {
   Receipt, Plus, Save, Trash2, Pencil, Eye, Send, Download,
-  UserPlus, X, ArrowRight, ChevronUp, ChevronDown,
+  UserPlus, X, ArrowRight, ChevronUp, ChevronDown, Search,
 } from "lucide-react";
 import type { Invoice, InvoiceItem, InvoiceFormData, InvoicePayment, DocumentType, PaymentMethod, VatStatus } from "./invoice-types";
 import { DOC_TYPE_META, PAYMENT_METHOD_LABELS, docTypesFor, isVatExempt, paymentUsesBank } from "./invoice-types";
@@ -68,6 +68,9 @@ export function DocumentsPage() {
   const [sendConfirm, setSendConfirm] = useState<Invoice | null>(null);
   const [sending, setSending] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | DocumentType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const vatStatus: VatStatus = taxSettings?.vat_status ?? "morashi";
   const allowedTypes = docTypesFor(vatStatus);
@@ -833,7 +836,19 @@ export function DocumentsPage() {
   }
 
   // ── List page ────────────────────────────────────────────────────
-  const filteredDocs = typeFilter === "all" ? documents : documents.filter((d) => d.document_type === typeFilter);
+  const hasSearch = !!searchQuery.trim() || !!dateFrom || !!dateTo;
+  const filteredDocs = documents
+    .filter((d) => typeFilter === "all" || d.document_type === typeFilter)
+    .filter((d) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const hay = `${d.customer_name || ""} ${d.invoice_number}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (dateFrom && d.issue_date < dateFrom) return false;
+      if (dateTo && d.issue_date > dateTo) return false;
+      return true;
+    });
   const tabOrder: (DocumentType | "all")[] = ["all", ...allowedTypes];
 
   return (
@@ -887,12 +902,40 @@ export function DocumentsPage() {
         })}
       </div>
 
+      {/* Search + date range */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            dir="rtl"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="חיפוש לפי לקוח או מספר מסמך..."
+            className="w-full pr-9 pl-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+        </div>
+        <div className="flex gap-2">
+          <div className="w-full sm:w-36"><Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="מתאריך" /></div>
+          <div className="w-full sm:w-36"><Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="עד תאריך" /></div>
+          {hasSearch && (
+            <button
+              onClick={() => { setSearchQuery(""); setDateFrom(""); setDateTo(""); }}
+              className="text-slate-400 hover:text-slate-600 px-2 cursor-pointer"
+              title="נקה חיפוש"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+
       {filteredDocs.length === 0 ? (
         <Card className="p-12">
           <EmptyState
-            icon={<Receipt size={40} className="text-slate-300" />}
-            title={typeFilter === "all" ? "אין מסמכים עדיין" : `אין ${DOC_TYPE_META[typeFilter as DocumentType]?.labelPlural || "מסמכים"} עדיין`}
-            description='לחץ על "מסמך חדש" כדי להתחיל'
+            icon={<Search size={40} className="text-slate-300" />}
+            title={hasSearch ? "לא נמצאו מסמכים" : typeFilter === "all" ? "אין מסמכים עדיין" : `אין ${DOC_TYPE_META[typeFilter as DocumentType]?.labelPlural || "מסמכים"} עדיין`}
+            description={hasSearch ? "נסה לשנות את החיפוש או טווח התאריכים" : 'לחץ על "מסמך חדש" כדי להתחיל'}
           />
         </Card>
       ) : (

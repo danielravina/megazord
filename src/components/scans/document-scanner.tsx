@@ -26,7 +26,6 @@ interface Business {
 interface OcrResult {
   title?: string;
   tags?: string[];
-  extractedText?: string;
   docType?: string;
   dateOnDoc?: string;
   totalAmount?: number | null;
@@ -71,7 +70,6 @@ interface TempDoc {
   previewUrl: string;
   title: string;
   tags: string[];
-  extractedText: string;
   docType: string;
   dateOnDoc: string;
   totalAmount: string;
@@ -86,7 +84,7 @@ interface TempDoc {
 }
 
 const EMPTY_TEMP: TempDoc = {
-  imageUrl: "", previewUrl: "", title: "", tags: [], extractedText: "", docType: "other",
+  imageUrl: "", previewUrl: "", title: "", tags: [], docType: "other",
   dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false,
   direction: "expense", projectId: "", businessId: "", businessVat: "", businessName: "", newBusinessName: "",
 };
@@ -234,7 +232,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
       if (!ocrResult.ok) {
         logEvent("error", "scan_ocr_error", { requestId, status: ocrResult.status, body: ocrResult.bodyText });
         toast("סריקת המסמך נכשלה", "error");
-        ocr = { title: file.name.replace(/\.[^.]+$/, ""), tags: ["כללי"], extractedText: "", docType: "other", dateOnDoc: "", totalAmount: null, folderSuggestion: "", isInvestment: false };
+        ocr = { title: file.name.replace(/\.[^.]+$/, ""), tags: ["כללי"], docType: "other", dateOnDoc: "", totalAmount: null, folderSuggestion: "", isInvestment: false };
       } else {
         ocr = ocrResult.data || {};
         const missing: string[] = [];
@@ -249,7 +247,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
 
       setTempDoc({
         imageUrl: path, previewUrl: signedUrl, title: ocr.title || file.name, tags: ocr.tags || ["כללי"],
-        extractedText: ocr.extractedText || "", docType: ocr.docType || "other",
+        docType: ocr.docType || "other",
         dateOnDoc: ocr.dateOnDoc || "", totalAmount: ocr.totalAmount?.toString() || "",
         folder: ocr.folderSuggestion || "", isInvestment: ocr.isInvestment || false,
         direction: "expense",
@@ -296,7 +294,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
     const { error: insertError } = await supabase.from("documents").insert({
       id: generateId(), user_id: user.id, title: tempDoc.title || "מסמך ללא שם",
       image_url: tempDoc.imageUrl, tags: tempDoc.tags,
-      extracted_text: tempDoc.extractedText, doc_type: tempDoc.docType,
+      doc_type: tempDoc.docType,
       date_on_doc: tempDoc.dateOnDoc || null,
       total_amount: parseFloat(tempDoc.totalAmount) || null,
       project_id: tempDoc.projectId || null,
@@ -389,6 +387,7 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
         onClose={() => setConfirmOpen(false)}
         title="פרטי מסמך"
         size="full"
+        dismissible={false}
         footer={
           <div className="flex gap-2 justify-between w-full">
             <Button variant="ghost" onClick={() => setConfirmOpen(false)}>ביטול</Button>
@@ -428,10 +427,6 @@ export function DocumentScanner({ onScanned, primary = false }: Props) {
             ]} value={tempDoc.direction} onChange={(e) => setTempDoc({ ...tempDoc, direction: e.target.value })} />
             <Checkbox label="השקעה בעסק (רכוש קבוע)" checked={tempDoc.isInvestment} onChange={(e) => setTempDoc({ ...tempDoc, isInvestment: e.target.checked })} />
             <Input label="תגיות (מופרדות בפסיק)" value={tempDoc.tags.join(", ")} onChange={(e) => setTempDoc({ ...tempDoc, tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })} />
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">טקסט שחולץ</label>
-              <textarea rows={4} className="w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm" value={tempDoc.extractedText} onChange={(e) => setTempDoc({ ...tempDoc, extractedText: e.target.value })} readOnly />
-            </div>
           </div>
           {tempDoc.imageUrl && (
             <div className="md:w-1/2 shrink-0 bg-slate-100 border flex items-center justify-center h-64 md:h-full overflow-hidden">

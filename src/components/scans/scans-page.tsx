@@ -30,7 +30,6 @@ interface Document {
   title: string;
   image_url: string | null;
   tags: string[];
-  extracted_text: string | null;
   doc_type: string;
   date_on_doc: string | null;
   total_amount: number | null;
@@ -273,7 +272,6 @@ export function ScansPage() {
   const [loading, setLoading] = useState(true);
   const [viewId, setViewId] = useState<string | null>(null);
   const [editingView, setEditingView] = useState(false);
-  const [showExtracted, setShowExtracted] = useState(false);
   const [viewEdit, setViewEdit] = useState({ title: "", docType: "other", dateOnDoc: "", totalAmount: "", folder: "", isInvestment: false, tags: "", projectId: "", businessId: "", direction: "expense" });
   const [search, setSearch] = useState("");
   // תיקייה פעילה (id של תיקייה מובנית או שם של תיקיית משתמש). null = ראשי
@@ -343,7 +341,10 @@ export function ScansPage() {
   // Load signed URLs when viewing a document
   useEffect(() => {
     const path = viewing?.image_url;
-    if (path && !path.startsWith("http")) getSignedUrl(path);
+    if (path && !path.startsWith("http")) {
+      const t = setTimeout(() => getSignedUrl(path), 0);
+      return () => clearTimeout(t);
+    }
   }, [viewId]);
 
   // Preload signed URLs for all visible doc thumbnails
@@ -490,7 +491,6 @@ export function ScansPage() {
     const q = search.toLowerCase();
     if (!q) return true;
     return d.title.toLowerCase().includes(q) ||
-      (d.extracted_text || "").toLowerCase().includes(q) ||
       d.tags.some((t) => t.toLowerCase().includes(q));
   });
 
@@ -790,7 +790,7 @@ export function ScansPage() {
       {/* Detail Modal */}
       <Modal
         open={!!viewId}
-        onClose={() => { setViewId(null); setEditingView(false); setShowExtracted(false); }}
+        onClose={() => { setViewId(null); setEditingView(false); }}
         title={viewing?.title || ""}
         size="full"
         footer={
@@ -864,22 +864,8 @@ export function ScansPage() {
                         </button>
                       ))}
                     </div>
-                  )}
-                  {viewing.extracted_text && (
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                      <button
-                        onClick={() => setShowExtracted(!showExtracted)}
-                        className="w-full flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase"
-                      >
-                        <span>טקסט שחולץ</span>
-                        <span className="text-xs">{showExtracted ? "הסתר" : "הצג"}</span>
-                      </button>
-                      {showExtracted && (
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap max-h-40 overflow-y-auto mt-2">{viewing.extracted_text}</p>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-xs text-slate-400">
+                   )}
+                   <p className="text-xs text-slate-400">
                     נוסף: {new Date(viewing.date).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </>

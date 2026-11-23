@@ -104,7 +104,6 @@ export interface DocRaw {
   title: string;
   image_url: string | null;
   tags: string[];
-  extracted_text: string | null;
   doc_type: string;
   date_on_doc: string | null;
   total_amount: number | null;

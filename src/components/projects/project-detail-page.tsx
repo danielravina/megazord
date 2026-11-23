@@ -37,7 +37,6 @@ interface LinkedDoc {
   image_url: string | null;
   folder: string | null;
   tags: string[];
-  extracted_text: string | null;
   is_investment: boolean;
   direction: string;
   business_id: string | null;
@@ -561,12 +560,6 @@ export function ProjectDetailPage() {
             {viewDoc.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {viewDoc.tags.map((t) => <Badge key={t} variant="blue">{t}</Badge>)}
-              </div>
-            )}
-            {viewDoc.extracted_text && (
-              <div className="bg-slate-50 p-4 rounded-xl border">
-                <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">טקסט שחולץ</p>
-                <p className="whitespace-pre-wrap max-h-40 overflow-y-auto">{viewDoc.extracted_text}</p>
               </div>
             )}
           </div>
