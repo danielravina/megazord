@@ -139,6 +139,32 @@ document.body.removeChild(el);
 ### Git
 - Commits are GPG-sign configured, but signing fails in non-interactive shells (no `/dev/tty`). Use `git commit --no-gpg-sign` when committing from automation.
 
+## Deployment
+
+### UI (Cloudflare Pages)
+- Hosted on Cloudflare Pages project **`atzmai`**, git-connected to GitHub `main` (`danielravina/megazord`).
+- **Deploy = merge/push to `main`.** Cloudflare runs the build (static export to `out/`) and publishes automatically — no manual upload step.
+- `wrangler.toml` (repo root) sets `pages_build_output_dir = "out"`.
+- Do NOT use manual `wrangler pages deploy`: `wrangler whoami` fails locally (no credentials). Only fall back to it if git integration breaks.
+- Run `npm run build` locally first to catch build errors before pushing.
+
+### Database (Supabase migrations)
+- Project ref: `uqzlhaifylnhnbgrhdkw` (linked in `supabase/.temp/project-ref`).
+- Credentials are in `.env` (gitignored). Load them into the shell first:
+  ```bash
+  set -a && source .env && set +a
+  npx supabase migration list --remote   # check what's pending
+  npx supabase db push --remote --yes    # apply pending migrations to prod
+  ```
+- Always add a numbered migration in `supabase/migrations/` (e.g. `020_advanced_search.sql`); never alter prod schema by hand.
+- Non-interactive shells can't answer the confirmation prompt — `db push` requires `--yes`.
+- RPCs: `security invoker`, filter by `auth.uid()`, and `grant execute ... to authenticated`.
+
+### Order
+1. DB migration (schema/RPC changes)
+2. Edge function (if changed — see Edge Functions section)
+3. Push UI to `main` (triggers Cloudflare deploy)
+
 ## Run Commands
 ```bash
 npm run dev          # Start dev server (port 3000)

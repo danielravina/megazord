@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/components/layout/auth-provider";
 import {
   Search, Users, FolderKanban, Receipt, FileText,
-  ClipboardList, CalendarDays, Building,
+  ClipboardList, CalendarDays, Building, SlidersHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -97,47 +98,67 @@ export function GlobalSearch() {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => {
           if (e.key === "Escape") setOpen(false);
+          if (e.key === "Enter") {
+            setOpen(false);
+            router.push(query.trim() ? `/search/?q=${encodeURIComponent(query.trim())}` : "/search/");
+          }
         }}
         placeholder="חיפוש..."
         className="w-28 sm:w-56 lg:w-72 bg-slate-100 rounded-lg py-2 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
       />
 
-      {open && hasQuery && (
+      {open && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-slate-200 max-h-96 overflow-y-auto z-50 p-1.5">
-          {loading ? (
-            <div className="text-xs text-slate-400 px-3 py-2">מחפש...</div>
-          ) : grouped.length === 0 ? (
-            <div className="text-xs text-slate-400 px-3 py-2">אין תוצאות</div>
-          ) : (
-            grouped.map(([type, items]) => {
-              const Icon = TYPE_ICONS[type] || Search;
-              return (
-                <div key={type} className="mb-1">
-                  <div className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    <Icon size={11} />
-                    {type}
+          {hasQuery && (
+            loading ? (
+              <div className="text-xs text-slate-400 px-3 py-2">מחפש...</div>
+            ) : grouped.length === 0 ? (
+              <div className="text-xs text-slate-400 px-3 py-2">אין תוצאות</div>
+            ) : (
+              grouped.map(([type, items]) => {
+                const Icon = TYPE_ICONS[type] || Search;
+                return (
+                  <div key={type} className="mb-1">
+                    <div className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      <Icon size={11} />
+                      {type}
+                    </div>
+                    {items.map((r, i) => (
+                      <button
+                        key={`${type}-${i}`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          router.push(r.href);
+                          setQuery("");
+                          setOpen(false);
+                        }}
+                        className="w-full text-right px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="text-sm font-medium text-slate-700 truncate">{r.title}</div>
+                        {r.subtitle && (
+                          <div className="text-[10px] text-slate-400 truncate">{r.subtitle}</div>
+                        )}
+                      </button>
+                    ))}
                   </div>
-                  {items.map((r, i) => (
-                    <button
-                      key={`${type}-${i}`}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        router.push(r.href);
-                        setQuery("");
-                        setOpen(false);
-                      }}
-                      className="w-full text-right px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="text-sm font-medium text-slate-700 truncate">{r.title}</div>
-                      {r.subtitle && (
-                        <div className="text-[10px] text-slate-400 truncate">{r.subtitle}</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              );
-            })
+                );
+              })
+            )
           )}
+          <div className="border-t border-slate-100 mt-1 pt-1">
+            <Link
+              href={query.trim() ? `/search/?q=${encodeURIComponent(query.trim())}` : "/search/"}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setQuery("");
+                setOpen(false);
+              }}
+              className="flex items-center gap-2 px-2 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <SlidersHorizontal size={12} />
+              חיפוש מתקדם
+            </Link>
+          </div>
         </div>
       )}
     </div>
